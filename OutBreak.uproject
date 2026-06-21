@@ -9,9 +9,7 @@
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [
-				"Engine",
-				"AIModule",
-				"UMG"
+				"Engine"
 			]
 		}
 	],
@@ -24,11 +22,34 @@
 			]
 		},
 		{
-			"Name": "StateTree",
+			"Name": "GameplayAbilities",
 			"Enabled": true
 		},
 		{
-			"Name": "GameplayStateTree",
+			"Name": "OnlineSubsystemGooglePlay",
+			"Enabled": false,
+			"SupportedTargetPlatforms": [
+				"Android"
+			]
+		},
+		{
+			"Name": "OnlineSubsystemIOS",
+			"Enabled": false,
+			"SupportedTargetPlatforms": [
+				"IOS",
+				"TVOS"
+			]
+		},
+		{
+			"Name": "OnlineSubsystemSteam",
+			"Enabled": true
+		},
+		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
+		{
+			"Name": "SlateModelViewViewModel",
 			"Enabled": true
 		}
 	]

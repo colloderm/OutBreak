@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 public class OutBreakEditorTarget : TargetRules
 {
-	public OutBreakEditorTarget(TargetInfo Target) : base(Target)
+	public OutBreakEditorTarget( TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.V6;
