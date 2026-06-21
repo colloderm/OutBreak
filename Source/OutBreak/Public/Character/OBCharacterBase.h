@@ -7,9 +7,11 @@
 #include "AbilitySystemInterface.h"
 #include "OBCharacterBase.generated.h"
 
+class UOBPawnData;
 class UOBAbilitySet;
 class UAbilitySystemComponent;
 class UOBAttributeSetBase;
+class UOBEquipmentComponent;
 class USpringArmComponent;
 class UCameraComponent;
 
@@ -27,7 +29,7 @@ public:
 protected:
 	//~ APawn interface
 	virtual void PossessedBy(AController* NewController) override; // 서버 경로
-	virtual void OnRep_PlayerState() override;                    // 클라이언트 경로
+	virtual void OnRep_PlayerState() override;                     // 클라이언트 경로
 	//~ End interface
 
 	void InitAbilitySystemComponent();
@@ -45,7 +47,15 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	TObjectPtr<UCameraComponent> FollowCamera;
 	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Pawn")
+	TObjectPtr<UOBPawnData> PawnData;
+	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ability")
 	TObjectPtr<UOBAbilitySet> DefaultAbilitySet;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
+	TObjectPtr<UOBEquipmentComponent> EquipmentComponent;
 
+public:
+	void SetPawnData(UOBPawnData* InPawnData) { PawnData = InPawnData; }
 };

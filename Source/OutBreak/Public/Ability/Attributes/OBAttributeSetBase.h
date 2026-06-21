@@ -12,10 +12,10 @@
  * Getter / ValueGetter / ValueSetter / Initter 를 자동 정의한다.
  */
 #define ATTRIBUTE_ACCESSORS(ClassName, PropertyName) \
-GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
-GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
-GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
-GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
+	GAMEPLAYATTRIBUTE_PROPERTY_GETTER(ClassName, PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_GETTER(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
+	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
 /*
 왜 존재하는가?
@@ -28,35 +28,36 @@ GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 UCLASS()
 class OUTBREAK_API UOBAttributeSetBase : public UAttributeSet
 {
- GENERATED_BODY()
+	GENERATED_BODY()
 public:
- UOBAttributeSetBase();
+	UOBAttributeSetBase();
 
- //~ UAttributeSet interface
- // 복제할 속성 목록을 등록한다.
- virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
- // 값이 '변경되기 직전' 호출 — 주로 경계(Clamp) 보정에 사용.
- virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
- // GameplayEffect가 '실행 완료된 직후' 호출 — 메타 속성(Damage)을 실제 Health에 반영.
- virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
- //~ End interface
+	//~ UAttributeSet interface
+	// 복제할 속성 목록을 등록한다.
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	// 값이 '변경되기 직전' 호출 — 주로 경계(Clamp) 보정에 사용.
+	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+	// GameplayEffect가 '실행 완료된 직후' 호출 — 메타 속성(Damage)을 실제 Health에 반영.
+	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+	//~ End interface
  
- UPROPERTY(BlueprintReadOnly, Category = "Vital", ReplicatedUsing = OnRep_Health)
- FGameplayAttributeData Health;
- ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, Health)
+	UPROPERTY(BlueprintReadOnly, Category = "Vital", ReplicatedUsing = OnRep_Health)
+	FGameplayAttributeData Health;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, Health)
  
- UPROPERTY(BlueprintReadOnly, Category = "Vital", ReplicatedUsing = OnRep_MaxHealth)
- FGameplayAttributeData MaxHealth;
- ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, MaxHealth)
+	UPROPERTY(BlueprintReadOnly, Category = "Vital", ReplicatedUsing = OnRep_MaxHealth)
+	FGameplayAttributeData MaxHealth;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, MaxHealth)
  
- UPROPERTY(BlueprintReadOnly, Category = "Meta", Meta = (HideFromModifiers))
- FGameplayAttributeData Damage;
- ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, Damage)
+	UPROPERTY(BlueprintReadOnly, Category = "Meta")
+	FGameplayAttributeData Damage;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, Damage)
  
-protected:
- UFUNCTION()
- void OnRep_Health(const FGameplayAttributeData& OldValue);
+   protected:
+	UFUNCTION()
+	void OnRep_Health(const FGameplayAttributeData& OldValue);
 
- UFUNCTION()
- void OnRep_MaxHealth(const FGameplayAttributeData& OldValue);
+	UFUNCTION()
+	void OnRep_MaxHealth(const FGameplayAttributeData& OldValue);
+	
 };
