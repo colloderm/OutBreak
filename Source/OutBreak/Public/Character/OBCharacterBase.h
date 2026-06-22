@@ -7,6 +7,8 @@
 #include "AbilitySystemInterface.h"
 #include "OBCharacterBase.generated.h"
 
+DECLARE_MULTICAST_DELEGATE(FOBOnAbilitySystemInitialized);
+
 class UOBPawnData;
 class UOBAbilitySet;
 class UAbilitySystemComponent;
@@ -55,7 +57,17 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
 	TObjectPtr<UOBEquipmentComponent> EquipmentComponent;
+	
+	// ASC가 이미 초기화됐는지 가드(중복 InitAbilityActorInfo/브로드캐스트 방지).
+	bool bAbilitySystemInitialized = false;
 
 public:
 	void SetPawnData(UOBPawnData* InPawnData) { PawnData = InPawnData; }
+	
+public:
+	/*
+	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).
+	멀티플레이 역할? - 서버/클라 각자 자기 머신에서 초기화 완료 시 브로드캐스트.
+	*/
+	FOBOnAbilitySystemInitialized OnAbilitySystemInitialized;
 };

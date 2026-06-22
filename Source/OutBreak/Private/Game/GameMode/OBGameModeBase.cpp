@@ -6,6 +6,7 @@
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Game/GameState/OBGameStateBase.h"
+#include "UI/HUD/OBHUD.h"
 
 AOBGameModeBase::AOBGameModeBase()
 {
@@ -13,5 +14,6 @@ AOBGameModeBase::AOBGameModeBase()
 	PlayerControllerClass = AOBPlayerController::StaticClass();
 	PlayerStateClass = AOBPlayerStateBase::StaticClass();
 	GameStateClass = AOBGameStateBase::StaticClass();
+	HUDClass = AOBHUD::StaticClass();
 	
 }

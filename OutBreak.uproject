@@ -51,6 +51,10 @@
 		{
 			"Name": "SlateModelViewViewModel",
 			"Enabled": true
+		},
+		{
+			"Name": "ModelViewViewModel",
+			"Enabled": true
 		}
 	]
 }

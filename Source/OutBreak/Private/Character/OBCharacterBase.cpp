@@ -87,14 +87,22 @@ void AOBCharacterBase::OnRep_PlayerState()
 
 void AOBCharacterBase::InitAbilitySystemComponent()
 {	
+	// 이미 초기화됐으면 중복 실행 방지(OnRep이 여러 번 와도 안전).
+	if (bAbilitySystemInitialized) return;
+	
 	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
 	if (!PS) return;
 
 	AbilitySystemComponent = PS->GetAbilitySystemComponent();
 	AttributeSet = PS->GetAttributeSet();
+	if (!AbilitySystemComponent) return;
 
-	// GAS 필수: Owner=PlayerState, Avatar=this(Character) 로 액터 정보를 초기화.
-	// 이 호출은 서버/클라 양쪽 모두에서 반드시 일어나야 한다.
+	// GAS 필수: Owner=PlayerState, Avatar=this. 서버/클라 양쪽 호출.
 	AbilitySystemComponent->InitAbilityActorInfo(PS, this);
+	
+	bAbilitySystemInitialized = true;
+	
+	// UI 등 구독자에게 ASC 준비 완료를 알린다.
+	OnAbilitySystemInitialized.Broadcast();
 	
 }
