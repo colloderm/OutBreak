@@ -6,6 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "OBPlayerController.generated.h"
 
+class UOBInputConfig;
+struct FGameplayTag;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
@@ -25,6 +27,8 @@ protected:
 	void Input_JumpStarted();
 	void Input_JumpCompleted();
 	
+	void Input_AbilityInputPressed(FGameplayTag InputTag);
+	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -40,5 +44,8 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	int32 InputMappingPriority = 0;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UOBInputConfig> InputConfig;
 	
 };

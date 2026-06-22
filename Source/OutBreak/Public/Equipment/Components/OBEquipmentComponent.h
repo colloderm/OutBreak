@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Ability/Data/OBAbilitySet.h"
 #include "OBEquipmentComponent.generated.h"
 
 class AOBWeaponBase;
@@ -45,4 +46,8 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
 	FName AttachSocketName = TEXT("hand_r_Socket");
+	
+	//현재 무기로 부여한 능력/효과 핸들. 해제 시 회수에 사용.
+	FOBAbilitySet_GrantedHandles GrantedAbilityHandles;
+	
 };

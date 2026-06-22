@@ -7,4 +7,6 @@ namespace OBGameplayTags
 	// 실제 태그 문자열을 정의·등록한다. 엔진 시작 시 자동 등록되어
 	// 에디터의 GameplayTag 목록에도 "SetByCaller.Damage"로 나타난다.
 	UE_DEFINE_GAMEPLAY_TAG(SetByCaller_Damage, "SetByCaller.Damage");
+	
+	UE_DEFINE_GAMEPLAY_TAG(InputTag_Weapon_Fire, "InputTag.Weapon.Fire");
 }

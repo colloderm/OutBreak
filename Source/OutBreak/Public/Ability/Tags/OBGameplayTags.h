@@ -17,4 +17,7 @@ namespace OBGameplayTags
 	// 데미지 GE에 수치를 실어 보내기 위한 SetByCaller 키.
 	// GE_Damage의 Modifier Magnitude(Set By Caller)와 동일한 태그여야 한다.
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(SetByCaller_Damage);
+	
+	// 발사 입력 태그: InputConfig와 무기 AbilitySet이 동일하게 사용.
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Weapon_Fire);
 }

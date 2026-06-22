@@ -2,10 +2,13 @@
 
 #include "Equipment/Components/OBEquipmentComponent.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Weapon/OBWeaponBase.h"
 #include "GameFramework/Character.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Weapon/Data/OBWeaponData.h"
 
 UOBEquipmentComponent::UOBEquipmentComponent()
 {
@@ -51,6 +54,18 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 
 	// 서버는 OnRep이 호출되지 않으므로 여기서 직접 부착(리슨 서버 포함).
 	AttachWeaponToOwner();
+	
+	// 무기 데이터의 AbilitySet을 캐릭터 ASC에 부여(발사 능력 등).
+	if (UOBWeaponData* Data = NewWeapon->GetWeaponData())
+	{
+		if (Data->AbilitySet)
+		{
+			if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter))
+			{
+				Data->AbilitySet->GiveToAbilitySystem(ASC, &GrantedAbilityHandles, NewWeapon);
+			}
+		}
+	}
 
 	// [확장] 장착 시 발사 Ability 부여:
 	// UOBAbilitySet이 Ability 부여를 지원하면 여기서 PlayerState ASC에 적용한다.
@@ -61,14 +76,17 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 void UOBEquipmentComponent::UnequipWeapon()
 {
 	AActor* OwnerActor = GetOwner();
-	if (!OwnerActor || !OwnerActor->HasAuthority())
+	if (!OwnerActor || !OwnerActor->HasAuthority()) return;
+	
+	// 부여했던 능력/효과 회수.
+	if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()))
 	{
-		return;
+		GrantedAbilityHandles.TakeFromAbilitySystem(ASC);
 	}
 
 	if (CurrentWeapon)
 	{
-		// [확장] 부여했던 Ability 회수도 여기서 처리.
+		// 부여했던 Ability 회수도 여기서 처리.
 		CurrentWeapon->Destroy();
 		CurrentWeapon = nullptr;
 	}
@@ -85,16 +103,10 @@ void UOBEquipmentComponent::OnRep_CurrentWeapon()
 
 void UOBEquipmentComponent::AttachWeaponToOwner()
 {
-	if (!CurrentWeapon)
-	{
-		return;
-	}
+	if (!CurrentWeapon) return;
 
 	ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
-	if (!OwnerCharacter || !OwnerCharacter->GetMesh())
-	{
-		return;
-	}
+	if (!OwnerCharacter || !OwnerCharacter->GetMesh()) return;
 
 	const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
 	CurrentWeapon->AttachToComponent(OwnerCharacter->GetMesh(), AttachRules, AttachSocketName);

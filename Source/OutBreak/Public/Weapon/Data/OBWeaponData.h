@@ -6,6 +6,7 @@
 #include "Engine/DataAsset.h"
 #include "OBWeaponData.generated.h"
 
+class UOBAbilitySet;
 class USkeletalMesh;
 class UGameplayEffect;
 
@@ -63,4 +64,9 @@ public:
 	// --- GAS 연동 ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|GAS")
 	TSubclassOf<UGameplayEffect> DamageEffect;
+	
+	// 무기를 장착하면 부여할 능력
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|GAS")
+	TObjectPtr<UOBAbilitySet> AbilitySet;
+    	
 };
