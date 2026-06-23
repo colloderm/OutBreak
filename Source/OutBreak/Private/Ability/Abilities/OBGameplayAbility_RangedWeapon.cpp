@@ -84,19 +84,49 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	);
 
 #if ENABLE_DRAW_DEBUG
+	const FVector DebugEnd = bHit ? Hit.ImpactPoint : TraceEnd;
 	if (bDrawDebugTrace)
 	{
-		DrawDebugLine(GetWorld(), TraceStart, bHit ? Hit.ImpactPoint : TraceEnd,
-			bHit ? FColor::Red : FColor::Green, false, 1.0f, 0, 1.0f);
+		// 서버에서 호출 → 모든 클라이언트가 동일하게 그린다.
+		Character->Multicast_DrawFireTrace(TraceStart, DebugEnd, bHit);
 	}
 #endif
-
-	if (!bHit || !Hit.GetActor()) return; // 빗나감.
-
+	
+	// 소스 ASC를 먼저 확보(발사 큐는 명중 여부와 무관하게 발생).
 	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
+
+	// --- 발사 큐: 총구 화염 + 사격음 (매 발사) ---
+	if (SourceASC)
+	{
+		FGameplayCueParameters FireCueParams;
+		FireCueParams.Location = Weapon->GetMuzzleLocation(); // 머즐 위치(큐에 실어 복제)
+		FireCueParams.Instigator = Character;
+		FireCueParams.SourceObject = Weapon;
+		SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Fire, FireCueParams);
+	}
+	
+	// 발사 반동 몽타주(모든 클라에 복제). 명중 여부와 무관.
+	if (WeaponData->FireMontage)
+	{
+		Character->Multicast_PlayFireMontage(WeaponData->FireMontage);
+	}
+
+	if (!bHit || !Hit.GetActor()) return; // 빗나감: 발사 큐만 재생하고 종료.
+	
+	// --- 피격 큐: 탄착 이펙트 (명중 지점) ---
+	if (SourceASC)
+	{
+		FGameplayCueParameters ImpactCueParams;
+		ImpactCueParams.Location = Hit.ImpactPoint;      // 탄착 위치
+		ImpactCueParams.Normal = Hit.ImpactNormal;			// 표면 방향(이펙트 회전용)
+		ImpactCueParams.PhysicalMaterial = Hit.PhysMaterial;
+		SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Impact, ImpactCueParams);
+	}
+
+	// --- 데미지 적용 ---
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Hit.GetActor());
 
-	if (!SourceASC || !TargetASC || !WeaponData->DamageEffect) return; // 대상이 GAS를 갖지 않거나 데미지 GE 미지정.
+	if (!TargetASC || !WeaponData->DamageEffect) return;
 
 	// 데미지 GE 스펙 생성 + SetByCaller로 무기 데미지 주입.
 	FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();

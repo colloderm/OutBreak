@@ -32,6 +32,10 @@ public:
 	// 장착 시 사용할 무기 스켈레탈 메시.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual")
 	TObjectPtr<USkeletalMesh> WeaponMesh;
+	
+	// 발사 시 재생할 상체 반동 몽타주.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
+	TObjectPtr<UAnimMontage> FireMontage;
 
 	// --- 발사 스탯 ---
 

@@ -17,3 +17,31 @@ AOBGameModeBase::AOBGameModeBase()
 	HUDClass = AOBHUD::StaticClass();
 	
 }
+
+void AOBGameModeBase::RequestRespawn(AController* Controller, APawn* DeadPawn)
+{
+	if (!Controller) return;
+	
+	// 약참조로 캡처(타이머 동안 파괴 가능성 대비)
+	TWeakObjectPtr<AController> WeakController = Controller;
+	TWeakObjectPtr<APawn> WeakDeadPawn = DeadPawn;
+	
+	FTimerHandle RespawnTimer;
+	FTimerDelegate RespawnDel = FTimerDelegate::CreateWeakLambda(this,
+		[this, WeakController, WeakDeadPawn]()
+		{
+			// 죽은 폰 제거(컨트롤러 자동 UnPossess)
+			if (WeakDeadPawn.IsValid())
+			{
+				WeakDeadPawn->Destroy();
+			}
+			
+			// 새 폰 스폰 + 빙의(PlayerStart 사용). PossessedBy가 체력/무기/태그를 재 초기화
+			if (WeakController.IsValid())
+			{
+				RestartPlayer(WeakController.Get());
+			}
+		});
+	
+	GetWorldTimerManager().SetTimer(RespawnTimer, RespawnDel, RespawnDelay, false);
+}

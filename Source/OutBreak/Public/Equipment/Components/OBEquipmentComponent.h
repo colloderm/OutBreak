@@ -27,6 +27,8 @@ public:
 	AOBWeaponBase* GetCurrentWeapon() const { return CurrentWeapon; }
 	
 protected:
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	
 	/*
 	언제 호출되는가? - 서버가 CurrentWeapon을 변경해 복제될 때.
 	서버/클라? - 클라이언트 전용 콜백.

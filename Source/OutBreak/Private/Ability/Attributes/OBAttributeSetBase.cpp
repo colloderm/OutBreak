@@ -3,6 +3,7 @@
 #include "Ability/Attributes/OBAttributeSetBase.h"
 
 #include "GameplayEffectExtension.h"
+#include "Character/OBCharacterBase.h"
 #include "Net/UnrealNetwork.h" 
 
 UOBAttributeSetBase::UOBAttributeSetBase()
@@ -51,6 +52,19 @@ void UOBAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 	{
 		SetHealth(FMath::Clamp(GetHealth(), 0.0f, GetMaxHealth()));
 	}
+	
+	// 체력이 0 이하가 되면 사망 처리(서버). 중복은 Character가 가드.
+	if (GetHealth() <= 0.0f)
+	{
+		if (UAbilitySystemComponent* OwningASC = GetOwningAbilitySystemComponent())
+		{
+			if (AOBCharacterBase* Character = Cast<AOBCharacterBase>(OwningASC->GetAvatarActor()))
+			{
+				Character->HandleDeath();
+			}
+		}
+	}
+	
 }
 
 void UOBAttributeSetBase::OnRep_Health(const FGameplayAttributeData& OldValue)

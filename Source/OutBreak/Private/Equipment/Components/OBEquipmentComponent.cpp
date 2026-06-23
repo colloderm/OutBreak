@@ -92,6 +92,16 @@ void UOBEquipmentComponent::UnequipWeapon()
 	}
 }
 
+void UOBEquipmentComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// 폰이 파괴될 때 부여했던 능력을 확실히 회수(grant 누수 방지).
+	if (GetOwner() && GetOwner()->HasAuthority())
+	{
+		UnequipWeapon();
+	}	
+	Super::EndPlay(EndPlayReason);
+}
+
 void UOBEquipmentComponent::OnRep_CurrentWeapon()
 {
 	// 클라이언트: 복제된 무기를 소켓에 부착.
