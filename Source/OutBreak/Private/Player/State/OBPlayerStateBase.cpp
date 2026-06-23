@@ -3,11 +3,12 @@
 #include "Player/State/OBPlayerStateBase.h"
 
 #include "AbilitySystemComponent.h"
+#include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
 
 AOBPlayerStateBase::AOBPlayerStateBase()
 {
-	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent = CreateDefaultSubobject<UOBAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 	AbilitySystemComponent->SetIsReplicated(true);
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 	SetNetUpdateFrequency(100.0f);

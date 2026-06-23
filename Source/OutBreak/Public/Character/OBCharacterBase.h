@@ -53,15 +53,16 @@ protected:
 
 	void InitAbilitySystemComponent();
 	
-	/*
-	왜 호출되는가? - 사망 복제 도착 시 클라이언트 연출 처리.
-	서버/클라? - 클라이언트 콜백.
-	*/
+	// 왜 호출되는가? - 사망 클라이언트 연출 처리.
 	UFUNCTION()
 	void OnRep_IsDead();
 
 	// 이동/충돌 비활성 공통 로직(서버+클라).
 	void DisablePawnForDeath();
+	
+	void StartDeath();
+
+	void StartRagdoll();
 	
 protected:
 	UPROPERTY()

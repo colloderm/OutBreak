@@ -91,7 +91,7 @@ void AOBCharacterBase::HandleDeath()
 	}
 	
 	// 서버측 물리/이동 비활성
-	DisablePawnForDeath();
+	StartDeath();
 	
 	// 컨트롤러를 먼저 캡처(리스폰 시 UnPossess로 null 될 수 있음)
 	AController* DyingController = GetController();
@@ -114,11 +114,10 @@ void AOBCharacterBase::Multicast_DrawFireTrace_Implementation(const FVector& Sta
 
 void AOBCharacterBase::OnRep_IsDead()
 {
-	// 클라이언트: 사망 연출(충돌 끄기 등). 래그돌/몽타주는 확wkd
+	// 클라이언트: 사망 연출(래그돌)
 	if (bIsDead)
 	{
-		DisablePawnForDeath();
-		// [확장] 사망 몽타주/래그돌/무기 숨김 → GameplayCue 권장.
+		StartDeath();
 	}
 }
 
@@ -136,6 +135,27 @@ void AOBCharacterBase::DisablePawnForDeath()
 		MoveComp->StopMovementImmediately();
 		MoveComp->DisableMovement();
 	}
+}
+
+void AOBCharacterBase::StartDeath()
+{
+	DisablePawnForDeath();
+	StartRagdoll();
+}
+
+void AOBCharacterBase::StartRagdoll()
+{
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp) return;
+	
+	// 메시를 래그돌 프로파일로 전환(월드 충돌, 폰끼리 무시)
+	MeshComp->SetCollisionProfileName(TEXT("Ragdoll"));
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	
+	// 전체 본을 물리 시뮬레이션으로
+	MeshComp->SetAllBodiesSimulatePhysics(true);
+	MeshComp->SetSimulatePhysics(true);
+	MeshComp->WakeAllRigidBodies();
 }
 
 void AOBCharacterBase::Multicast_PlayFireMontage_Implementation(UAnimMontage* MontageToPlay)

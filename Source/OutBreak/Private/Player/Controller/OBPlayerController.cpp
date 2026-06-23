@@ -4,11 +4,13 @@
 
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Character/OBCharacterBase.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
 #include "LyraInspired/Input/OBInputConfig.h"
+#include "Camera/PlayerCameraManager.h"
 
 void AOBPlayerController::BeginPlay()
 {
@@ -21,6 +23,69 @@ void AOBPlayerController::BeginPlay()
 		if (DefaultMappingContext)
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, InputMappingPriority);
+		}
+	}
+}
+
+void AOBPlayerController::ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake)
+{
+	// 소유 클라에서만
+	if (!IsLocalController()) return;
+	
+	CurrentRecoilRecoverySpeed = RecoverySpeed;
+	
+	// 수평은 좌우 랜덤
+	const float YawDelta = FMath::FRandRange(-YawKick, YawKick);
+	
+	// 컨트롤 회전에 직접 반동 적용(위 + 좌우). 컨트롤 회전으 서버로 복제
+	FRotator NewControlRotation = GetControlRotation();
+	NewControlRotation.Pitch += PitchKick;
+	NewControlRotation.Yaw += YawDelta;
+	SetControlRotation(NewControlRotation);
+	
+	AccumulatedRecoilPitch += PitchKick;
+	AccumulatedRecoilYaw += YawDelta;
+	
+	if (CameraShake)
+	{
+		ClientStartCameraShake(CameraShake);
+	}
+}
+
+void AOBPlayerController::UpdateRecoilRecovery(float DeltaSeconds)
+{
+	if (FMath::IsNearlyZero(AccumulatedRecoilPitch) && FMath::IsNearlyZero(AccumulatedRecoilYaw)) return;
+	
+	// 누적 반동을 0으로 보간
+	const float NewPitch = FMath::FInterpTo(AccumulatedRecoilPitch, 0.f, DeltaSeconds, CurrentRecoilRecoverySpeed);
+	const float NewYaw = FMath::FInterpTo(AccumulatedRecoilYaw, 0.f, DeltaSeconds, CurrentRecoilRecoverySpeed);
+	
+	// 이번 프레임에 되돌일 양(반동분만)
+	const float DeltaPitch = AccumulatedRecoilPitch - NewPitch;
+	const float DeltaYaw = AccumulatedRecoilYaw - NewYaw;
+	
+	// 반동분만 시야에서 차감(플레이어 수동 입력과 안 싸움)
+	FRotator NewControlRotation = GetControlRotation();
+	NewControlRotation.Pitch -= DeltaPitch;
+	NewControlRotation.Yaw -= DeltaYaw;
+	SetControlRotation(NewControlRotation);
+	
+	AccumulatedRecoilPitch = NewPitch;
+	AccumulatedRecoilYaw = NewYaw;
+}
+
+void AOBPlayerController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	
+	if (IsLocalController())
+	{
+		UpdateRecoilRecovery(DeltaSeconds);
+		
+		// 누적 입력을 능력 발동/통지로 처리.
+		if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+		{
+			ASC->ProcessAbilityInput(DeltaSeconds, false);
 		}
 	}
 }
@@ -55,6 +120,7 @@ void AOBPlayerController::SetupInputComponent()
 			if (Action.InputAction && Action.InputTag.IsValid())
 			{
 				EIC->BindAction(Action.InputAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_AbilityInputPressed, Action.InputTag);
+				EIC->BindAction(Action.InputAction, ETriggerEvent::Completed, this, &AOBPlayerController::Input_AbilityInputReleased, Action.InputTag);
 			}
 		}
 	}
@@ -107,22 +173,21 @@ void AOBPlayerController::Input_JumpCompleted()
 
 void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 {
-	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn());
-	if (!ASC) return;
-	
-	// 입력 태그를 가진 능력 스펫을 찾아 발동.
-	// 활성화 중 배열 변경 가능성 방어를 위해 핸들을 먼저 수집.
-	TArray<FGameplayAbilitySpecHandle> HandlesToActivate;
-	for (const FGameplayAbilitySpec& Spec : ASC->GetActivatableAbilities())
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 	{
-		if (Spec.GetDynamicSpecSourceTags().HasTagExact(InputTag))
-		{
-			HandlesToActivate.Add(Spec.Handle);
-		}
+		ASC->AbilityInputTagPressed(InputTag);
 	}
-	
-	for (const FGameplayAbilitySpecHandle& Handle : HandlesToActivate)
+}
+
+void AOBPlayerController::Input_AbilityInputReleased(FGameplayTag InputTag)
+{
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 	{
-		ASC->TryActivateAbility(Handle);
+		ASC->AbilityInputTagReleased(InputTag);
 	}
+}
+
+UOBAbilitySystemComponent* AOBPlayerController::GetOBAbilitySystemComponent() const
+{
+	return Cast<UOBAbilitySystemComponent>(UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()));
 }

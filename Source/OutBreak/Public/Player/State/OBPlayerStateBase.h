@@ -7,6 +7,7 @@
 #include "AbilitySystemInterface.h"
 #include "OBPlayerStateBase.generated.h"
 
+class UOBAbilitySystemComponent;
 class UOBAttributeSetBase;
 class UAbilitySystemComponent;
 
@@ -21,9 +22,12 @@ public:
 	
 	UOBAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
 	
+	// 타입이 필요한 곳(컨트롤러 등)을 위한 전용 getter.
+	UOBAbilitySystemComponent* GetOBAbilitySystemComponent() const { return AbilitySystemComponent; }
+	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ability", Meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
+	TObjectPtr<UOBAbilitySystemComponent> AbilitySystemComponent;
 
 	UPROPERTY()
 	TObjectPtr<UOBAttributeSetBase> AttributeSet;

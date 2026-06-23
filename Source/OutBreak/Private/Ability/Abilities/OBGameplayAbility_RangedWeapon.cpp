@@ -10,6 +10,7 @@
 #include "Core/OBCollisionChannels.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Player/Controller/OBPlayerController.h"
 
 UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -31,6 +32,25 @@ void UOBGameplayAbility_RangedWeapon::ActivateAbility(
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, /*bReplicate=*/true, /*bWasCancelled=*/true);
 		return;
+	}
+	
+	// 반동/쉐이크는 소유 클라이언트에서만(시야 회전→서버 트레이스에 자동 반영).
+	if (ActorInfo->IsLocallyControlled())
+	{
+		if (AOBWeaponBase* Weapon = GetEquippedWeapon())
+		{
+			if (UOBWeaponData* Data = Weapon->GetWeaponData())
+			{
+				if (AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
+				{
+					if (AOBPlayerController* PC = Cast<AOBPlayerController>(Char->GetController()))
+					{
+						PC->ApplyWeaponRecoil(Data->VerticalRecoil, Data->HorizontalRecoil,
+							Data->RecoilRecoverySpeed, Data->FireCameraShake);
+					}
+				}
+			}
+		}
 	}
 
 	// 데미지 판정은 서버 권위에서만 수행.

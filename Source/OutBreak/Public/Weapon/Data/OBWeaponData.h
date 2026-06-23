@@ -6,6 +6,7 @@
 #include "Engine/DataAsset.h"
 #include "OBWeaponData.generated.h"
 
+class UCameraShakeBase;
 class UOBAbilitySet;
 class USkeletalMesh;
 class UGameplayEffect;
@@ -72,5 +73,21 @@ public:
 	// 무기를 장착하면 부여할 능력
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|GAS")
 	TObjectPtr<UOBAbilitySet> AbilitySet;
+	
+	// 발당 수직 반동(Pitch, deg).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil")
+	float VerticalRecoil = 0.6f;
+
+	// 발당 수평 흔들림(Yaw, ± deg).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil")
+	float HorizontalRecoil = 0.3f;
+
+	// 사격 멈춘 뒤 시야 복귀 속도.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil")
+	float RecoilRecoverySpeed = 8.0f;
+
+	// 발사 카메라 쉐이크(로컬 전용).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil")
+	TSubclassOf<UCameraShakeBase> FireCameraShake;
     	
 };

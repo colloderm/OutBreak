@@ -45,7 +45,6 @@ void UOBAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 		{
 			const float NewHealth = GetHealth() - LocalDamage;
 			SetHealth(FMath::Clamp(NewHealth, 0.0f, GetMaxHealth()));
-			// TODO: 사망 처리(태그 부여/사망 Ability 트리거)는 이후 Ability 단계에서 연결.
 		}
 	}
 	else if (Data.EvaluatedData.Attribute == GetHealthAttribute())
@@ -54,7 +53,10 @@ void UOBAttributeSetBase::PostGameplayEffectExecute(const FGameplayEffectModCall
 	}
 	
 	// 체력이 0 이하가 되면 사망 처리(서버). 중복은 Character가 가드.
-	if (GetHealth() <= 0.0f)
+	const bool bAffectedHealth = 
+		Data.EvaluatedData.Attribute == GetDamageAttribute() || Data.EvaluatedData.Attribute == GetHealthAttribute();
+
+	if (bAffectedHealth && GetHealth() <= 0.0f)
 	{
 		if (UAbilitySystemComponent* OwningASC = GetOwningAbilitySystemComponent())
 		{
