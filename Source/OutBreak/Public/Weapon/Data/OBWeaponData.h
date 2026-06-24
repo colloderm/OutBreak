@@ -30,13 +30,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
 	FText DisplayName;
 
-	// 장착 시 사용할 무기 스켈레탈 메시.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual")
 	TObjectPtr<USkeletalMesh> WeaponMesh;
 	
-	// 발사 시 재생할 상체 반동 몽타주.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
 	TObjectPtr<UAnimMontage> FireMontage;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
+	TObjectPtr<UAnimMontage> ReloadMontage;
 
 	// --- 발사 스탯 ---
 
@@ -54,7 +55,11 @@ public:
 
 	// 발사 방식(단발/점사/연사).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat")
-	EOBWeaponFireMode FireMode = EOBWeaponFireMode::FullAuto;
+	EOBWeaponFireMode FireMode = EOBWeaponFireMode::Single;
+	
+	// 점사(Burst) 모드에서 한 번 누름당 발사 수.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "1"))
+	int32 BurstCount = 3;
 
 	// --- 탄약(최대치 정의) ---
 	

@@ -18,14 +18,15 @@ namespace OBGameplayTags
 	// GE_Damage의 Modifier Magnitude(Set By Caller)와 동일한 태그여야 한다.
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(SetByCaller_Damage);
 	
-	// 발사 입력 태그: InputConfig와 무기 AbilitySet이 동일하게 사용.
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Weapon_Fire);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Weapon_Reload);
 	
-	// 사망 상태 태그: 능력 발동 차단/사망 분기에 사용.
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Reloading);
 	
 	// 발사 연출(총구 화염/사격음).
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Fire);
 	// 피격 연출(탄착 이펙트/사운드).
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Impact);
+	
 }

@@ -23,6 +23,8 @@ public:
 	void AbilityInputTagPressed(const FGameplayTag& InputTag);
 	// 입력 태그가 떼졌을 때.
 	void AbilityInputTagReleased(const FGameplayTag& InputTag);
+	// 해당 능력의 입력이 아직 눌려있는지.
+	bool IsAbilityInputHeld(const FGameplayAbilitySpecHandle& Handle) const { return InputHeldSpecHandles.Contains(Handle); }
 
 	/*
 	왜 호출되는가? - 매 틱 누적 입력을 능력 발동/통지로 처리.

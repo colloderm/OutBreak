@@ -4,10 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Ability/Abilities/OBGameplayAbility.h"
+#include "Weapon/Data/OBWeaponData.h"
 #include "OBGameplayAbility_RangedWeapon.generated.h"
 
 class AOBWeaponBase;
-class UOBWeaponData;
 
 /*
  * 왜 존재하는가?
@@ -25,29 +25,47 @@ public:
 	UOBGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer = FObjectInitializer::Get());
 	
 protected:
-	/*
-	왜 호출되는가? - 발사 입력으로 능력이 발동될 때 실제 사격 로직을 실행.
-	언제 호출되는가? - 입력 → TryActivateAbility 성공 시.
-	서버/클라? - 양쪽 실행되나, 트레이스·데미지는 내부 권위 가드로 서버 전용.
-	*/
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
+	
+	// 타이머/태스크 정리 후 종료.
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility,
+		bool bWasCancelled) override;
 
-	AOBWeaponBase* GetEquippedWeapon() const;
+	// 단발 1회: 반동(클라) + 트레이스/데미지/큐/몽타주(서버).
+	void FireOneShot();
 
-	/*
-	왜 호출되는가? - 서버에서 라인트레이스를 수행하고 명중 시 데미지를 적용.
-	서버/클라? - 서버 전용(호출부에서 권위 확인 후 진입).
-	*/
+	// 점사/연사 타이머 콜백.
+	void FireLoop();
+
+	// 연사: 입력 뗌 시 종료.
+	UFUNCTION()
+	void OnFireInputReleased(float TimeHeld);
+
+	// 서버 트레이스
 	void PerformServerWeaponTrace();
+	AOBWeaponBase* GetEquippedWeapon() const;
+	
+	// 무기 데이터 조회 헬퍼.
+	EOBWeaponFireMode GetFireMode() const;
+	int32 GetBurstCount() const;
+	float GetFireInterval() const;
 
-	/*
-	왜 존재하는가? - 개발 중 탄도 확인용 디버그 라인 표시 토글.
-	멀티플레이 역할? - 시각 디버그 전용(게임플레이 영향 없음).
-	*/
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Debug")
 	bool bDrawDebugTrace = false;
+	
+private:
+	// 점사/연사 반복 타이머.
+	FTimerHandle FireTimerHandle;
+	// 이번 활성화에서 쏜 발 수.
+	int32 ShotsFired = 0;
+	// 이번 활성화의 발사 모드.
+	EOBWeaponFireMode CurrentFireMode = EOBWeaponFireMode::Single;
 };

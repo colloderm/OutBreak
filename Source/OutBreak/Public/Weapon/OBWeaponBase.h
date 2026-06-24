@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "OBWeaponBase.generated.h"
 
+DECLARE_MULTICAST_DELEGATE(FOBOnAmmoChanged);
+
 class USkeletalMeshComponent;
 class UOBWeaponData;
 
@@ -23,7 +25,29 @@ public:
 	// 무기 데이터 접근자(읽기 전용).
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UOBWeaponData* GetWeaponData() const { return WeaponData; }
+	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	UFUNCTION(BlueprintPure, Category = "Weapon|Ammo")
+	int32 GetCurrentAmmo() const { return CurrentAmmo; }
+	UFUNCTION(BlueprintPure, Category = "Weapon|Ammo")
+	int32 GetReserveAmmo() const { return ReserveAmmo; }
+
+	bool HasAmmo() const { return CurrentAmmo > 0; }
+	bool CanReload() const;            // 탄창 안 참 && 예비탄 있음
+	void ConsumeAmmo(int32 Amount = 1); // 서버
+	void PerformReload();              // 서버: 예비탄→탄창
+	void InitializeAmmo();             // 서버: WeaponData 기준 초기화
+
+public:
+	// UI 갱신용(탄약 변경 통지).
+	FOBOnAmmoChanged OnAmmoChanged;
+
+protected:
+	virtual void BeginPlay() override;
+
+	UFUNCTION() void OnRep_Ammo();
+	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TObjectPtr<USkeletalMeshComponent> WeaponMesh;
@@ -33,4 +57,11 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	FName MuzzleSocketName = TEXT("Muzzle");
+	
+	// 현재 탄창 탄약.
+	UPROPERTY(ReplicatedUsing = OnRep_Ammo)
+	int32 CurrentAmmo = 0;
+	// 예비탄.
+	UPROPERTY(ReplicatedUsing = OnRep_Ammo)
+	int32 ReserveAmmo = 0;
 };

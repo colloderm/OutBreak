@@ -10,20 +10,20 @@
 #include "Core/OBCollisionChannels.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
+#include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Player/Controller/OBPlayerController.h"
 
 UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
-	// 발사는 입력 순간 1회 발동(연사는 입력 정책/반복으로 확장).
+	// 누름당 1회 활성화 → 내부에서 FireMode별 패턴 처리.
 	ActivationPolicy = EOBAbilityActivationPolicy::OnInputTriggered;
 }
 
 void UOBGameplayAbility_RangedWeapon::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	const FGameplayEventData* TriggerEventData)
+	const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData)
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
@@ -34,35 +34,118 @@ void UOBGameplayAbility_RangedWeapon::ActivateAbility(
 		return;
 	}
 	
-	// 반동/쉐이크는 소유 클라이언트에서만(시야 회전→서버 트레이스에 자동 반영).
-	if (ActorInfo->IsLocallyControlled())
+	CurrentFireMode = GetFireMode();
+	ShotsFired = 0;
+
+	// 첫 발 즉시.
+	FireOneShot();
+	++ShotsFired;
+
+	// 단발: 1발 후 종료. (홀드해도 OnInputTriggered라 재발동 안 됨)
+	if (CurrentFireMode == EOBWeaponFireMode::Single)
 	{
-		if (AOBWeaponBase* Weapon = GetEquippedWeapon())
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+		return;
+	}
+
+	// 점사/연사: RPM 간격으로 반복.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			FireTimerHandle, this, &UOBGameplayAbility_RangedWeapon::FireLoop, GetFireInterval(), true);
+	}
+
+	// 연사: 입력 뗌을 기다려 종료(커스텀 ASC 파이프라인 필요).
+	if (CurrentFireMode == EOBWeaponFireMode::FullAuto)
+	{
+		UAbilityTask_WaitInputRelease* WaitRelease =
+			UAbilityTask_WaitInputRelease::WaitInputRelease(this, /*bTestAlreadyReleased=*/false);
+		WaitRelease->OnRelease.AddDynamic(this, &UOBGameplayAbility_RangedWeapon::OnFireInputReleased);
+		WaitRelease->ReadyForActivation();
+	}
+}
+
+void UOBGameplayAbility_RangedWeapon::FireLoop()
+{
+	// 연사 중 입력 뗌 체크는 "로컬 조종" 머신에서만.
+	// (서버의 원격 클라 인스턴스는 InputHeld가 없으므로 제외)
+	if (CurrentFireMode == EOBWeaponFireMode::FullAuto && CurrentActorInfo && CurrentActorInfo->IsLocallyControlled())
+	{
+		const UOBAbilitySystemComponent* ASC = Cast<UOBAbilitySystemComponent>(GetAbilitySystemComponentFromActorInfo());
+		if (!ASC || !ASC->IsAbilityInputHeld(CurrentSpecHandle))
 		{
-			if (UOBWeaponData* Data = Weapon->GetWeaponData())
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, /*bReplicateEndAbility=*/true, false);
+			return;
+		}
+	}
+	
+	FireOneShot();
+	++ShotsFired;
+
+	if (CurrentFireMode == EOBWeaponFireMode::Burst && ShotsFired >= GetBurstCount())
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
+}
+
+void UOBGameplayAbility_RangedWeapon::OnFireInputReleased(float TimeHeld)
+{
+	// 연사: 입력 떼면 종료.
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+}
+
+void UOBGameplayAbility_RangedWeapon::EndAbility(
+	const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, 
+	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
+{
+	// 반복 타이머 정리.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(FireTimerHandle);
+	}
+	
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+}
+
+void UOBGameplayAbility_RangedWeapon::FireOneShot()
+{
+	AOBWeaponBase* Weapon = GetEquippedWeapon();
+
+	// 탄약 없음 → 발사 중단(연사/점사 종료). 탄약은 복제되어 클라도 인지.
+	if (!Weapon || !Weapon->HasAmmo())
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
+	}
+
+	// 탄약 소모(서버 권위).
+	if (HasAuthority(&CurrentActivationInfo))
+	{
+		Weapon->ConsumeAmmo(1);
+	}
+	
+	// 반동/카메라 쉐이크: 소유 클라.
+	if (CurrentActorInfo && CurrentActorInfo->IsLocallyControlled())
+	{
+		if (UOBWeaponData* Data = Weapon->GetWeaponData())
+		{
+			if (AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
 			{
-				if (AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
+				if (AOBPlayerController* PC = Cast<AOBPlayerController>(Char->GetController()))
 				{
-					if (AOBPlayerController* PC = Cast<AOBPlayerController>(Char->GetController()))
-					{
-						PC->ApplyWeaponRecoil(Data->VerticalRecoil, Data->HorizontalRecoil,
-							Data->RecoilRecoverySpeed, Data->FireCameraShake);
-					}
+					PC->ApplyWeaponRecoil(
+						Data->VerticalRecoil, Data->HorizontalRecoil, Data->RecoilRecoverySpeed, Data->FireCameraShake
+					);
 				}
 			}
 		}
 	}
 
-	// 데미지 판정은 서버 권위에서만 수행.
-	if (HasAuthority(&ActivationInfo))
+	// 트레이스/데미지/큐/몽타주: 서버에서만 수행.
+	if (HasAuthority(&CurrentActivationInfo))
 	{
 		PerformServerWeaponTrace();
 	}
-
-	// [확장] 머즐 VFX/사격음/반동/몽타주는 여기서 양쪽 재생(예측 표현).
-
-	// 단발 발사이므로 즉시 종료.
-	EndAbility(Handle, ActorInfo, ActivationInfo, /*bReplicate=*/true, /*bWasCancelled=*/false);
 }
 
 AOBWeaponBase* UOBGameplayAbility_RangedWeapon::GetEquippedWeapon() const
@@ -75,6 +158,42 @@ AOBWeaponBase* UOBGameplayAbility_RangedWeapon::GetEquippedWeapon() const
 		return Equipment->GetCurrentWeapon();
 	}
 	return nullptr;
+}
+
+EOBWeaponFireMode UOBGameplayAbility_RangedWeapon::GetFireMode() const
+{
+	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
+	{
+		if (UOBWeaponData* Data = Weapon->GetWeaponData())
+		{
+			return Data->FireMode;
+		}
+	}
+	return EOBWeaponFireMode::Single;
+}
+
+int32 UOBGameplayAbility_RangedWeapon::GetBurstCount() const
+{
+	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
+	{
+		if (UOBWeaponData* Data = Weapon->GetWeaponData())
+		{
+			return FMath::Max(1, Data->BurstCount);
+		}
+	}
+	return 3;
+}
+
+float UOBGameplayAbility_RangedWeapon::GetFireInterval() const
+{
+	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
+	{
+		if (UOBWeaponData* Data = Weapon->GetWeaponData())
+		{
+			return (Data->RoundsPerMinute > 0.0f) ? (60.0f / Data->RoundsPerMinute) : 0.1f;
+		}
+	}
+	return 0.1f;
 }
 
 void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
