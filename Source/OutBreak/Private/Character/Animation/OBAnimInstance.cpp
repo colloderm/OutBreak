@@ -45,6 +45,7 @@ void UOBAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 	if (OwningCharacter)
 	{
 		bIsDead = OwningCharacter->IsDead();
+		bIsAiming = OwningCharacter->IsAiming();
 	}
 }
 

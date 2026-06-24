@@ -6,6 +6,8 @@
 #include "GameFramework/HUD.h"
 #include "OBHUD.generated.h"
 
+class UOBAmmoViewModel;
+class AOBWeaponBase;
 class UUserWidget;
 class UOBHealthViewModel;
 class AOBCharacterBase;
@@ -33,6 +35,10 @@ protected:
 	// 실제 위젯/ViewModel 생성 + 주입.
 	void InitHealthWidget(AOBCharacterBase* Character);
 	
+	void InitAmmoWidget(AOBCharacterBase* Character);
+	// 무기 교체 시 VM 재바인딩.
+	void HandleWeaponChanged(AOBWeaponBase* NewWeapon);
+	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<UUserWidget> HealthBarWidgetClass;
@@ -42,4 +48,13 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UOBHealthViewModel> HealthViewModel;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> AmmoWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> AmmoWidget;
+
+	UPROPERTY()
+	TObjectPtr<UOBAmmoViewModel> AmmoViewModel;
 };

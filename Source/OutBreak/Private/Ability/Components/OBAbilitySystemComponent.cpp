@@ -83,7 +83,7 @@ void UOBAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 		TryActivateAbility(Handle);
 	}
 
-	// 4) 뗌: 활성 능력에 InputReleased 통지(홀드/차지 종료).
+	// 4) 뗌: 활성 능력에 InputReleased 통지 + WhileInputActive는 종료.
 	for (const FGameplayAbilitySpecHandle& Handle : InputReleasedSpecHandles)
 	{
 		if (FGameplayAbilitySpec* Spec = FindAbilitySpecFromHandle(Handle))
@@ -94,6 +94,13 @@ void UOBAbilitySystemComponent::ProcessAbilityInput(float DeltaTime, bool bGameP
 				if (Spec->IsActive())
 				{
 					AbilitySpecInputReleased(*Spec);
+					
+					// WhileInputActive(ADS 등)는 입력 떼면 종료.
+					const UOBGameplayAbility* OBAbility = Cast<UOBGameplayAbility>(Spec->Ability);
+					if (OBAbility && OBAbility->GetActivationPolicy() == EOBAbilityActivationPolicy::WhileInputActive)
+					{
+						CancelAbilityHandle(Handle);
+					}
 				}
 			}
 		}

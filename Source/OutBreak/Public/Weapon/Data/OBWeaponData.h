@@ -83,16 +83,47 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil")
 	float VerticalRecoil = 0.6f;
 
-	// 발당 수평 흔들림(Yaw, ± deg).
+	// 발당 수평 흔들림(Yaw, deg).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil")
 	float HorizontalRecoil = 0.3f;
 
 	// 사격 멈춘 뒤 시야 복귀 속도.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil")
 	float RecoilRecoverySpeed = 8.0f;
+	
+	// 조준 시 카메라 FOV(작을수록 줌인).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|ADS")
+	float ADSFOV = 50.0f;
+	
+	// 조준 시 이동 속도 배율.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|ADS")
+	float ADSSpeedMultiplier = 0.5f;
+	
+	// FOV/상태 블렌드 속도.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|ADS")
+	float ADSBlendSpeed = 12.0f;
+	
+	// 조준 시 반동 배율(1=동일, 0.5=절반, 0=무반동).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|ADS")
+	float ADSRecoilMultiplier = 0.5f;
 
 	// 발사 카메라 쉐이크(로컬 전용).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil")
 	TSubclassOf<UCameraShakeBase> FireCameraShake;
-    	
+	
+	// 기본 탄퍼짐(반각, 도). 0이면 정확 사격.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Spread", Meta = (ClampMin = "0.0"))
+	float BaseSpreadDegrees = 1.5f;
+
+	// 조준(ADS) 시 퍼짐 배율(작을수록 정밀).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Spread", Meta = (ClampMin = "0.0"))
+	float ADSSpreadMultiplier = 0.3f;
+
+	// 이동 중 퍼짐 배율(클수록 부정확).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Spread", Meta = (ClampMin = "0.0"))
+	float MovingSpreadMultiplier = 1.8f;
+	
+	// 발사 시 화면 집중 펄스(연사는 작게).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Feel")
+	float FireFocusPulse = 0.12f;
 };

@@ -57,7 +57,11 @@ protected:
 	EOBWeaponFireMode GetFireMode() const;
 	int32 GetBurstCount() const;
 	float GetFireInterval() const;
-
+	
+	// 현재 상태(조준/이동) 기반 퍼짐 각도(도).
+	float GetCurrentSpreadAngle() const;
+	
+protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Debug")
 	bool bDrawDebugTrace = false;
 	

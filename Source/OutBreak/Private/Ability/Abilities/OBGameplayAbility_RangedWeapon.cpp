@@ -124,18 +124,26 @@ void UOBGameplayAbility_RangedWeapon::FireOneShot()
 		Weapon->ConsumeAmmo(1);
 	}
 	
-	// 반동/카메라 쉐이크: 소유 클라.
+	// 반동/카메라 쉐이크: 소유 클라. 조준 중이면 감소
 	if (CurrentActorInfo && CurrentActorInfo->IsLocallyControlled())
 	{
 		if (UOBWeaponData* Data = Weapon->GetWeaponData())
 		{
 			if (AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
 			{
+				// 조준 중이면 반동 배율 적용.
+				const float RecoilMult = Char->IsAiming() ? Data->ADSRecoilMultiplier : 1.0f;
+				
 				if (AOBPlayerController* PC = Cast<AOBPlayerController>(Char->GetController()))
 				{
 					PC->ApplyWeaponRecoil(
-						Data->VerticalRecoil, Data->HorizontalRecoil, Data->RecoilRecoverySpeed, Data->FireCameraShake
-					);
+						Data->VerticalRecoil * RecoilMult,
+						Data->HorizontalRecoil * RecoilMult,
+						Data->RecoilRecoverySpeed,
+						Data->FireCameraShake,
+						RecoilMult);
+					
+					Char->AddFireFocusPulse(Data->FireFocusPulse);  // 화면 집중 펄스
 				}
 			}
 		}
@@ -196,6 +204,31 @@ float UOBGameplayAbility_RangedWeapon::GetFireInterval() const
 	return 0.1f;
 }
 
+float UOBGameplayAbility_RangedWeapon::GetCurrentSpreadAngle() const
+{
+	AOBWeaponBase* Weapon = GetEquippedWeapon();
+	UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
+	if (!Data) return 0.0f;
+
+	float Spread = Data->BaseSpreadDegrees;
+
+	if (AOBCharacterBase* Character = GetOBCharacterFromActorInfo())
+	{
+		// 조준 중이면 탄퍼짐 감소.
+		if (Character->IsAiming())
+		{
+			Spread *= Data->ADSSpreadMultiplier;
+		}
+		// 이동 중이면 증가(수평 속도 기준).
+		if (Character->GetVelocity().SizeSquared2D() > FMath::Square(10.0f))
+		{
+			Spread *= Data->MovingSpreadMultiplier;
+		}
+	}
+
+	return Spread;
+}
+
 void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 {
 	AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
@@ -209,8 +242,12 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	FRotator ViewRotation;
 	Character->GetActorEyesViewPoint(ViewLocation, ViewRotation);
 
-	const FVector TraceStart = ViewLocation;
-	const FVector TraceEnd = TraceStart + ViewRotation.Vector() * WeaponData->Range;
+	// 퍼짐 각도만큼 랜덤 콘 적용(서버 권위 랜덤).
+	const float SpreadRadians = FMath::DegreesToRadians(GetCurrentSpreadAngle());
+	const FVector ShotDirection = (SpreadRadians > 0.0f)
+		? FMath::VRandCone(ViewRotation.Vector(), SpreadRadians) : ViewRotation.Vector();
+	const FVector TraceStart = ViewLocation; // 사격 시작
+	const FVector TraceEnd = TraceStart + ShotDirection * WeaponData->Range; // 사격 끝
 
 	// 사격 트레이스: Weapon 채널(캐릭터/벽 Block, 카메라 프로브와 분리).
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OBWeaponTrace), /*bTraceComplex=*/true);

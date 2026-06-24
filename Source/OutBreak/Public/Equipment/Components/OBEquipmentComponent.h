@@ -9,6 +9,8 @@
 
 class AOBWeaponBase;
 
+DECLARE_MULTICAST_DELEGATE_OneParam(FOBOnWeaponChanged, AOBWeaponBase*);
+
 UCLASS(ClassGroup=(OutBreak), meta=(BlueprintSpawnableComponent))
 class OUTBREAK_API UOBEquipmentComponent : public UActorComponent
 {
@@ -25,6 +27,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Equipment")
 	AOBWeaponBase* GetCurrentWeapon() const { return CurrentWeapon; }
+	
+public:
+	FOBOnWeaponChanged OnWeaponChanged;
 	
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

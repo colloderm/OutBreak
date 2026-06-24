@@ -23,7 +23,9 @@ public class OutBreak : ModuleRules
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			"ModelViewViewModel"
+			"ModelViewViewModel",
+			"OnlineSubsystem",
+			"OnlineSubsystemUtils"
 		});
 
 		// Uncomment if you are using Slate UI

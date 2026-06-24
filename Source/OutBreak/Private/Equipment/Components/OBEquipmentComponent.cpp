@@ -63,9 +63,12 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 			if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter))
 			{
 				Data->AbilitySet->GiveToAbilitySystem(ASC, &GrantedAbilityHandles, NewWeapon);
+				
+				OnWeaponChanged.Broadcast(CurrentWeapon);
 			}
 		}
 	}
+	
 
 	// [확장] 장착 시 발사 Ability 부여:
 	// UOBAbilitySet이 Ability 부여를 지원하면 여기서 PlayerState ASC에 적용한다.
@@ -89,6 +92,8 @@ void UOBEquipmentComponent::UnequipWeapon()
 		// 부여했던 Ability 회수도 여기서 처리.
 		CurrentWeapon->Destroy();
 		CurrentWeapon = nullptr;
+		
+		OnWeaponChanged.Broadcast(nullptr);
 	}
 }
 
@@ -108,6 +113,8 @@ void UOBEquipmentComponent::OnRep_CurrentWeapon()
 	if (CurrentWeapon)
 	{
 		AttachWeaponToOwner();
+		
+		OnWeaponChanged.Broadcast(CurrentWeapon);
 	}
 }
 

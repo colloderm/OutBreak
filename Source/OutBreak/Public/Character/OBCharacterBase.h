@@ -31,7 +31,6 @@ public:
 	// 복제 등록
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
-	//현재 사망 여부
 	UFUNCTION(BlueprintPure, Category = "OB|Death")
 	bool IsDead() const { return bIsDead; }
 	
@@ -45,7 +44,28 @@ public:
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayFireMontage(UAnimMontage* MontageToPlay);
 	
+	void SetPawnData(UOBPawnData* InPawnData) { PawnData = InPawnData; }
+	
+	// 조준 상태(서버). 이동 감속 + 복제 상태
+	void SetAiming(bool bnewAiming);
+	
+	UFUNCTION(BlueprintPure, Category = "OB|ADS")
+	bool IsAiming() const { return bIsAiming; }
+	
+	// 발사 시 집중 효과 펄스(로컬용)
+	void AddFireFocusPulse(float PulseAmount);
+	
+public:
+	/*
+	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).
+	멀티플레이 역할? - 서버/클라 각자 자기 머신에서 초기화 완료 시 브로드캐스트.
+	*/
+	FOBOnAbilitySystemInitialized OnAbilitySystemInitialized;
+	
 protected:
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+	
 	//~ APawn interface
 	virtual void PossessedBy(AController* NewController) override; // 서버 경로
 	virtual void OnRep_PlayerState() override;                     // 클라이언트 경로
@@ -53,7 +73,7 @@ protected:
 
 	void InitAbilitySystemComponent();
 	
-	// 왜 호출되는가? - 사망 클라이언트 연출 처리.
+	// 사망 클라이언트 연출 처리.
 	UFUNCTION()
 	void OnRep_IsDead();
 
@@ -63,6 +83,13 @@ protected:
 	void StartDeath();
 
 	void StartRagdoll();
+	
+	UFUNCTION()
+	void OnRep_isAiming();
+	void UpdateAimingState();
+	
+	// 발사 시 집중 효과를 카메라 적용
+	void ApplyCombatFocusPostProcess();
 	
 protected:
 	UPROPERTY()
@@ -86,23 +113,40 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
 	TObjectPtr<UOBEquipmentComponent> EquipmentComponent;
 	
+	// 집중 강도(0~1).
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|CombatFocus")
+	float FocusVignette = 0.6f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|CombatFocus")
+	float FocusMotionBlur = 0.35f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|CombatFocus")
+	float FocusFringe = 2.0f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|CombatFocus")
+	float FocusRecoverySpeed = 6.0f;
+	
+	// 조준 중 유지되는 기본 집중(은은한 터널비전).
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|CombatFocus")
+	float AimFocusBaseline = 0.3f;
+	
 	// ASC가 이미 초기화됐는지 가드(중복 InitAbilityActorInfo/브로드캐스트 방지).
 	bool bAbilitySystemInitialized = false;
 	
-	/*
-	왜 존재하는가? - 사망 상태. UI/연출/로직 분기의 기준.
-	멀티플레이 역할? - 서버가 설정, OnRep으로 클라 연출 트리거.
-	*/
 	UPROPERTY(ReplicatedUsing = OnRep_IsDead)
 	bool bIsDead = false;
-
-public:
-	void SetPawnData(UOBPawnData* InPawnData) { PawnData = InPawnData; }
 	
-public:
-	/*
-	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).
-	멀티플레이 역할? - 서버/클라 각자 자기 머신에서 초기화 완료 시 브로드캐스트.
-	*/
-	FOBOnAbilitySystemInitialized OnAbilitySystemInitialized;
+	UPROPERTY(ReplicatedUsing = OnRep_IsAiming)
+	bool bIsAiming = false;
+	
+private:
+	float DefaultWalkSpeed = 600.f;
+	float DefaultCameraFOV = 90.f;
+	float TargetCameraFOV = 90.f;
+	float CameraBlendSpeed = 12.f;
+	
+	float CombatFocus = 0.0f;        // 현재
+	float CombatFocusTarget = 0.0f;  // 목표(ADS 기준)
+	float BaseVignette = 0.4f;       // 기본값 캐시
+	float BaseMotionBlur = 0.0f;
 };

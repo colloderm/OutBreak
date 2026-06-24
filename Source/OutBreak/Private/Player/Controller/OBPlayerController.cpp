@@ -27,7 +27,7 @@ void AOBPlayerController::BeginPlay()
 	}
 }
 
-void AOBPlayerController::ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake)
+void AOBPlayerController::ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale)
 {
 	// 소유 클라에서만
 	if (!IsLocalController()) return;
@@ -48,7 +48,8 @@ void AOBPlayerController::ApplyWeaponRecoil(float PitchKick, float YawKick, floa
 	
 	if (CameraShake)
 	{
-		ClientStartCameraShake(CameraShake);
+		// 스케일 적용(조준 시 약하게).
+		ClientStartCameraShake(CameraShake, CameraShakeScale);
 	}
 }
 

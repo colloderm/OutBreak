@@ -7,6 +7,8 @@
 #include "Character/OBCharacterBase.h"
 #include "AbilitySystemComponent.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/ViewModels/OBAmmoViewModel.h"
+#include "Equipment/Components/OBEquipmentComponent.h"
 #include "View/MVVMView.h"
 
 void AOBHUD::BeginPlay()
@@ -31,6 +33,7 @@ void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)
 	if (AOBCharacterBase* Character = Cast<AOBCharacterBase>(NewPawn))
 	{
 		TryInitHealthWidget(Character);
+		InitAmmoWidget(Character);
 	}
 }
 
@@ -74,5 +77,36 @@ void AOBHUD::InitHealthWidget(AOBCharacterBase* Character)
 	if (UMVVMView* View = HealthWidget->GetExtension<UMVVMView>())
 	{
 		View->SetViewModel(FName("OBHealthViewModel"), HealthViewModel);
+	}
+}
+
+void AOBHUD::InitAmmoWidget(AOBCharacterBase* Character)
+{
+	if (AmmoWidget || !Character || !AmmoWidgetClass) return;
+
+	UOBEquipmentComponent* Equipment = Character->FindComponentByClass<UOBEquipmentComponent>();
+	if (!Equipment) return;
+	
+	AmmoViewModel = NewObject<UOBAmmoViewModel>(this);
+	
+	// 무기 교체 구독 + 현재 무기로 초기화(아직 null이면 OnWeaponChanged가 채움).
+	Equipment->OnWeaponChanged.AddUObject(this, &AOBHUD::HandleWeaponChanged);
+	AmmoViewModel->SetWeapon(Equipment->GetCurrentWeapon());
+	
+	AmmoWidget = CreateWidget<UUserWidget>(GetOwningPlayerController(), AmmoWidgetClass);
+	if (!AmmoWidget) return;
+	AmmoWidget->AddToViewport();
+	
+	if (UMVVMView* View = AmmoWidget->GetExtension<UMVVMView>())
+	{
+		View->SetViewModel(FName("OBAmmoViewModel"), AmmoViewModel);
+	}
+}
+
+void AOBHUD::HandleWeaponChanged(AOBWeaponBase* NewWeapon)
+{
+	if (AmmoViewModel)
+	{
+		AmmoViewModel->SetWeapon(NewWeapon);
 	}
 }

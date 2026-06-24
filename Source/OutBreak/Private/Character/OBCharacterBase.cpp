@@ -20,10 +20,12 @@
 #include "Animation/AnimMontage.h"
 #include "Weapon/OBWeaponBase.h"
 #include "DrawDebugHelpers.h"
+#include "Weapon/Data/OBWeaponData.h"
 
 AOBCharacterBase::AOBCharacterBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -54,7 +56,24 @@ AOBCharacterBase::AOBCharacterBase()
 	{
 		GetMesh()->SetCollisionResponseToChannel(OB_TraceChannel_CameraProbe, ECR_Ignore);
 	}
+}
 
+void AOBCharacterBase::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		DefaultWalkSpeed = MoveComp->MaxWalkSpeed;
+	}
+	if (FollowCamera)
+	{
+		DefaultCameraFOV = FollowCamera->FieldOfView;
+		TargetCameraFOV = DefaultCameraFOV;
+		
+		BaseVignette = FollowCamera->PostProcessSettings.VignetteIntensity;
+		BaseMotionBlur = FollowCamera->PostProcessSettings.MotionBlurAmount;
+	}
 }
 
 UAbilitySystemComponent* AOBCharacterBase::GetAbilitySystemComponent() const
@@ -66,8 +85,9 @@ void AOBCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
-	// 사망 상태를 모든 클라이언트로 복제.
+	// 상태에 대한 내용을 모든 클라이언트로 복제.
 	DOREPLIFETIME(AOBCharacterBase, bIsDead);
+	DOREPLIFETIME(AOBCharacterBase, bIsAiming);
 }
 
 void AOBCharacterBase::HandleDeath()
@@ -156,6 +176,109 @@ void AOBCharacterBase::StartRagdoll()
 	MeshComp->SetAllBodiesSimulatePhysics(true);
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
+}
+
+void AOBCharacterBase::SetAiming(bool bnewAiming)
+{
+	if (!HasAuthority()) return;
+	bIsAiming = bnewAiming;
+	UpdateAimingState(); // 서버 반영
+}
+
+void AOBCharacterBase::OnRep_isAiming()
+{
+	UpdateAimingState(); // 클라 반영
+}
+
+void AOBCharacterBase::UpdateAimingState()
+{
+	// 현재 무기 데이터
+	UOBWeaponData* Data = nullptr;
+	if (EquipmentComponent)
+	{
+		if (AOBWeaponBase* Weapon = EquipmentComponent->GetCurrentWeapon())
+		{
+			Data = Weapon->GetWeaponData();
+		}
+	}
+	
+	// 이동 감속(모든 머신: 복제된 bIsAiming + 공유 WeaponData)
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		const float Mult = (bIsAiming && Data) ? Data->ADSSpeedMultiplier : 1.0f;
+		MoveComp->MaxWalkSpeed = DefaultWalkSpeed * Mult;
+	}
+	
+	// 카메라 FOV 블렌드(조준하는 본인만)
+	if (IsLocallyControlled() && FollowCamera)
+	{
+		TargetCameraFOV = (bIsAiming && Data) ? Data->ADSFOV : DefaultCameraFOV;
+		CameraBlendSpeed = Data ? Data->ADSBlendSpeed : 12.f;
+		
+		// 조준 중이면 은은한 집중 유지.
+		CombatFocusTarget = bIsAiming ? AimFocusBaseline : 0.f;
+		
+		SetActorTickEnabled(true);
+	}
+}
+
+void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
+{
+	// 로컬 전용
+	if (!IsLocallyControlled()) return;
+	
+	CombatFocus = FMath::Min(1.f, CombatFocus + PulseAmount);
+	SetActorTickEnabled(true);
+}
+
+void AOBCharacterBase::ApplyCombatFocusPostProcess()
+{
+	if (!FollowCamera) return;
+	
+	FPostProcessSettings& PP = FollowCamera->PostProcessSettings;
+	
+	PP.bOverride_VignetteIntensity = true;
+	PP.VignetteIntensity = FMath::Lerp(BaseVignette, FocusVignette, CombatFocus);
+	
+	PP.bOverride_MotionBlurAmount = true;
+	PP.MotionBlurAmount = FMath::Lerp(BaseMotionBlur, FocusMotionBlur, CombatFocus);
+	
+	PP.bOverride_SceneFringeIntensity = true;
+	PP.SceneFringeIntensity = FMath::Lerp(0.f, FocusFringe, CombatFocus);
+}
+
+void AOBCharacterBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	
+	bool bStillBlending = false;
+
+	if (FollowCamera)
+	{
+		const float NewFOV = FMath::FInterpTo(FollowCamera->FieldOfView, TargetCameraFOV, DeltaSeconds, CameraBlendSpeed);
+		FollowCamera->SetFieldOfView(NewFOV);
+		if (!FMath::IsNearlyEqual(NewFOV, TargetCameraFOV, 0.1f))
+		{
+			bStillBlending = true;
+		}
+		else
+		{
+			FollowCamera->SetFieldOfView(TargetCameraFOV);
+		}
+	}
+	
+	const float NewFocus = FMath::FInterpTo(CombatFocus, CombatFocusTarget, DeltaSeconds, FocusRecoverySpeed);
+	if (!FMath::IsNearlyEqual(NewFocus, CombatFocusTarget, 0.001f) || CombatFocus > 0.001f)
+	{
+		bStillBlending = true;
+	}
+	CombatFocus = NewFocus;
+	ApplyCombatFocusPostProcess();
+	
+	if (!bStillBlending)
+	{
+		SetActorTickEnabled(false);
+	}
 }
 
 void AOBCharacterBase::Multicast_PlayFireMontage_Implementation(UAnimMontage* MontageToPlay)

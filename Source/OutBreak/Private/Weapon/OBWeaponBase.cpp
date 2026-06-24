@@ -53,6 +53,7 @@ void AOBWeaponBase::InitializeAmmo()
 		CurrentAmmo = WeaponData->MagazineSize;
 		ReserveAmmo = WeaponData->MaxReserveAmmo;
 	}
+	OnAmmoChanged.Broadcast();
 }
 
 bool AOBWeaponBase::CanReload() const

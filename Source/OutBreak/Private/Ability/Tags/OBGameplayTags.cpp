@@ -9,9 +9,11 @@ namespace OBGameplayTags
 	
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Weapon_Fire, "InputTag.Weapon.Fire");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Weapon_Reload, "InputTag.Weapon.Reload");
+	UE_DEFINE_GAMEPLAY_TAG(InputTag_Weapon_Aim, "InputTag.Weapon.Aim");
 	
 	UE_DEFINE_GAMEPLAY_TAG(State_Dead, "State.Dead");
 	UE_DEFINE_GAMEPLAY_TAG(State_Reloading, "State.Reloading");
+	UE_DEFINE_GAMEPLAY_TAG(State_Aiming, "State.Aiming");
 	
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_Fire, "GameplayCue.Weapon.Fire");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_Impact, "GameplayCue.Weapon.Impact");
