@@ -124,8 +124,8 @@ void UOBEquipmentComponent::AttachWeaponToOwner()
 
 	ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
 	if (!OwnerCharacter || !OwnerCharacter->GetMesh()) return;
-
+	auto ChildMesh = Cast<USkeletalMeshComponent>(OwnerCharacter->GetMesh()->GetChildComponent(0));
 	const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
-	CurrentWeapon->AttachToComponent(OwnerCharacter->GetMesh(), AttachRules, AttachSocketName);
+	CurrentWeapon->AttachToComponent(ChildMesh, AttachRules, AttachSocketName);
 }
 

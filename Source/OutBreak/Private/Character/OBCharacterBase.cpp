@@ -20,6 +20,7 @@
 #include "Animation/AnimMontage.h"
 #include "Weapon/OBWeaponBase.h"
 #include "DrawDebugHelpers.h"
+#include "Character/Animation/OBAnimInstance.h"
 #include "Weapon/Data/OBWeaponData.h"
 
 AOBCharacterBase::AOBCharacterBase()
@@ -231,6 +232,26 @@ void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
 	SetActorTickEnabled(true);
 }
 
+USkeletalMeshComponent* AOBCharacterBase::GetMontageMesh() const
+{
+	// 메인 Mesh가 게임플레이 AnimInstance(슬롯)를 돌리면 그것 사용(소스 메시).
+	if (GetMesh() && GetMesh()->GetAnimInstance() && GetMesh()->GetAnimInstance()->IsA<UOBAnimInstance>())
+	{
+		return GetMesh();
+	}
+	// 아니면 자식 중에서 UOBAnimInstance 가진 메시 탐색.
+	TArray<USkeletalMeshComponent*> Meshes;
+	GetComponents<USkeletalMeshComponent>(Meshes);
+	for (USkeletalMeshComponent* Comp : Meshes)
+	{
+		if (Comp && Comp->GetAnimInstance() && Comp->GetAnimInstance()->IsA<UOBAnimInstance>())
+		{
+			return Comp;
+		}
+	}
+	return GetMesh(); // 폴백
+}
+
 void AOBCharacterBase::ApplyCombatFocusPostProcess()
 {
 	if (!FollowCamera) return;
@@ -285,10 +306,14 @@ void AOBCharacterBase::Multicast_PlayFireMontage_Implementation(UAnimMontage* Mo
 {
 	if (!MontageToPlay || !GetMesh()) return;
 	
-	// 각 머신의 AnimInstance에서 몽타주 재생(상체 슬롯).
-	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	USkeletalMeshComponent* MontageMesh = GetMontageMesh();
+
+	if (MontageMesh)
 	{
-		AnimInstance->Montage_Play(MontageToPlay);
+		if (UAnimInstance* AnimInstance = MontageMesh->GetAnimInstance())
+		{
+			AnimInstance->Montage_Play(MontageToPlay);
+		}
 	}
 }
 
@@ -341,6 +366,12 @@ void AOBCharacterBase::InitAbilitySystemComponent()
 
 	// GAS 필수: Owner=PlayerState, Avatar=this. 서버/클라 양쪽 호출.
 	AbilitySystemComponent->InitAbilityActorInfo(PS, this);
+	
+	// 몽타주가 재생될 메시를 슬롯 보유 메시로 고정(리타깃 자식 메시 셋업 대응).
+	if (AbilitySystemComponent && AbilitySystemComponent->AbilityActorInfo.IsValid())
+	{
+		AbilitySystemComponent->AbilityActorInfo->SkeletalMeshComponent = GetMontageMesh();
+	}
 	
 	bAbilitySystemInitialized = true;
 	

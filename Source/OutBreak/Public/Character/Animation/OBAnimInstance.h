@@ -38,6 +38,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "Aim", Meta = (AllowPrivateAccess = "true"))
 	float AimPitch = 0.0f;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "Aim", Meta = (AllowPrivateAccess = "true"))
+	float AimYaw = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "State", Meta = (AllowPrivateAccess = "true"))
 	bool bIsDead = false;

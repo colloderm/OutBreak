@@ -55,6 +55,9 @@ public:
 	// 발사 시 집중 효과 펄스(로컬용)
 	void AddFireFocusPulse(float PulseAmount);
 	
+	// 몽타주를 재생할 메시(우리 게임플레이 AnimInstance=슬롯 보유 메시).
+	USkeletalMeshComponent* GetMontageMesh() const;
+	
 public:
 	/*
 	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).

@@ -35,7 +35,7 @@ protected:
 	// 실제 위젯/ViewModel 생성 + 주입.
 	void InitHealthWidget(AOBCharacterBase* Character);
 	
-	void InitAmmoWidget(AOBCharacterBase* Character);
+	void BindAmmoToCharacter(AOBCharacterBase* Character);
 	// 무기 교체 시 VM 재바인딩.
 	void HandleWeaponChanged(AOBWeaponBase* NewWeapon);
 	

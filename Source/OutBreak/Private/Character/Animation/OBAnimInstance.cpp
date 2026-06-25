@@ -41,6 +41,7 @@ void UOBAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 
 	const FRotator BaseAimRotation = OwningPawn->GetBaseAimRotation();
 	AimPitch = FRotator::NormalizeAxis(BaseAimRotation.Pitch);
+	AimYaw = FRotator::NormalizeAxis(BaseAimRotation.Yaw);
 
 	if (OwningCharacter)
 	{
