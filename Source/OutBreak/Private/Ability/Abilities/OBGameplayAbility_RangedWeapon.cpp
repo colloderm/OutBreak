@@ -131,6 +131,8 @@ void UOBGameplayAbility_RangedWeapon::FireOneShot()
 		{
 			if (AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
 			{
+				Char->NotifyFired();
+				
 				// 조준 중이면 반동 배율 적용.
 				const float RecoilMult = Char->IsAiming() ? Data->ADSRecoilMultiplier : 1.0f;
 				

@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "OBPawnData.generated.h"
 
+class AOBWeaponBase;
 class AOBWeaponBase;
 
 UCLASS(BlueprintType, Const)
@@ -16,9 +18,14 @@ public:
 	// 로비 UI에 표시할 캐릭터 이름.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
 	FText DisplayName;
+	
+	// 시작 로드아웃 무기들(주/보조/근접).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loadout")
+	TArray<TSubclassOf<AOBWeaponBase>> DefaultWeapons;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
-	TSubclassOf<AOBWeaponBase> DefaultWeapon;
+	// 시작 소모품(붕대/수류탄 등): 태그→개수.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loadout", Meta = (Categories = "Item"))
+	TMap<FGameplayTag, int32> StartingItems;
 
 	// [확장] 캐릭터별 외형 메시:
 	// UPROPERTY(EditDefaultsOnly, Category = "Visual")

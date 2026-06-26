@@ -6,6 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "OBPlayerController.generated.h"
 
+class UInputAction;
+enum class EOBWeaponSlot : uint8;
 class UOBAbilitySystemComponent;
 class UCameraShakeBase;
 class UOBInputConfig;
@@ -54,6 +56,8 @@ protected:
 	// 조종 폰의 커스텀 ASC 조회.
 	UOBAbilitySystemComponent* GetOBAbilitySystemComponent() const;
 	
+	void Input_EquipSlot(EOBWeaponSlot Slot);
+	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -72,5 +76,12 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UOBInputConfig> InputConfig;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> SlotPrimaryAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> SlotSecondaryAction;
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Weapon")
+	TObjectPtr<UInputAction> SlotMeleeAction;
 	
 };

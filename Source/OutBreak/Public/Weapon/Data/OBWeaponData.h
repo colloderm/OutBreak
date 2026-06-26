@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "GameplayTagContainer.h"
 #include "OBWeaponData.generated.h"
 
 class UCameraShakeBase;
@@ -12,11 +13,33 @@ class USkeletalMesh;
 class UGameplayEffect;
 
 UENUM(BlueprintType)
+enum class EOBWeaponCategory : uint8
+{
+	// 주무기
+	AssaultRifle UMETA(DisplayName = "Assault Rifle"),
+	SniperRifle  UMETA(DisplayName = "Sniper Rifle"),
+	SMG          UMETA(DisplayName = "SMG"),
+	Shotgun      UMETA(DisplayName = "Shotgun"),
+	// 보조무기
+	Pistol		 UMETA(DisplayName = "Pistol"),
+	// 근접무기
+	Melee		 UMETA(DisplayName = "Melee"),
+};
+
+UENUM(BlueprintType)
 enum class EOBWeaponFireMode : uint8
 {
 	Single		UMETA(DisplayName = "Single"),   // 단발
 	Burst		UMETA(DisplayName = "Burst"),    // 점사
 	FullAuto	UMETA(DisplayName = "Full Auto") // 연사
+};
+
+UENUM(BlueprintType)
+enum class EOBWeaponSlot : uint8
+{
+	Primary   UMETA(DisplayName = "Primary"),
+	Secondary UMETA(DisplayName = "Secondary"),
+	Melee     UMETA(DisplayName = "Melee")
 };
 
 UCLASS(BlueprintType, Const)
@@ -38,6 +61,18 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
 	TObjectPtr<UAnimMontage> ReloadMontage;
+	
+	// 무기가 들어갈 로드아웃 슬롯(키 1/2/3).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	EOBWeaponSlot WeaponSlot = EOBWeaponSlot::Primary;
+	
+	// 무기 카테고리(슬롯/애님 레이어 분류).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	EOBWeaponCategory WeaponCategory = EOBWeaponCategory::AssaultRifle;
+	
+	// 탄약 타입
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Ammo", Meta = (Categories = "Ammo"))
+	FGameplayTag AmmoType;
 
 	// --- 발사 스탯 ---
 

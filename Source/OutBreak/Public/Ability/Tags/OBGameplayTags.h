@@ -18,17 +18,27 @@ namespace OBGameplayTags
 	// GE_Damage의 Modifier Magnitude(Set By Caller)와 동일한 태그여야 한다.
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(SetByCaller_Damage);
 	
+	// 입력
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Weapon_Fire);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Weapon_Reload);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Weapon_Aim);
 	
+	// 상태
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Reloading);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Aiming);
 	
-	// 발사 연출(총구 화염/사격음).
+	// 연출(발사 - 총구 화염/사격음, 피격 - 탄착 이펙트/사운드 등).
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Fire);
-	// 피격 연출(탄착 이펙트/사운드).
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Impact);
+	
+	// 탄약 타입(인벤토리 탄약 풀의 키). 무기마다 자기 타입을 지정.
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ammo_AssaultRifle);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ammo_SniperRifle);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ammo_SMG);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ammo_Shotgun);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ammo_Pistol);
+	
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Melee);
 	
 }

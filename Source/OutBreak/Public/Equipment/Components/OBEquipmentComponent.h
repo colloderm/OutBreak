@@ -34,17 +34,9 @@ public:
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
-	/*
-	언제 호출되는가? - 서버가 CurrentWeapon을 변경해 복제될 때.
-	서버/클라? - 클라이언트 전용 콜백.
-	*/
 	UFUNCTION()
 	void OnRep_CurrentWeapon();
 
-	/*
-	언제 호출되는가? - 서버 장착 직후 / 클라 OnRep 직후.
-	서버/클라? - 양쪽 모두.
-	*/
 	void AttachWeaponToOwner();
 
 protected:

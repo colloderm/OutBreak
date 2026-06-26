@@ -10,6 +10,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
+#include "Inventory/Components/OBInventoryComponent.h"
 #include "Character/Data/OBPawnData.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Ability/Data/OBAbilitySet.h"
@@ -41,6 +42,8 @@ AOBCharacterBase::AOBCharacterBase()
 	FollowCamera->bUsePawnControlRotation = false;
 	
 	EquipmentComponent = CreateDefaultSubobject<UOBEquipmentComponent>(TEXT("EquipmentComponent"));
+	
+	InventoryComponent = CreateDefaultSubobject<UOBInventoryComponent>(TEXT("InventoryComponent"));
 
 	bUseControllerRotationYaw = false;
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
@@ -221,6 +224,8 @@ void AOBCharacterBase::UpdateAimingState()
 		
 		SetActorTickEnabled(true);
 	}
+	
+	UpdateCombatOrientation();   // 조준 변화 시 지향 갱신
 }
 
 void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
@@ -252,6 +257,15 @@ USkeletalMeshComponent* AOBCharacterBase::GetMontageMesh() const
 	return GetMesh(); // 폴백
 }
 
+void AOBCharacterBase::NotifyFired()
+{
+	bRecentlyFired = true;
+	UpdateCombatOrientation();
+	GetWorldTimerManager().SetTimer(
+		CombatOrientTimer, this, &AOBCharacterBase::ClearRecentlyFired, CombatOrientHoldTime, false
+	);
+}
+
 void AOBCharacterBase::ApplyCombatFocusPostProcess()
 {
 	if (!FollowCamera) return;
@@ -266,6 +280,24 @@ void AOBCharacterBase::ApplyCombatFocusPostProcess()
 	
 	PP.bOverride_SceneFringeIntensity = true;
 	PP.SceneFringeIntensity = FMath::Lerp(0.f, FocusFringe, CombatFocus);
+}
+
+void AOBCharacterBase::ClearRecentlyFired()
+{
+	bRecentlyFired = false;
+	UpdateCombatOrientation();
+}
+
+void AOBCharacterBase::UpdateCombatOrientation()
+{
+	// 조준 중이거나 방금 발사했으면 조준 방향(컨트롤 회전)을 바라봄.
+	const bool bCombat = bIsAiming || bRecentlyFired;
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->bOrientRotationToMovement = !bCombat;   // 평소엔 이동 방향
+	}
+	bUseControllerRotationYaw = bCombat;
 }
 
 void AOBCharacterBase::Tick(float DeltaSeconds)
@@ -325,22 +357,35 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 	// 1) ASC 초기화
 	InitAbilitySystemComponent();
 	
-	// 부활: 이전 생애의 사망 태그를 제거(ASC는 PlayerState에 영속).
+	// 2) 부활 사망 태그 제거
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(OBGameplayTags::State_Dead);
 	}
 	
-	// 2) 기본 AbilitySet 적용(체력 등)
+	// 3) 기본 AbilitySet(체력 등)
 	if (AbilitySystemComponent && DefaultAbilitySet)
 	{
 		DefaultAbilitySet->GiveToAbilitySystem(AbilitySystemComponent, nullptr, this);
 	}
 	
-	// 3) PawnData의 기본 무기 지급(서버). 로비 캐릭터별로 무기가 달라지는 진입점.
-	if (PawnData && EquipmentComponent && PawnData->DefaultWeapon)
+	// 4) 시작 로드아웃 일괄 지급
+	if (PawnData && InventoryComponent)
 	{
-		EquipmentComponent->EquipWeapon(PawnData->DefaultWeapon);
+		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : PawnData->DefaultWeapons)
+		{
+			if (WeaponClass)
+			{
+				InventoryComponent->AddWeapon(WeaponClass);
+			}
+		}
+
+		for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
+		{
+			InventoryComponent->AddItem(Item.Key, Item.Value);
+		}
+
+		InventoryComponent->EquipDefaultSlot();   // 주무기 우선 장착
 	}
 }
 

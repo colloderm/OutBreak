@@ -7,6 +7,7 @@
 #include "AbilitySystemInterface.h"
 #include "OBCharacterBase.generated.h"
 
+class UOBInventoryComponent;
 DECLARE_MULTICAST_DELEGATE(FOBOnAbilitySystemInitialized);
 
 class UOBPawnData;
@@ -58,6 +59,9 @@ public:
 	// 몽타주를 재생할 메시(우리 게임플레이 AnimInstance=슬롯 보유 메시).
 	USkeletalMeshComponent* GetMontageMesh() const;
 	
+	// 발사 방향 보기
+	void NotifyFired();
+	
 public:
 	/*
 	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).
@@ -94,6 +98,9 @@ protected:
 	// 발사 시 집중 효과를 카메라 적용
 	void ApplyCombatFocusPostProcess();
 	
+	void UpdateCombatOrientation();
+	void ClearRecentlyFired();
+	
 protected:
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
@@ -115,6 +122,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
 	TObjectPtr<UOBEquipmentComponent> EquipmentComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	TObjectPtr<UOBInventoryComponent> InventoryComponent;
 	
 	// 집중 강도(0~1).
 	UPROPERTY(EditDefaultsOnly, Category = "Camera|CombatFocus")
@@ -141,6 +151,12 @@ protected:
 	
 	UPROPERTY(ReplicatedUsing = OnRep_IsAiming)
 	bool bIsAiming = false;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Combat")
+	float CombatOrientHoldTime = 1.5f;
+
+	bool bRecentlyFired = false;
+	FTimerHandle CombatOrientTimer;
 	
 private:
 	float DefaultWalkSpeed = 600.f;

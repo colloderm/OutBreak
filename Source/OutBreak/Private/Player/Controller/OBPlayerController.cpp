@@ -11,6 +11,8 @@
 #include "InputAction.h"
 #include "LyraInspired/Input/OBInputConfig.h"
 #include "Camera/PlayerCameraManager.h"
+#include "Inventory/Components/OBInventoryComponent.h"
+#include "Weapon/Data/OBWeaponData.h"
 
 void AOBPlayerController::BeginPlay()
 {
@@ -125,6 +127,21 @@ void AOBPlayerController::SetupInputComponent()
 			}
 		}
 	}
+	
+	if (SlotPrimaryAction)
+	{
+		EIC->BindAction(SlotPrimaryAction,   ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Primary);
+	}
+	
+	if (SlotSecondaryAction)
+	{
+		EIC->BindAction(SlotSecondaryAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Secondary);
+	}
+	
+	if (SlotMeleeAction)
+	{
+		EIC->BindAction(SlotMeleeAction,     ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Melee);
+	}
 }
 
 void AOBPlayerController::Input_Move(const FInputActionValue& Value)
@@ -191,4 +208,15 @@ void AOBPlayerController::Input_AbilityInputReleased(FGameplayTag InputTag)
 UOBAbilitySystemComponent* AOBPlayerController::GetOBAbilitySystemComponent() const
 {
 	return Cast<UOBAbilitySystemComponent>(UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()));
+}
+
+void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
+{
+	if (APawn* P = GetPawn())
+	{
+		if (UOBInventoryComponent* Inv = P->FindComponentByClass<UOBInventoryComponent>())
+		{
+			Inv->Server_EquipSlot(Slot);  // 클라 → 서버 요청
+		}
+	}
 }
