@@ -18,14 +18,21 @@ public class OutBreak : ModuleRules
 			"UMG",
 			"GameplayAbilities",
 			"GameplayTags",
-			"GameplayTasks"
+			"GameplayTasks",
+			"NavigationSystem",
+			"DeveloperSettings",
+			"AnimationDataController",
+			"AnimationData",
+			"AnimationBudgetAllocator",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"ModelViewViewModel",
 			"OnlineSubsystem",
-			"OnlineSubsystemUtils"
+			"OnlineSubsystemUtils",
+			"AIModule",
+			"Navmesh"
 		});
 
 		// Uncomment if you are using Slate UI

@@ -18,6 +18,7 @@ UOBGameplayAbility_Reload::UOBGameplayAbility_Reload(const FObjectInitializer& O
 	// 재장전 중 상태 태그(발사 차단에 사용).
 	ActivationOwnedTags.AddTag(OBGameplayTags::State_Reloading);
 	ActivationBlockedTags.AddTag(OBGameplayTags::State_Weapon_Switching);
+	ActivationBlockedTags.AddTag(OBGameplayTags::State_UsingConsumable);
 }
 
 void UOBGameplayAbility_Reload::ActivateAbility(

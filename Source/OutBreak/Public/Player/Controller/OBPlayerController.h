@@ -6,7 +6,6 @@
 #include "GameFramework/PlayerController.h"
 #include "OBPlayerController.generated.h"
 
-class UInputAction;
 enum class EOBWeaponSlot : uint8;
 class UOBAbilitySystemComponent;
 class UCameraShakeBase;

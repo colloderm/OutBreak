@@ -26,21 +26,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "OnlineSubsystemGooglePlay",
-			"Enabled": false,
-			"SupportedTargetPlatforms": [
-				"Android"
-			]
-		},
-		{
-			"Name": "OnlineSubsystemIOS",
-			"Enabled": false,
-			"SupportedTargetPlatforms": [
-				"IOS",
-				"TVOS"
-			]
-		},
-		{
 			"Name": "OnlineSubsystemSteam",
 			"Enabled": true
 		},
@@ -62,6 +47,10 @@
 		},
 		{
 			"Name": "GameFeatures",
+			"Enabled": true
+		},
+		{
+			"Name": "AnimationBudgetAllocator",
 			"Enabled": true
 		}
 	]

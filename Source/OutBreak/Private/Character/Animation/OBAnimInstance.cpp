@@ -3,12 +3,14 @@
 
 #include "Character/Animation/OBAnimInstance.h"
 
+#include "AbilitySystemComponent.h"
 #include "Character/OBCharacterBase.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Weapon/OBWeaponBase.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Ability/Tags/OBGameplayTags.h"
 #include "Weapon/Data/OBWeaponData.h"
 
 void UOBAnimInstance::NativeInitializeAnimation()
@@ -135,6 +137,10 @@ bool UOBAnimInstance::ShouldDisableLeftHandIK() const
 	// 꺼내기(Equip)/재장전 몽타주가 재생 중이면 왼팔을 자유롭게(IK off).
 	if (Data->EquipMontage  && Montage_IsPlaying(Data->EquipMontage))  return true;
 	if (Data->ReloadMontage && Montage_IsPlaying(Data->ReloadMontage)) return true;
+	if (UAbilitySystemComponent* ASC = OwningCharacter->GetAbilitySystemComponent())
+	{
+		if (ASC->HasMatchingGameplayTag(OBGameplayTags::State_UsingConsumable)) return true;
+	}
 
 	return false;
 }

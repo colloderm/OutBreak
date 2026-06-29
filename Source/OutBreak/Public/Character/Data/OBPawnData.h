@@ -8,7 +8,6 @@
 #include "OBPawnData.generated.h"
 
 class AOBWeaponBase;
-class AOBWeaponBase;
 
 UCLASS(BlueprintType, Const)
 class OUTBREAK_API UOBPawnData : public UPrimaryDataAsset

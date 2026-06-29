@@ -22,6 +22,7 @@ UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectIn
 	
 	// 무기 전환 중에는 발사 차단.
 	ActivationBlockedTags.AddTag(OBGameplayTags::State_Weapon_Switching);
+	ActivationBlockedTags.AddTag(OBGameplayTags::State_UsingConsumable);
 }
 
 void UOBGameplayAbility_RangedWeapon::ActivateAbility(
