@@ -34,41 +34,64 @@ void UOBGameplayAbility_Consumable::ActivateAbility(const FGameplayAbilitySpecHa
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+
+	bReleased = false;
 	
-	float UseTime = DefaultUseTime;
+	float MontageLen = DefaultUseTime;
 	if (UseMontage)
 	{
-		UseTime = UseMontage->GetPlayLength();
+		MontageLen = UseMontage->GetPlayLength();
 		
 		UAbilityTask_PlayMontageAndWait* MontageTask = 
 			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, UseMontage);
-		// 중단 시 취소
+		MontageTask->OnCompleted.AddDynamic(this, &UOBGameplayAbility_Consumable::OnMontageEnded);
 		MontageTask->OnInterrupted.AddDynamic(this, &UOBGameplayAbility_Consumable::OnUseCancelled);
 		MontageTask->OnCancelled.AddDynamic(this, &UOBGameplayAbility_Consumable::OnUseCancelled);
 		MontageTask->ReadyForActivation();
 	}
 	
-	// 온료 타이밍은 WaitDelay로 서버 확정(효과/소모는 여기서만 1회
-	UAbilityTask_WaitDelay* DelayTask = UAbilityTask_WaitDelay::WaitDelay(this, UseTime);
-	DelayTask->OnFinish.AddDynamic(this, &UOBGameplayAbility_Consumable::OnUseCompleted);
-	DelayTask->ReadyForActivation();
+	// 효과 적용 시점: ReleaseTime>0 → 그 시점(몽타주 중간), 아니면 몽타주 끝.
+	const float ApplyAt = (ReleaseTime > 0.f) ? FMath::Min(ReleaseTime, MontageLen) : MontageLen;
+	
+	UAbilityTask_WaitDelay* ReleaseTask = UAbilityTask_WaitDelay::WaitDelay(this, FMath::Max(0.01f, ApplyAt));
+	ReleaseTask->OnFinish.AddDynamic(this, &UOBGameplayAbility_Consumable::OnReleased);
+	ReleaseTask->ReadyForActivation();
 }
 
-void UOBGameplayAbility_Consumable::OnUseCompleted()
+void UOBGameplayAbility_Consumable::OnReleased()
 {
+	if (bReleased) return;
+	bReleased = true;
+
 	if (HasAuthority(&CurrentActivationInfo))
 	{
-		ApplyConsumableEffect();
+		ApplyConsumableEffect();                 // 투척 / 회복 등
 		if (UOBInventoryComponent* Inv = GetInventory())
 		{
 			Inv->ConsumeItem(ItemTag, 1);
 		}
+	}
+
+	// 몽타주가 없으면 즉시 종료. 있으면 몽타주가 끝날 때 종료(팔로우스루 유지).
+	if (!UseMontage)
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
+}
+
+void UOBGameplayAbility_Consumable::OnMontageEnded()
+{
+	// 릴리즈가 아직이면(몽타주가 릴리즈보다 먼저 끝나는 예외) 보장.
+	if (!bReleased)
+	{
+		OnReleased();
 	}
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 }
 
 void UOBGameplayAbility_Consumable::OnUseCancelled()
 {
+	// 릴리즈 전에 중단되면 효과 미적용(수류탄 안 던져지고 소모 안 됨).
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 

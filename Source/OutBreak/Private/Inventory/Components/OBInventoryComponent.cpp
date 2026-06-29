@@ -112,7 +112,10 @@ void UOBInventoryComponent::EquipSlot(EOBWeaponSlot Slot)
 	const bool bHasWeapon = Equip && Equip->GetCurrentWeapon() != nullptr;
 
 	// 이미 무기를 들고 다른 슬롯으로 → holster → draw 전환.
-	if (bHasWeapon && Slot != ActiveSlot)
+	if (bHasWeapon && Slot == ActiveSlot) return;
+	
+	// 다른 슬롯으로 → 즉시 교체 + draw.
+	if (bHasWeapon)
 	{
 		SwapToSlot(Slot);
 		return;

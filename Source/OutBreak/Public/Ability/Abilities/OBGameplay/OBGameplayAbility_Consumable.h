@@ -22,11 +22,13 @@ public:
 protected:
 	// 파생에서 실제 효과 구현(서버에서 호출)
 	virtual void ApplyConsumableEffect() {}
-	
 	UOBInventoryComponent* GetInventory() const;
 	
 	UFUNCTION()
-	void OnUseCompleted();
+	void OnReleased();
+	
+	UFUNCTION()
+	void OnMontageEnded();
 	
 	UFUNCTION()
 	void OnUseCancelled();
@@ -41,4 +43,11 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Consumable")
 	float DefaultUseTime = 1.5f;
+	
+	// 효과 적용 시점(초, 몽타주 시작 기준). 0이면 몽타주 끝에 적용(힐 등).
+	UPROPERTY(EditDefaultsOnly, Category = "Consumable", Meta = (ClampMin = "0.0"))
+	float ReleaseTime = 0.f;
+
+private:
+	bool bReleased = false;
 };
