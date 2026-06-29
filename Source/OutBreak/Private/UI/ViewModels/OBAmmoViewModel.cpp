@@ -3,10 +3,11 @@
 #include "UI/ViewModels/OBAmmoViewModel.h"
 
 #include "Weapon/OBWeaponBase.h"
+#include "Weapon/Data/OBWeaponData.h"
+#include "Inventory/Components/OBInventoryComponent.h"
 
 void UOBAmmoViewModel::SetWeapon(AOBWeaponBase* InWeapon)
 {
-	// 이전 무기 구독 해제.
 	if (Weapon.IsValid() && AmmoChangedHandle.IsValid())
 	{
 		Weapon->OnAmmoChanged.Remove(AmmoChangedHandle);
@@ -14,13 +15,26 @@ void UOBAmmoViewModel::SetWeapon(AOBWeaponBase* InWeapon)
 	}
 
 	Weapon = InWeapon;
-
-	// 새 무기 구독.
 	if (InWeapon)
 	{
 		AmmoChangedHandle = InWeapon->OnAmmoChanged.AddUObject(this, &UOBAmmoViewModel::HandleAmmoChanged);
+		RefreshAmmo();
 	}
+	// null이면 마지막 값 유지(사망/교체 깜빡임 방지)
+}
 
+void UOBAmmoViewModel::SetInventory(UOBInventoryComponent* InInventory)
+{
+	if (Inventory.IsValid() && PoolChangedHandle.IsValid())
+	{
+		Inventory->OnAmmoPoolChanged.Remove(PoolChangedHandle);
+		PoolChangedHandle.Reset();
+	}
+	Inventory = InInventory;
+	if (InInventory)
+	{
+		PoolChangedHandle = InInventory->OnAmmoPoolChanged.AddUObject(this, &UOBAmmoViewModel::HandleAmmoChanged);
+	}
 	RefreshAmmo();
 }
 
@@ -31,16 +45,23 @@ void UOBAmmoViewModel::HandleAmmoChanged()
 
 void UOBAmmoViewModel::RefreshAmmo()
 {
+	int32 Mag = 0;
+	int32 Reserve = 0;
+
 	if (AOBWeaponBase* W = Weapon.Get())
 	{
-		SetCurrentAmmo(W->GetCurrentAmmo());
-		SetReserveAmmo(W->GetReserveAmmo());
+		Mag = W->GetCurrentAmmo();
+		if (UOBWeaponData* Data = W->GetWeaponData())
+		{
+			if (UOBInventoryComponent* Inv = Inventory.Get())
+			{
+				Reserve = Inv->GetAmmo(Data->AmmoType);   // 무기 타입의 풀 예비탄
+			}
+		}
+		SetCurrentAmmo(Mag);
+		SetReserveAmmo(Reserve);
 	}
-	else
-	{
-		SetCurrentAmmo(0);
-		SetReserveAmmo(0);
-	}
+	// 무기 없으면 마지막 값 유지
 }
 
 void UOBAmmoViewModel::SetCurrentAmmo(int32 NewValue)

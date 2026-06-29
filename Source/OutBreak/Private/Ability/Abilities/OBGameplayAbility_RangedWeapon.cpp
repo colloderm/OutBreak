@@ -19,6 +19,9 @@ UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectIn
 {
 	// 누름당 1회 활성화 → 내부에서 FireMode별 패턴 처리.
 	ActivationPolicy = EOBAbilityActivationPolicy::OnInputTriggered;
+	
+	// 무기 전환 중에는 발사 차단.
+	ActivationBlockedTags.AddTag(OBGameplayTags::State_Weapon_Switching);
 }
 
 void UOBGameplayAbility_RangedWeapon::ActivateAbility(

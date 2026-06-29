@@ -6,6 +6,7 @@
 #include "MVVMViewModelBase.h"
 #include "OBAmmoViewModel.generated.h"
 
+class UOBInventoryComponent;
 class AOBWeaponBase;
 
 UCLASS()
@@ -17,6 +18,8 @@ public:
 	// 표시할 무기 설정(교체 시 재바인딩).
 	UFUNCTION(BlueprintCallable, Category = "OB|UI")
 	void SetWeapon(AOBWeaponBase* InWeapon);
+	
+	void SetInventory(UOBInventoryComponent* InInventory);
 
 private:
 	void HandleAmmoChanged();
@@ -34,6 +37,10 @@ private:
 
 	UPROPERTY()
 	TWeakObjectPtr<AOBWeaponBase> Weapon;
+	
+	TWeakObjectPtr<UOBInventoryComponent> Inventory;
 
 	FDelegateHandle AmmoChangedHandle;
+	
+	FDelegateHandle PoolChangedHandle;
 };

@@ -30,14 +30,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|Ammo")
 	int32 GetCurrentAmmo() const { return CurrentAmmo; }
-	UFUNCTION(BlueprintPure, Category = "Weapon|Ammo")
-	int32 GetReserveAmmo() const { return ReserveAmmo; }
 
 	bool HasAmmo() const { return CurrentAmmo > 0; }
 	bool CanReload() const;            // 탄창 안 참 && 예비탄 있음
 	void ConsumeAmmo(int32 Amount = 1); // 서버
 	void PerformReload();              // 서버: 예비탄→탄창
 	void InitializeAmmo();             // 서버: WeaponData 기준 초기화
+	
+	void SetCurrentAmmo(int32 NewAmmo);
 
 public:
 	// UI 갱신용(탄약 변경 통지).
@@ -61,7 +61,4 @@ protected:
 	// 현재 탄창 탄약.
 	UPROPERTY(ReplicatedUsing = OnRep_Ammo)
 	int32 CurrentAmmo = 0;
-	// 예비탄.
-	UPROPERTY(ReplicatedUsing = OnRep_Ammo)
-	int32 ReserveAmmo = 0;
 };

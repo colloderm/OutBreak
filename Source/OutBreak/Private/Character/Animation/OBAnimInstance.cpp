@@ -9,6 +9,7 @@
 #include "Weapon/OBWeaponBase.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Weapon/Data/OBWeaponData.h"
 
 void UOBAnimInstance::NativeInitializeAnimation()
 {
@@ -55,7 +56,7 @@ void UOBAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Super::NativeUpdateAnimation(DeltaSeconds);
 	
 	// 무기 소켓 읽기는 게임 스레드에서(스레드 안전 업데이트에서 하면 위험).
-	UpdateLeftHandIK();
+	UpdateLeftHandIK(DeltaSeconds);
 }
 
 float UOBAnimInstance::CalculateDirectionAngle(const FVector& Velocity, const FRotator& BaseRotation) const
@@ -74,47 +75,66 @@ float UOBAnimInstance::CalculateDirectionAngle(const FVector& Velocity, const FR
 	return (RightDot < 0.0f) ? -Angle : Angle;
 }
 
-void UOBAnimInstance::UpdateLeftHandIK()
+void UOBAnimInstance::UpdateLeftHandIK(float DeltaSeconds)
 {
-	bEnableLeftHandIK = false;
-	
-	if (!OwningCharacter) return;
-	
-	// 현재 장착 무기 조회.
+	float TargetAlpha = 0.f;   // 기본: IK 끔
+
+	if (OwningCharacter)
+	{
+		UOBEquipmentComponent* Equipment = OwningCharacter->FindComponentByClass<UOBEquipmentComponent>();
+		AOBWeaponBase* Weapon = Equipment ? Equipment->GetCurrentWeapon() : nullptr;
+
+		USkeletalMeshComponent* WeaponMesh = Weapon ? Cast<USkeletalMeshComponent>(Weapon->GetRootComponent()) : nullptr;
+		USkeletalMeshComponent* CharacterMesh = OwningCharacter->GetMesh();
+
+		if (Weapon && WeaponMesh && CharacterMesh && WeaponMesh->DoesSocketExist(WeaponLeftHandSocket))
+		{
+			// W: 무기 그립(목표) 월드.
+			const FTransform GripWorld = WeaponMesh->GetSocketTransform(WeaponLeftHandSocket, RTS_World);
+
+			// O: HandGrip_L 소켓이 hand_l 본에 대해 갖는 고정 오프셋.
+			const FTransform HandBoneWorld = CharacterMesh->GetSocketTransform(TEXT("hand_l"), RTS_World);
+			const FTransform HandGripWorld = CharacterMesh->GetSocketTransform(HandGripSocket, RTS_World);
+			const FTransform GripRelToHand = HandGripWorld.GetRelativeTransform(HandBoneWorld);
+
+			const FTransform DesiredHandWorld = GripRelToHand.Inverse() * GripWorld;
+			LeftHandIKTransform = DesiredHandWorld.GetRelativeTransform(CharacterMesh->GetComponentTransform());
+
+			// 장착/해제/재장전 몽타주가 왼팔을 움직이는 동안엔 IK를 끈다.
+			TargetAlpha = ShouldDisableLeftHandIK() ? 0.f : 1.f;
+
+#if ENABLE_DRAW_DEBUG
+			if (bDebugLeftHandIK && GetWorld())
+			{
+				DrawDebugSphere(GetWorld(), HandGripWorld.GetLocation(), 4.0f, 8, FColor::Cyan, false, -1.0f);
+			}
+#endif
+		}
+	}
+
+	if (TargetAlpha < LeftHandIKAlpha)
+	{
+		LeftHandIKAlpha = TargetAlpha;
+	}
+	else
+	{
+		LeftHandIKAlpha = FMath::FInterpTo(LeftHandIKAlpha, TargetAlpha, DeltaSeconds, LeftHandIKBlendSpeed);
+	}
+	bEnableLeftHandIK = LeftHandIKAlpha > KINDA_SMALL_NUMBER;
+}
+
+bool UOBAnimInstance::ShouldDisableLeftHandIK() const
+{
+	if (!OwningCharacter) return false;
+
 	UOBEquipmentComponent* Equipment = OwningCharacter->FindComponentByClass<UOBEquipmentComponent>();
 	AOBWeaponBase* Weapon = Equipment ? Equipment->GetCurrentWeapon() : nullptr;
-	if (!Weapon)
-	{
-		return;
-	}
+	UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
+	if (!Data) return false;
 
-	USkeletalMeshComponent* WeaponMesh = Cast<USkeletalMeshComponent>(Weapon->GetRootComponent());
-	USkeletalMeshComponent* CharacterMesh = OwningCharacter->GetMesh();
-	if (!WeaponMesh || !CharacterMesh || !WeaponMesh->DoesSocketExist(WeaponLeftHandSocket))
-	{
-		return;
-	}
+	// 꺼내기(Equip)/재장전 몽타주가 재생 중이면 왼팔을 자유롭게(IK off).
+	if (Data->EquipMontage  && Montage_IsPlaying(Data->EquipMontage))  return true;
+	if (Data->ReloadMontage && Montage_IsPlaying(Data->ReloadMontage)) return true;
 
-	// W: 무기 그립(목표) 월드.
-	const FTransform GripWorld = WeaponMesh->GetSocketTransform(WeaponLeftHandSocket, RTS_World);
-
-	// O: HandGrip_L 소켓이 hand_l 본에 대해 갖는 고정 오프셋(손목→손바닥).
-	const FTransform HandBoneWorld = CharacterMesh->GetSocketTransform(TEXT("hand_l"), RTS_World);
-	const FTransform HandGripWorld = CharacterMesh->GetSocketTransform(HandGripSocket, RTS_World);
-	const FTransform GripRelToHand = HandGripWorld.GetRelativeTransform(HandBoneWorld);
-
-	// hand_l이 가야 할 위치 = 오프셋 역보정 → HandGrip_L이 무기 그립에 정확히 닿음.
-	const FTransform DesiredHandWorld = GripRelToHand.Inverse() * GripWorld;
-
-	LeftHandIKTransform = DesiredHandWorld.GetRelativeTransform(CharacterMesh->GetComponentTransform());
-	
-#if ENABLE_DRAW_DEBUG
-	if (bDebugLeftHandIK && GetWorld())
-	{
-		// 왼손 IK 타깃(소켓) 위치를 시안색 구로 표시.
-		DrawDebugSphere(GetWorld(), HandGripWorld.GetLocation(), 4.0f, 8, FColor::Cyan, false, -1.0f);
-	}
-#endif
-
-	bEnableLeftHandIK = true;
+	return false;
 }

@@ -11,6 +11,7 @@ class UCameraShakeBase;
 class UOBAbilitySet;
 class USkeletalMesh;
 class UGameplayEffect;
+class UAnimInstance;
 
 UENUM(BlueprintType)
 enum class EOBWeaponCategory : uint8
@@ -61,6 +62,14 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
 	TObjectPtr<UAnimMontage> ReloadMontage;
+	
+	// 무기 꺼내기(draw) 몽타주. 슬롯 보유 메시 스켈레톤 기준.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
+	TObjectPtr<UAnimMontage> EquipMontage;
+	
+	// 무기 장착 시 링크할 카테고리 포즈 레이어(Linked Anim Layer).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
+	TSubclassOf<UAnimInstance> EquippedAnimLayer;
 	
 	// 무기가 들어갈 로드아웃 슬롯(키 1/2/3).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")

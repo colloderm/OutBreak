@@ -27,6 +27,7 @@ namespace OBGameplayTags
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Reloading);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Aiming);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Weapon_Switching);
 	
 	// 연출(발사 - 총구 화염/사격음, 피격 - 탄착 이펙트/사운드 등).
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Fire);

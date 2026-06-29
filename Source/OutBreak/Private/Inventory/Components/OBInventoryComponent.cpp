@@ -4,6 +4,12 @@
 
 #include "Weapon/OBWeaponBase.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
+#include "Ability/Tags/OBGameplayTags.h"
+#include "Weapon/Data/OBWeaponData.h"
+#include "Animation/AnimMontage.h"
+#include "TimerManager.h"
 #include "Net/UnrealNetwork.h"
 
 UOBInventoryComponent::UOBInventoryComponent()
@@ -31,6 +37,12 @@ int32 UOBInventoryComponent::GetCount(const TArray<FOBCountEntry>& Arr, const FG
 	}
 	
 	return 0;
+}
+
+FOBWeaponSlotEntry* UOBInventoryComponent::FindSlotEntry(EOBWeaponSlot Slot)
+{
+	for (FOBWeaponSlotEntry& E : WeaponSlots) { if (E.Slot == Slot) return &E; }
+	return nullptr;
 }
 
 TSubclassOf<AOBWeaponBase> UOBInventoryComponent::GetWeaponInSlot(EOBWeaponSlot Slot) const
@@ -94,7 +106,19 @@ void UOBInventoryComponent::EquipSlot(EOBWeaponSlot Slot)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 	if (!GetWeaponInSlot(Slot)) return;
+	if (bSwitching) return;
 	
+	UOBEquipmentComponent* Equip = GetOwner()->FindComponentByClass<UOBEquipmentComponent>();
+	const bool bHasWeapon = Equip && Equip->GetCurrentWeapon() != nullptr;
+
+	// 이미 무기를 들고 다른 슬롯으로 → holster → draw 전환.
+	if (bHasWeapon && Slot != ActiveSlot)
+	{
+		SwapToSlot(Slot);
+		return;
+	}
+	
+	// 첫 장착(또는 동일 슬롯 재장착) → 즉시
 	ActiveSlot = Slot;
 	EquipActiveWeapon();
 	OnInventoryChanged.Broadcast();
@@ -108,9 +132,104 @@ void UOBInventoryComponent::Server_EquipSlot_Implementation(EOBWeaponSlot Slot)
 void UOBInventoryComponent::EquipActiveWeapon()
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	
+	UOBEquipmentComponent* Equip = GetOwner()->FindComponentByClass<UOBEquipmentComponent>();
+	if (!Equip) return;
+	
+	Equip->EquipWeapon(GetWeaponInSlot(ActiveSlot));
+	AOBWeaponBase* Weapon = Equip->GetCurrentWeapon();
+	if (!Weapon) return;
+	
+	// 슬롯 탄창 복원(첫 장착이면 현재 full을 슬롯에 저장).
+	if (FOBWeaponSlotEntry* Entry = FindSlotEntry(ActiveSlot))
+	{
+		if (Entry->MagazineAmmo >= 0)
+		{
+			Weapon->SetCurrentAmmo(Entry->MagazineAmmo);
+		}
+		else
+		{
+			Entry->MagazineAmmo = Weapon->GetCurrentAmmo();
+		}
+	}
+
+	// 탄창 변화를 슬롯에 동기화하도록 구독(이전 무기 해제).
+	if (BoundWeapon.IsValid() && WeaponAmmoHandle.IsValid())
+	{
+		BoundWeapon->OnAmmoChanged.Remove(WeaponAmmoHandle);
+		WeaponAmmoHandle.Reset();
+	}
+	
+	WeaponAmmoHandle = Weapon->OnAmmoChanged.AddUObject(this, &UOBInventoryComponent::SyncActiveMagazine);
+	BoundWeapon = Weapon;
+}
+
+void UOBInventoryComponent::SyncActiveMagazine()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	
+	if (AOBWeaponBase* W = BoundWeapon.Get())
+	{
+		if (FOBWeaponSlotEntry* Entry = FindSlotEntry(ActiveSlot))
+		{
+			Entry->MagazineAmmo = W->GetCurrentAmmo();   // 발사/재장전마다 저장
+		}
+	}
+}
+
+void UOBInventoryComponent::SwapToSlot(EOBWeaponSlot NewSlot)
+{
+	if (!GetWorld()) return;
+
+	bSwitching = true;
+	SetSwitching(true);   // 발사/재장전 차단 + 진행 중 재장전 취소
+
+	ActiveSlot = NewSlot;
+	EquipActiveWeapon();
+	OnInventoryChanged.Broadcast();
+
+	// 꺼내기(draw) 시간만큼 후 차단 해제.
+	float DrawTime = DefaultDrawTime;
 	if (UOBEquipmentComponent* Equip = GetOwner()->FindComponentByClass<UOBEquipmentComponent>())
 	{
-		Equip->EquipWeapon(GetWeaponInSlot(ActiveSlot));
+		if (AOBWeaponBase* New = Equip->GetCurrentWeapon())
+		{
+			if (UOBWeaponData* Data = New->GetWeaponData())
+			{
+				if (Data->EquipMontage) DrawTime = Data->EquipMontage->GetPlayLength();
+			}
+		}
+	}
+
+	GetWorld()->GetTimerManager().SetTimer(
+		SwapTimerHandle, this, &UOBInventoryComponent::EndSwitching, FMath::Max(0.01f, DrawTime), false
+	);
+}
+
+void UOBInventoryComponent::EndSwitching()
+{
+	bSwitching = false;
+	SetSwitching(false);
+}
+
+void UOBInventoryComponent::SetSwitching(bool bEnable)
+{
+	UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
+	if (!ASC) return;
+
+	if (bEnable)
+	{
+		// 다른 무기로 재장전이 완료되는 것 방지: 진행 중 재장전 취소.
+		FGameplayTagContainer ReloadTags;
+		ReloadTags.AddTag(OBGameplayTags::State_Reloading);
+		ASC->CancelAbilities(&ReloadTags);
+
+		// 복제 loose 태그 → 서버+소유 클라 모두 발사/재장전 차단.
+		ASC->AddLooseGameplayTag(OBGameplayTags::State_Weapon_Switching);
+	}
+	else
+	{
+		ASC->RemoveLooseGameplayTag(OBGameplayTags::State_Weapon_Switching);
 	}
 }
 
@@ -177,7 +296,7 @@ void UOBInventoryComponent::AddItem(const FGameplayTag& ItemTag, int32 Amount)
 
 int32 UOBInventoryComponent::ConsumeItem(const FGameplayTag& ItemTag, int32 Amount)
 {
-	if (GetOwner() || !GetOwner()->HasAuthority() || Amount <= 0) return 0;
+	if (!GetOwner() || !GetOwner()->HasAuthority() || Amount <= 0) return 0;
 	for (FOBCountEntry& E : Items)
 	{
 		if (E.Tag == ItemTag)
@@ -200,11 +319,11 @@ void UOBInventoryComponent::EquipDefaultSlot()
 	{
 		EquipSlot(EOBWeaponSlot::Primary);
 	}
-	if (GetWeaponInSlot(EOBWeaponSlot::Secondary))
+	else if (GetWeaponInSlot(EOBWeaponSlot::Secondary))
 	{
 		EquipSlot(EOBWeaponSlot::Secondary);
 	}
-	if (GetWeaponInSlot(EOBWeaponSlot::Melee))
+	else if (GetWeaponInSlot(EOBWeaponSlot::Melee))
 	{
 		EquipSlot(EOBWeaponSlot::Melee);
 	}

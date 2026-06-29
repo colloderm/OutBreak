@@ -23,6 +23,9 @@ struct FOBWeaponSlotEntry
 	
 	UPROPERTY(BlueprintReadOnly)
 	TSubclassOf<AOBWeaponBase> WeaponClass;
+	
+	UPROPERTY(BlueprintReadOnly) 
+	int32 MagazineAmmo = -1;
 };
 
 USTRUCT(BlueprintType)
@@ -88,6 +91,15 @@ protected:
 	void EquipActiveWeapon();
 	static int32 GetCount(const TArray<FOBCountEntry>& Arr, const FGameplayTag& Tag);
 	
+	void SyncActiveMagazine();
+	FOBWeaponSlotEntry* FindSlotEntry(EOBWeaponSlot Slot);
+	
+	// 교체: 즉시 무기 교체 + draw 동안 잠금.
+	void SwapToSlot(EOBWeaponSlot NewSlot);
+	void EndSwitching();       // draw 종료 후 차단 해제
+	void SetSwitching(bool bEnable);
+	
+protected:	
 	UPROPERTY(Replicated)
 	TArray<FOBWeaponSlotEntry> WeaponSlots;
 	
@@ -100,4 +112,13 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_Items)
 	TArray<FOBCountEntry> Items;
 	
+private:
+	TWeakObjectPtr<AOBWeaponBase> BoundWeapon;
+	FDelegateHandle WeaponAmmoHandle;
+	
+	bool bSwitching = false;
+	FTimerHandle SwapTimerHandle;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Swap")
+	float DefaultDrawTime = 0.5f;
 };

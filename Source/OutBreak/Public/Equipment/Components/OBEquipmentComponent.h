@@ -8,6 +8,8 @@
 #include "OBEquipmentComponent.generated.h"
 
 class AOBWeaponBase;
+class UAnimMontage;
+class UAnimInstance;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOBOnWeaponChanged, AOBWeaponBase*);
 
@@ -38,10 +40,19 @@ protected:
 	void OnRep_CurrentWeapon();
 
 	void AttachWeaponToOwner();
+	
+	// 카테고리 포즈 레이어 링크 + draw 몽타주(머신별 코스메틱).
+	void ApplyCosmeticEquip();
+	// 링크된 레이어 해제.
+	void RemoveCosmeticEquip();
 
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentWeapon)
 	TObjectPtr<AOBWeaponBase> CurrentWeapon;
+	
+	// 현재 링크된 포즈 레이어(머신별·비복제, 해제 추적용).
+	UPROPERTY(Transient)
+	TSubclassOf<UAnimInstance> LinkedAnimLayer;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
 	FName AttachSocketName = TEXT("hand_r_Socket");

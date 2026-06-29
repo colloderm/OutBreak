@@ -9,6 +9,7 @@
 #include "Blueprint/UserWidget.h"
 #include "UI/ViewModels/OBAmmoViewModel.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
+#include "Inventory/Components/OBInventoryComponent.h"
 #include "View/MVVMView.h"
 
 void AOBHUD::BeginPlay()
@@ -85,6 +86,7 @@ void AOBHUD::BindAmmoToCharacter(AOBCharacterBase* Character)
 	if (!Character || !AmmoWidgetClass) return;
 
 	UOBEquipmentComponent* Equipment = Character->FindComponentByClass<UOBEquipmentComponent>();
+	UOBInventoryComponent* Inventory = Character->FindComponentByClass<UOBInventoryComponent>();
 	if (!Equipment) return;
 	
 	if (!AmmoWidget)
@@ -102,9 +104,10 @@ void AOBHUD::BindAmmoToCharacter(AOBCharacterBase* Character)
 	}
 	
 	// 무기 교체 구독 + 현재 무기로 초기화(아직 null이면 OnWeaponChanged가 채움).
-	Equipment->OnWeaponChanged.AddUObject(this, &AOBHUD::HandleWeaponChanged);
 	if (AmmoViewModel)
 	{
+		AmmoViewModel->SetInventory(Inventory);
+		Equipment->OnWeaponChanged.AddUObject(this, &AOBHUD::HandleWeaponChanged);
 		AmmoViewModel->SetWeapon(Equipment->GetCurrentWeapon());
 	}
 }

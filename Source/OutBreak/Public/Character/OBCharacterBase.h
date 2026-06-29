@@ -153,7 +153,7 @@ protected:
 	bool bIsAiming = false;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Combat")
-	float CombatOrientHoldTime = 1.5f;
+	float CombatOrientHoldTime = 1.f;
 
 	bool bRecentlyFired = false;
 	FTimerHandle CombatOrientTimer;

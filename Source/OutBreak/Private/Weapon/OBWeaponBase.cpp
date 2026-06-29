@@ -4,6 +4,7 @@
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Inventory/Components/OBInventoryComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
 
 AOBWeaponBase::AOBWeaponBase()
@@ -43,7 +44,6 @@ void AOBWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
 	DOREPLIFETIME(AOBWeaponBase, CurrentAmmo);
-	DOREPLIFETIME(AOBWeaponBase, ReserveAmmo);
 }
 
 void AOBWeaponBase::InitializeAmmo()
@@ -51,14 +51,19 @@ void AOBWeaponBase::InitializeAmmo()
 	if (WeaponData)
 	{
 		CurrentAmmo = WeaponData->MagazineSize;
-		ReserveAmmo = WeaponData->MaxReserveAmmo;
 	}
 	OnAmmoChanged.Broadcast();
 }
 
 bool AOBWeaponBase::CanReload() const
 {
-	return WeaponData && CurrentAmmo < WeaponData->MagazineSize && ReserveAmmo > 0;
+	if (!WeaponData || CurrentAmmo >= WeaponData->MagazineSize) return false;
+	
+	if (UOBInventoryComponent* Inv = GetOwner() ? GetOwner()->FindComponentByClass<UOBInventoryComponent>() : nullptr)
+	{
+		return Inv->GetAmmo(WeaponData->AmmoType) > 0;   // 풀에 해당 타입 탄 있어야
+	}
+	return false;
 }
 
 void AOBWeaponBase::ConsumeAmmo(int32 Amount)
@@ -73,14 +78,25 @@ void AOBWeaponBase::PerformReload()
 	if (!HasAuthority() || !WeaponData) return;
 
 	const int32 Needed = WeaponData->MagazineSize - CurrentAmmo;
-	const int32 ToLoad = FMath::Min(Needed, ReserveAmmo);
-	CurrentAmmo += ToLoad;
-	ReserveAmmo -= ToLoad;
-	OnAmmoChanged.Broadcast();
+	if (Needed <= 0) return;
+	
+	if (UOBInventoryComponent* Inv = GetOwner() ? GetOwner()->FindComponentByClass<UOBInventoryComponent>() : nullptr)
+	{
+		const int32 ToLoad = Inv->ConsumeAmmoFromPool(WeaponData->AmmoType, Needed);
+		CurrentAmmo += ToLoad;
+		OnAmmoChanged.Broadcast();
+	}	
 }
 
 void AOBWeaponBase::OnRep_Ammo()
 {
 	// 클라이언트: UI 갱신.
+	OnAmmoChanged.Broadcast();
+}
+
+void AOBWeaponBase::SetCurrentAmmo(int32 NewAmmo)
+{
+	if (!HasAuthority() || !WeaponData) return;
+	CurrentAmmo = FMath::Clamp(NewAmmo, 0, WeaponData->MagazineSize);
 	OnAmmoChanged.Broadcast();
 }

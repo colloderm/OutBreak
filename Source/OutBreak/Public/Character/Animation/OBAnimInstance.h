@@ -51,8 +51,10 @@ protected:
 private:
 	// 방향 계산 헬퍼(외부 모듈 의존 회피).
 	float CalculateDirectionAngle(const FVector& Velocity, const FRotator& BaseRotation) const;
-
-	void UpdateLeftHandIK();
+	
+	void UpdateLeftHandIK(float DeltaSeconds);
+	
+	bool ShouldDisableLeftHandIK() const; 
 	
 private:
 	UPROPERTY()
@@ -71,6 +73,14 @@ private:
 	// 무기 장착 시에만 IK 적용.
 	UPROPERTY(BlueprintReadOnly, Category = "IK", Meta = (AllowPrivateAccess = "true"))
 	bool bEnableLeftHandIK = false;
+	
+	// 왼손 IK 가중치(0~1). 장착/재장전 중 0으로 부드럽게 빠짐.
+	UPROPERTY(BlueprintReadOnly, Category = "IK", Meta = (AllowPrivateAccess = "true"))
+	float LeftHandIKAlpha = 0.f;
+
+	// IK 알파 블렌드 속도.
+	UPROPERTY(EditDefaultsOnly, Category = "IK")
+	float LeftHandIKBlendSpeed = 12.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "IK")
 	FName WeaponLeftHandSocket = TEXT("LeftHandGrip");
