@@ -52,9 +52,9 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UOBAttributeSetBase> AttributeSet;
 
-	UPROPERTY(ReplicatedUsing = OnRep_SelectedWeapons)
+	UPROPERTY(ReplicatedUsing = OnRep_SelectedWeapons, BlueprintReadOnly, Category = "Lobby")
 	TArray<TSubclassOf<AOBWeaponBase>> SelectedWeapons;
 
-	UPROPERTY(ReplicatedUsing = OnRep_Ready)
+	UPROPERTY(ReplicatedUsing = OnRep_Ready, BlueprintReadOnly, Category = "Lobby")
 	bool bReady = false;
 };

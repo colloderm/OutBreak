@@ -59,15 +59,6 @@ protected:
 	
 	void Input_EquipSlot(EOBWeaponSlot Slot);
 	
-	UFUNCTION(Server, Reliable) 
-	void Server_SetWeaponSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass);
-	
-	UFUNCTION(Server, Reliable) 
-	void Server_SetReady(bool bReady);
-	
-	UFUNCTION(Server, Reliable) 
-	void Server_StartGame();
-	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -93,5 +84,15 @@ protected:
 	TObjectPtr<UInputAction> SlotSecondaryAction;
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Weapon")
 	TObjectPtr<UInputAction> SlotMeleeAction;
+	
+public:
+	UFUNCTION(Server, Reliable) 
+	void Server_SetWeaponSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass);
+	
+	UFUNCTION(Server, Reliable) 
+	void Server_SetReady(bool bReady);
+	
+	UFUNCTION(Server, Reliable) 
+	void Server_StartGame();
 	
 };

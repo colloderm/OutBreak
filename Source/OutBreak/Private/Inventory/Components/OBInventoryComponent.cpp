@@ -97,8 +97,6 @@ void UOBInventoryComponent::AddWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 		AddAmmo(AmmoType, StartAmmo);
 	}
 	
-	UE_LOG(LogTemp, Warning, TEXT("[Inv] AddWeapon slot=%d class=%s"), (int32)Slot, *GetNameSafe(WeaponClass));
-	
 	OnInventoryChanged.Broadcast();
 }
 
