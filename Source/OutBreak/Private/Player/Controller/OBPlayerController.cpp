@@ -12,6 +12,8 @@
 #include "LyraInspired/Input/OBInputConfig.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Inventory/Components/OBInventoryComponent.h"
+#include "Player/State/OBPlayerStateBase.h"
+#include "Game/GameMode/OBLobbyGameMode.h"
 #include "Weapon/Data/OBWeaponData.h"
 
 void AOBPlayerController::BeginPlay()
@@ -219,4 +221,22 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 			Inv->Server_EquipSlot(Slot);  // 클라 → 서버 요청
 		}
 	}
+}
+
+void AOBPlayerController::Server_SetWeaponSlot_Implementation(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetWeaponForSlot(Slot, WeaponClass);
+}
+
+void AOBPlayerController::Server_SetReady_Implementation(bool bReady)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetReady(bReady);
+}
+
+void AOBPlayerController::Server_StartGame_Implementation()
+{
+	if (AOBLobbyGameMode* GM = GetWorld()->GetAuthGameMode<AOBLobbyGameMode>())
+		GM->TryStartGame(this);
 }

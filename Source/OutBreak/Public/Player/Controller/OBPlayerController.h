@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "OBPlayerController.generated.h"
 
+class AOBWeaponBase;
 enum class EOBWeaponSlot : uint8;
 class UOBAbilitySystemComponent;
 class UCameraShakeBase;
@@ -30,6 +31,7 @@ private:
 	// 누적된 반동을 매 프레임 0으로 복귀시킨다.
 	void UpdateRecoilRecovery(float DeltaSeconds);
 
+private:
 	// 아직 복구 안 된 반동 누적량.
 	float AccumulatedRecoilPitch = 0.0f;
 	float AccumulatedRecoilYaw = 0.0f;
@@ -56,6 +58,15 @@ protected:
 	UOBAbilitySystemComponent* GetOBAbilitySystemComponent() const;
 	
 	void Input_EquipSlot(EOBWeaponSlot Slot);
+	
+	UFUNCTION(Server, Reliable) 
+	void Server_SetWeaponSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass);
+	
+	UFUNCTION(Server, Reliable) 
+	void Server_SetReady(bool bReady);
+	
+	UFUNCTION(Server, Reliable) 
+	void Server_StartGame();
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")

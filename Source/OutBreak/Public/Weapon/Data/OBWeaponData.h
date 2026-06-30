@@ -7,6 +7,7 @@
 #include "GameplayTagContainer.h"
 #include "OBWeaponData.generated.h"
 
+class UTexture2D;
 class UCameraShakeBase;
 class UOBAbilitySet;
 class USkeletalMesh;
@@ -170,4 +171,8 @@ public:
 	// 발사 시 화면 집중 펄스(연사는 작게).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Feel")
 	float FireFocusPulse = 0.12f;
+	
+	// 로비 무기 버튼 아이콘
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
+	TObjectPtr<UTexture2D> WeaponIcon;
 };
