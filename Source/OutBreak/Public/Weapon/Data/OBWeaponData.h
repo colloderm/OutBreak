@@ -7,6 +7,7 @@
 #include "GameplayTagContainer.h"
 #include "OBWeaponData.generated.h"
 
+class USoundBase;
 class UTexture2D;
 class UCameraShakeBase;
 class UOBAbilitySet;
@@ -175,4 +176,8 @@ public:
 	// 로비 무기 버튼 아이콘
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
 	TObjectPtr<UTexture2D> WeaponIcon;
+	
+	// 발사음(무기별).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Audio")
+	TObjectPtr<USoundBase> FireSound;
 };

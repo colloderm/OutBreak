@@ -223,6 +223,19 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 	}
 }
 
+void AOBPlayerController::AcknowledgePossession(class APawn* P)
+{
+	Super::AcknowledgePossession(P);
+	
+	// 소유 클라에서 폰을 잡으면 게임 입력 강제(로비 UI 모드 잔재 제거).
+	if (IsLocalController())
+	{
+		FInputModeGameOnly Mode;
+		SetInputMode(Mode);
+		SetShowMouseCursor(false);
+	}
+}
+
 void AOBPlayerController::Server_SetWeaponSlot_Implementation(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
 {
 	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())

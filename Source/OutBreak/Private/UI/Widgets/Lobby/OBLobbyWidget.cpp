@@ -45,6 +45,14 @@ void UOBLobbyWidget::NativeConstruct()
 void UOBLobbyWidget::NativeDestruct()
 {
 	if (UWorld* W = GetWorld()) W->GetTimerManager().ClearTimer(RefreshTimer);
+	
+	if (APlayerController* PC = GetOwningPlayer())
+	{
+		FInputModeGameOnly Mode;
+		PC->SetInputMode(Mode);
+		PC->SetShowMouseCursor(false);
+	}
+	
 	Super::NativeDestruct();
 }
 

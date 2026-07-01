@@ -59,6 +59,8 @@ protected:
 	
 	void Input_EquipSlot(EOBWeaponSlot Slot);
 	
+	virtual void AcknowledgePossession(class APawn* P) override;
+	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
