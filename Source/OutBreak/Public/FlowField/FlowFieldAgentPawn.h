@@ -7,8 +7,6 @@
 #include "FlowFieldAgentPawn.generated.h"
 
 class UCapsuleComponent;
-class UFlowFieldDensityComponent;
-class UFlowFieldMovementComponent;
 class UPawnMovementComponent;
 class AActor;
 
@@ -20,8 +18,7 @@ class OUTBREAK_API AFlowFieldAgentPawn : public AActor
 
 public:
 	AFlowFieldAgentPawn();
-
-	virtual void Tick(float DeltaSeconds) override;
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "FlowField|Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComponent;
 

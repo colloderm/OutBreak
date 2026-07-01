@@ -6,6 +6,8 @@
 #include "Engine/DeveloperSettings.h"
 #include "FlowFieldSettings.generated.h"
 
+
+class AHordeProxyActor;
 /**
  * 
  */
@@ -16,6 +18,24 @@ class OUTBREAK_API UFlowFieldSettings : public UDeveloperSettings
 {
 	GENERATED_BODY()
 	
+	
+public:
+	int32 GetMaxAgentCount() const
+	{
+		return MaxAgentCount;
+	}
+	
+	float GetMaxVelocity() const
+	{
+		return MaxVelocity;
+	}
+	
+	TSubclassOf<AHordeProxyActor> GetHordeProxyClass() const
+	{
+		return HordeProxyActorClass;
+	}
+	
+private:
 	/** 한 프레임에 방향을 다시 질의할 수 있는 최대 Agent 수 */
 	UPROPERTY(Config, EditAnywhere, Category = "Query Budget", meta = (ClampMin = "1", UIMin = "1"))
 	int32 MaxFlowQueriesPerFrame = 64;
@@ -32,4 +52,13 @@ class OUTBREAK_API UFlowFieldSettings : public UDeveloperSettings
 	/** Flow Field 예산 시스템을 활성화할지 여부 */
 	UPROPERTY(Config, EditAnywhere, Category = "General")
 	bool bEnableBudgeting = true;
+	
+	UPROPERTY(Config, EditAnywhere, Category = "General")
+	int32 MaxAgentCount = 500;
+	
+	UPROPERTY(Config, EditAnywhere, Category = "General|Movement")
+	float MaxVelocity = 500.f;
+	
+	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Class")
+	TSubclassOf<AHordeProxyActor> HordeProxyActorClass;
 };

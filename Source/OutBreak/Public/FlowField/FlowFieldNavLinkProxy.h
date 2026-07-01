@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Struct/FlowFieldTypes.h"
+#include "Struct/FlowFieldNavTypes.h"
 #include "Navigation/NavLinkProxy.h"
 #include "FlowFieldNavLinkProxy.generated.h"
 

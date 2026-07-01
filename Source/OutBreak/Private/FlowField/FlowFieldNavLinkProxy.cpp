@@ -3,7 +3,7 @@
 
 #include "FlowField/FlowFieldNavLinkProxy.h"
 
-#include "FlowField/FlowFieldSubsystem.h"
+#include "FlowField/Subsystem/FlowFieldSubsystem.h"
 
 void AFlowFieldNavLinkProxy::EntryNavLink(const NavNodeRef Entry)
 {

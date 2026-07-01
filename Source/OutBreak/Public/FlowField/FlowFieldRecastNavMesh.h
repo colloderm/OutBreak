@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "NavFilters/NavigationQueryFilter.h"
 #include "NavMesh/RecastNavMesh.h"
-#include "Struct/FlowFieldTypes.h"
+#include "FlowField/Struct/FlowFieldNavTypes.h"
 #include "FlowFieldRecastNavMesh.generated.h"
 
 class ANavLinkProxy;

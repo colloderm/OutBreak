@@ -4,9 +4,7 @@
 
 #include "Components/CapsuleComponent.h"
 #include "Engine/World.h"
-#include "FlowField/FlowFieldDensityComponent.h"
-#include "FlowField/FlowFieldMovementComponent.h"
-#include "FlowField/FlowFieldSubsystem.h"
+#include "FlowField/Subsystem/FlowFieldSubsystem.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -28,10 +26,4 @@ void AFlowFieldAgentPawn::BeginPlay()
 {
 	Super::BeginPlay();
 	
-}
-
-void AFlowFieldAgentPawn::Tick(const float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
 }

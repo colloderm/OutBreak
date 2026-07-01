@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "AI/Navigation/NavigationTypes.h"
 #include "Navigation/NavLinkProxy.h"
-#include "FlowFieldTypes.generated.h"
+#include "FlowFieldNavTypes.generated.h"
 
 
 class AFlowFieldNavLinkProxy;

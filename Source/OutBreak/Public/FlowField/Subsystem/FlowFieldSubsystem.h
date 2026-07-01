@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "AI/Navigation/NavigationTypes.h"
-#include "Struct/FlowFieldTypes.h"
+#include "FlowField/Struct/FlowFieldNavTypes.h"
 #include "FlowFieldSubsystem.generated.h"
 
 class AFlowFieldRecastNavMesh;
@@ -29,22 +29,8 @@ class OUTBREAK_API UFlowFieldSubsystem : public UTickableWorldSubsystem
 public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
-	
-	
-	/* ———————————————————Listen Server 대응————————————————————————— */
-	AFlowFieldAgentPawn* SpawnFlowFieldPawn(
-		TSubclassOf<AFlowFieldAgentPawn> FlowFieldPawnClass, 
-		const FVector SpawnLocation);
-	
-	void DestroyFlowFieldPawn(AFlowFieldAgentPawn* FlowFieldPawn);
-	/* ———————————————————————————————————————————————————————————— */
+
 public:
-	void RegisterDensityComponent(UFlowFieldDensityComponent* DensityComponent);
-	void UnregisterDensityComponent(UFlowFieldDensityComponent* DensityComponent);
-
-	/** Accumulates pairwise XY separation before applying the velocity deltas to any Pawn. */
-	void ApplyDensitySeparation(float DeltaTime);
-
 	/** Builds the shared field toward GoalWorldLocation. Call after navigation generation is complete. */
 	UFUNCTION(BlueprintCallable, Category = "FlowField")
 	bool SetGoal(const FVector& GoalWorldLocation);
