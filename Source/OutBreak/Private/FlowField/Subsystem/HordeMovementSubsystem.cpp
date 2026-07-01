@@ -67,7 +67,7 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 		TEXT("UHordeMovementSubsystem::Parallel"),
 			AgentCount,
 			64,
-			[
+			[this,
 				Transforms,
 				Velocities,
 				CachedFlowDirections,
@@ -90,12 +90,12 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 				
 				const FVector NewVelocity =
 				(
-					CurrentVelocity
-					+ CurrentDirection * CurrentAcceleration
+					// CurrentVelocity + 
+					CurrentDirection * CurrentAcceleration
 				).GetClampedToMaxSize(MaxSpeed);
 				
 				const FVector NewPosition = 
-					CurrentPosition + (NewVelocity * DeltaSeconds);
+					CurrentPosition + (NewVelocity /* DeltaSeconds*/);
 				
 				Transforms[AgentIndex].SetLocation(NewPosition);
 				if (!NewVelocity.IsNearlyZero())

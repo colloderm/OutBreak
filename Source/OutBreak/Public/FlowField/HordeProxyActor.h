@@ -27,7 +27,7 @@ public:
 	
 	void RemoveInstance(const int32 InstanceId) const;
 	
-	void UpdateInstance(const TArray<FTransform>& Transforms);
+	void UpdateInstances(const TArray<FTransform>& Transforms) const;
 
 protected:
 	// Called when the game starts or when spawned

@@ -89,9 +89,11 @@ bool UFlowFieldSubsystem::QueryDirection(const FVector& WorldLocation, FVector& 
 	OutDirection = FVector::ZeroVector;
 
 	const AFlowFieldRecastNavMesh* NavMesh = FindNavMesh();
+	bool HasFlowField = NavMesh->HasFlowField();
+	bool QueryResult = NavMesh->QueryDirection(WorldLocation, OutDirection);
 	return NavMesh != nullptr
-		&& NavMesh->HasFlowField()
-		&& NavMesh->QueryDirection(WorldLocation, OutDirection);
+		&& HasFlowField
+		&& QueryResult;
 }
 
 bool UFlowFieldSubsystem::QueryConstrainedMove(

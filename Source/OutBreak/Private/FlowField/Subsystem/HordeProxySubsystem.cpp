@@ -56,7 +56,7 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 	
 	const TArray<FTransform>& Transforms = MovementSubsystem->MovementStorage.Transforms;
 	
-	HordeProxy->UpdateInstance(Transforms);
+	HordeProxy->UpdateInstances(Transforms);
 }
 
 

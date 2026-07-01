@@ -38,7 +38,7 @@ void AHordeProxyActor::RemoveInstance(const int32 InstanceId) const
 	InstancedStaticMesh->RemoveInstance(InstanceId);
 }
 
-void AHordeProxyActor::UpdateInstance(const TArray<FTransform>& Transforms)
+void AHordeProxyActor::UpdateInstances(const TArray<FTransform>& Transforms) const
 {
 	check(Transforms.Num() == InstancedStaticMesh->GetInstanceCount());
 	
