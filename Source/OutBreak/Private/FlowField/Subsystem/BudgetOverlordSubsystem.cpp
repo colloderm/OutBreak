@@ -32,6 +32,8 @@ void UBudgetOverlordSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 	
+	
+	/* Proxy는 Movement Subsystem의 값을 가져가 병렬로 처리하기에 우선 순위에 배치해야함.*/
 	MovementSubsystem->ProcessSystem(DeltaTime);
 	ProxySubsystem->ProcessSystem(DeltaTime);
 }

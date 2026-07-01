@@ -168,7 +168,7 @@ struct HordeProxyStorage
 	 */
 	TArray<FIntVector2>				PoseIndices;
 	TArray<int32>					InstanceIds;
-	TArray<TWeakObjectPtr<APawn>>	PawnProxies;
+	TArray<TObjectPtr<AActor>>		PawnProxies;
 	
 	int32 Size() const
 	{
@@ -198,7 +198,6 @@ struct HordeProxyStorage
 		// 	);
 		// 	PawnProxies.Add(SpawnActor);
 		// }
-		
 	}
 	
 	bool IsValid() const
@@ -208,7 +207,7 @@ struct HordeProxyStorage
 		return PoseIndices.Num() == AgentCount;
 	}
 	
-	int32 Add(APawn* Pawn, int32 InstanceId)
+	int32 Add(AActor* Pawn, int32 InstanceId)
 	{
 		PoseIndices.Add(FIntVector2::ZeroValue);
 		InstanceIds.Add(InstanceId);

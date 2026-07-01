@@ -30,7 +30,11 @@ public:
 		return MaxVelocity;
 	}
 	
-	TSubclassOf<AHordeProxyActor> GetHordeProxyClass() const
+	TSubclassOf<AHordeProxyActor> GetHordeProxyHostClass() const
+	{
+		return HordeProxyHostClass;
+	}
+	TSubclassOf<AActor> GetHordeProxyActorClass() const
 	{
 		return HordeProxyActorClass;
 	}
@@ -60,5 +64,9 @@ private:
 	float MaxVelocity = 500.f;
 	
 	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Class")
-	TSubclassOf<AHordeProxyActor> HordeProxyActorClass;
+	TSubclassOf<AHordeProxyActor> HordeProxyHostClass;
+	
+	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Class")
+	TSubclassOf<AActor> HordeProxyActorClass;
+	
 };

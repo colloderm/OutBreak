@@ -67,7 +67,7 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 		TEXT("UHordeMovementSubsystem::Parallel"),
 			AgentCount,
 			64,
-			[this,
+			[
 				Transforms,
 				Velocities,
 				CachedFlowDirections,
@@ -104,7 +104,7 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 						NewVelocity.GetSafeNormal2D();
 
 					Transforms[AgentIndex].SetRotation(
-						FacingDirection.Rotation().Quaternion());
+						FRotator(FacingDirection.Rotation()+FRotator(0,-90,0)).Quaternion());
 				}
 				Velocities[AgentIndex] = NewVelocity;
 			});

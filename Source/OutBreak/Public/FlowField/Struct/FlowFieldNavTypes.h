@@ -7,7 +7,12 @@
 #include "Navigation/NavLinkProxy.h"
 #include "FlowFieldNavTypes.generated.h"
 
+/* ToDo Liist*/
 
+/**
+ * Player 마다 FlowField Data가 도착된 Nav Node가 Target이 존재하는 위치 일 경우 바로 직선으로 이동하도록 Query문 반환해야함.
+ * Player에 대한 Nav 정보는 각 Player Capsule 크기 정보를 보유해야함. 이유는 도착 반경을 지정해야하기 때문에.
+ */
 class AFlowFieldNavLinkProxy;
 
 UENUM(BlueprintType)

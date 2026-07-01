@@ -32,14 +32,24 @@ void UHordeProxySubsystem::Register(FTransform&	Transform)
 	
 	check(World);
 	
+	const TSubclassOf<AActor> HordeProxyActorClass =
+		Settings->GetHordeProxyActorClass();
+	
+	if (!ensureAlwaysMsgf(
+		HordeProxyActorClass,
+		TEXT("Flow Field 설정에 HordeProxyActorClass가 지정되지 않았습니다.")))
+	{
+		return;
+	}
+	
 	FActorSpawnParameters SpawnParameters;
 	SpawnParameters.SpawnCollisionHandlingOverride =
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	
 
-	APawn* SpawnActor = World->SpawnActor<APawn>
+	AActor* SpawnActor = World->SpawnActor<AActor>
 	(
-		APawn::StaticClass(),
+		HordeProxyActorClass,
 		FTransform::Identity,
 		SpawnParameters
 	);
@@ -57,6 +67,7 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 	const TArray<FTransform>& Transforms = MovementSubsystem->MovementStorage.Transforms;
 	
 	HordeProxy->UpdateInstances(Transforms);
+	ParallelProxy();
 }
 
 
@@ -65,11 +76,11 @@ void UHordeProxySubsystem::CreateProxyHost()
 	if (HordeProxy) return;
 	
 	const TSubclassOf<AHordeProxyActor> HordeProxyClass =
-		Settings->GetHordeProxyClass();
+		Settings->GetHordeProxyHostClass();
 
 	if (!ensureAlwaysMsgf(
 		HordeProxyClass,
-		TEXT("Flow Field 설정에 HordeProxyActorClass가 지정되지 않았습니다.")))
+		TEXT("Flow Field 설정에 HordeProxyHostClass가 지정되지 않았습니다.")))
 	{
 		return;
 	}
@@ -90,6 +101,36 @@ void UHordeProxySubsystem::CreateProxyHost()
 		); 
 	
 	check(HordeProxy);
+}
+
+void UHordeProxySubsystem::ParallelProxy()
+{
+	check(MovementSubsystem);
+
+	TArray<FTransform>& Transforms =
+		MovementSubsystem->MovementStorage.Transforms;
+
+	const int32 UpdateCount = FMath::Min(
+		ProxyEntity.PawnProxies.Num(),
+		Transforms.Num());
+
+	for (int32 AgentIndex = 0;
+		 AgentIndex < UpdateCount;
+		 ++AgentIndex)
+	{
+		TObjectPtr<AActor> PawnProxy = ProxyEntity.PawnProxies[AgentIndex];
+
+		if (!IsValid(PawnProxy))
+		{
+			continue;
+		}
+		
+		PawnProxy->SetActorTransform(
+			Transforms[AgentIndex],
+			false,
+			nullptr,
+			ETeleportType::TeleportPhysics);
+	}
 }
 
 

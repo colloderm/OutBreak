@@ -27,6 +27,7 @@ protected:
 	void Register(FTransform& Transform);
 	virtual void ProcessSystem(const float DeltaSeconds) override;
 	void CreateProxyHost();
+	void ParallelProxy();
 	HordeProxyStorage ProxyEntity;
 	
 	friend class UBudgetOverlordSubsystem;
