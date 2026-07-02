@@ -17,4 +17,20 @@ class OUTBREAK_API UHordeEventSubsystem : public UBaseHordeWorldSubsystem
 	
 	TArray<HordeDamageEvent> HordeDamageEvents;
 	
+	void AddDamageEvent(AActor* DamagedActor, const double Damage);
+	
+	
+	virtual void ProcessSystem(const float DeltaSeconds) override;
+	void ProcessEvent();
+	void Parallel();
+	
+	UFUNCTION()
+	void HandleBeginOverlap(
+		UPrimitiveComponent* OverlappedComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult);
+	
 };

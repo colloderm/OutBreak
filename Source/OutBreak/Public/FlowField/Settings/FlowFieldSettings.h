@@ -7,6 +7,7 @@
 #include "FlowFieldSettings.generated.h"
 
 
+class AHordeProxyHost;
 class AHordeProxyActor;
 /**
  * 
@@ -30,11 +31,11 @@ public:
 		return MaxVelocity;
 	}
 	
-	TSubclassOf<AHordeProxyActor> GetHordeProxyHostClass() const
+	TSubclassOf<AHordeProxyHost> GetHordeProxyHostClass() const
 	{
 		return HordeProxyHostClass;
 	}
-	TSubclassOf<AActor> GetHordeProxyActorClass() const
+	TSubclassOf<AHordeProxyActor> GetHordeProxyActorClass() const
 	{
 		return HordeProxyActorClass;
 	}
@@ -64,9 +65,9 @@ private:
 	float MaxVelocity = 500.f;
 	
 	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Class")
-	TSubclassOf<AHordeProxyActor> HordeProxyHostClass;
+	TSubclassOf<AHordeProxyHost> HordeProxyHostClass;
 	
 	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Class")
-	TSubclassOf<AActor> HordeProxyActorClass;
+	TSubclassOf<AHordeProxyActor> HordeProxyActorClass;
 	
 };

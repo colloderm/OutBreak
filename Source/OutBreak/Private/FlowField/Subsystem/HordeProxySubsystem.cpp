@@ -4,9 +4,10 @@
 #include "FlowField/Subsystem/HordeProxySubsystem.h"
 
 #include "GeometryTypes.h"
-#include "FlowField/HordeProxyActor.h"
+#include "FlowField/HordeProxyHost.h"
 #include "FlowField/Subsystem/HordeMovementSubsystem.h"
 #include "FlowField/Settings/FlowFieldSettings.h"
+#include "FlowField/HordeProxyHost.h"
 #include "FlowField/HordeProxyActor.h"
 
 void UHordeProxySubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -32,7 +33,7 @@ void UHordeProxySubsystem::Register(FTransform&	Transform)
 	
 	check(World);
 	
-	const TSubclassOf<AActor> HordeProxyActorClass =
+	const TSubclassOf<AHordeProxyActor> HordeProxyActorClass =
 		Settings->GetHordeProxyActorClass();
 	
 	if (!ensureAlwaysMsgf(
@@ -47,12 +48,13 @@ void UHordeProxySubsystem::Register(FTransform&	Transform)
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	
 
-	AActor* SpawnActor = World->SpawnActor<AActor>
+	AHordeProxyActor* SpawnActor = World->SpawnActor<AHordeProxyActor>
 	(
 		HordeProxyActorClass,
 		FTransform::Identity,
 		SpawnParameters
 	);
+	
 	
 	ProxyEntity.Add(SpawnActor, InstanceId);
 }
@@ -75,7 +77,7 @@ void UHordeProxySubsystem::CreateProxyHost()
 {
 	if (HordeProxy) return;
 	
-	const TSubclassOf<AHordeProxyActor> HordeProxyClass =
+	const TSubclassOf<AHordeProxyHost> HordeProxyClass =
 		Settings->GetHordeProxyHostClass();
 
 	if (!ensureAlwaysMsgf(
@@ -93,7 +95,7 @@ void UHordeProxySubsystem::CreateProxyHost()
 	SpawnParameters.SpawnCollisionHandlingOverride =
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	
-	HordeProxy = World->SpawnActor<AHordeProxyActor>
+	HordeProxy = World->SpawnActor<AHordeProxyHost>
 		(
 			HordeProxyClass,
 			FTransform::Identity,

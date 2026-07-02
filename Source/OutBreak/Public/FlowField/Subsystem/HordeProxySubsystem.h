@@ -33,7 +33,7 @@ protected:
 	friend class UBudgetOverlordSubsystem;
 private:
 	UPROPERTY(Transient)
-	TObjectPtr<class AHordeProxyActor> HordeProxy;
+	TObjectPtr<class AHordeProxyHost> HordeProxy;
 	
 	UPROPERTY(Transient)
 	TObjectPtr<class UHordeMovementSubsystem> MovementSubsystem;

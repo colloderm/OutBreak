@@ -12,7 +12,7 @@ using HordeAgentID = int32;
 
 struct HordeDamageEvent
 {
-	TWeakPtr<APawn> DamagedPawn;
+	TWeakObjectPtr<AActor> DamagedActor;
 	double Damage;
 };
 
