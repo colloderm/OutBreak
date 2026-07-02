@@ -16,6 +16,8 @@ AOBGameModeBase::AOBGameModeBase()
 	GameStateClass = AOBGameStateBase::StaticClass();
 	HUDClass = AOBHUD::StaticClass();
 	
+	// 로비→게임 매끄러운 전환 + PlayerState(선택값) 보존.
+	bUseSeamlessTravel = true;
 }
 
 void AOBGameModeBase::RequestRespawn(AController* Controller, APawn* DeadPawn)

@@ -5,8 +5,10 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
+#include "Weapon/Data/OBWeaponData.h"
 #include "OBPlayerStateBase.generated.h"
 
+class AOBWeaponBase;
 class UOBAbilitySystemComponent;
 class UOBAttributeSetBase;
 class UAbilitySystemComponent;
@@ -19,11 +21,29 @@ public:
 	AOBPlayerStateBase();
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void CopyProperties(APlayerState* NewPlayerState) override;
 	
 	UOBAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
-	
-	// 타입이 필요한 곳(컨트롤러 등)을 위한 전용 getter.
 	UOBAbilitySystemComponent* GetOBAbilitySystemComponent() const { return AbilitySystemComponent; }
+	
+	// 로비 선택(서버).
+	void SetWeaponForSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass);
+	void SetReady(bool bInReady);
+
+	const TArray<TSubclassOf<AOBWeaponBase>>& GetSelectedWeapons() const { return SelectedWeapons; }
+	bool IsReady() const { return bReady; }
+
+	// 로비 UI 갱신.
+	DECLARE_MULTICAST_DELEGATE(FOBOnLobbyStateChanged);
+	FOBOnLobbyStateChanged OnLobbyStateChanged;
+	
+protected:
+	UFUNCTION() 
+	void OnRep_SelectedWeapons();
+	
+	UFUNCTION() 
+	void OnRep_Ready();
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ability", Meta = (AllowPrivateAccess = "true"))
@@ -31,4 +51,10 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UOBAttributeSetBase> AttributeSet;
+
+	UPROPERTY(ReplicatedUsing = OnRep_SelectedWeapons, BlueprintReadOnly, Category = "Lobby")
+	TArray<TSubclassOf<AOBWeaponBase>> SelectedWeapons;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Ready, BlueprintReadOnly, Category = "Lobby")
+	bool bReady = false;
 };
