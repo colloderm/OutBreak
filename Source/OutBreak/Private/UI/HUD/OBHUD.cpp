@@ -10,6 +10,7 @@
 #include "UI/ViewModels/OBAmmoViewModel.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Inventory/Components/OBInventoryComponent.h"
+#include "UI/HUD/OBConsumableWidget.h"
 #include "View/MVVMView.h"
 
 void AOBHUD::BeginPlay()
@@ -35,6 +36,7 @@ void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)
 	{
 		TryInitHealthWidget(Character);
 		BindAmmoToCharacter(Character);
+		BindConsumablesToCharacter(Character);
 	}
 }
 
@@ -118,4 +120,22 @@ void AOBHUD::HandleWeaponChanged(AOBWeaponBase* NewWeapon)
 	{
 		AmmoViewModel->SetWeapon(NewWeapon);
 	}
+}
+
+void AOBHUD::BindConsumablesToCharacter(AOBCharacterBase* Character)
+{
+	if (!Character || !ConsumableWidgetClass) return;
+	
+	UOBInventoryComponent* Inventory = Character->FindComponentByClass<UOBInventoryComponent>();
+	if (!Inventory) return;
+	
+	if (!ConsumableWidget)
+	{
+		ConsumableWidget = CreateWidget<UOBConsumableWidget>(GetOwningPlayerController(), ConsumableWidgetClass);
+		if (ConsumableWidget)
+			ConsumableWidget->AddToViewport();
+	}
+	
+	if (ConsumableWidget)
+		ConsumableWidget->SetInventory(Inventory); // 리스폰 시 재 바인딩
 }
