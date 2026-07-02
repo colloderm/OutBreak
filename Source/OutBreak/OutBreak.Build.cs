@@ -16,6 +16,8 @@ public class OutBreak : ModuleRules
 			"InputCore", 
 			"EnhancedInput",
 			"UMG",
+			"Slate",
+			"SlateCore",
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks",
