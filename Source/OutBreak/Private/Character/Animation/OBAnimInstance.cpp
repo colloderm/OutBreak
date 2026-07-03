@@ -50,6 +50,7 @@ void UOBAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 	{
 		bIsDead = OwningCharacter->IsDead();
 		bIsAiming = OwningCharacter->IsAiming();
+		bWeaponReady = bIsAiming || OwningCharacter->IsRecentlyFired();
 	}
 }
 

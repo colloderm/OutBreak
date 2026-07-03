@@ -53,6 +53,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "OB|ADS")
 	bool IsAiming() const { return bIsAiming; }
 	
+	UFUNCTION(BlueprintPure, Category = "OB|Combat")
+	bool IsRecentlyFired() const { return bRecentlyFired; }
+	
 	// 발사 시 집중 효과 펄스(로컬용)
 	void AddFireFocusPulse(float PulseAmount);
 	

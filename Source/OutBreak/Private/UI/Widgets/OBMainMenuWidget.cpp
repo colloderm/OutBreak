@@ -13,7 +13,7 @@ void UOBMainMenuWidget::MenuSetup(int32 InNumPublicConnections, FString InMatchT
 	
 	AddToViewport();
 	SetVisibility(ESlateVisibility::Visible);
-	bIsFocusable = true;
+	SetIsFocusable(true);
 	
 	// 입력을 UI 모드로
 	if (APlayerController* PC = GetGameInstance()->GetFirstLocalPlayerController())
