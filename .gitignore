@@ -75,3 +75,7 @@ Plugins/**/Intermediate/*
 DerivedDataCache/*
 
 .idea/*
+
+# Dev B ignore
+Content/Infected
+Content/Zombie_Pack
