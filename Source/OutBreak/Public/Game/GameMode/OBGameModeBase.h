@@ -18,7 +18,7 @@ public:
 	언제 호출되는가? - Character.HandleDeath에서.
 	서버/클라? - 서버 전용(GameMode는 서버에만 존재).
 	*/
-	void RequestRespawn(AController* Controller, APawn* DeadPawn);
+	virtual void RequestRespawn(AController* Controller, APawn* DeadPawn);
 	
 protected:
 	// 사망 후 리스폰까지 지연 시간(초)

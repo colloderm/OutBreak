@@ -1,0 +1,36 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Engine/DataAsset.h"
+#include "OBExpeditionMapData.generated.h"
+
+/**
+ * 
+ */
+UCLASS(BlueprintType)
+class OUTBREAK_API UOBExpeditionMapData : public UPrimaryDataAsset
+{
+	GENERATED_BODY()
+	
+public:
+	// 맵 선택 UI 표시명.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map")
+	FText DisplayName;
+
+	// 실제 로드할 레벨(ServerTravel 대상).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map")
+	TSoftObjectPtr<UWorld> Level;
+
+	// [핵심] 이 세션의 총 정원(PvPvE 전체). 기본 맵 12. 큰 맵은 이 값을 올림.
+	// - GameSession->MaxPlayers로 들어가 PreLogin 단계에서 초과 접속을 거부.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session", meta = (ClampMin = "1", ClampMax = "100"))
+	int32 MaxSessionPlayers = 12;
+
+	// 세션 길이(초). 15~30분 범위. 기본 1200(20분).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session", meta = (ClampMin = "60"))
+	int32 SessionLength = 1200;
+
+	// (이후 확장) 개인 탈출구 마감시간, 필요아이템 태그 등도 여기로 모을 예정.
+};

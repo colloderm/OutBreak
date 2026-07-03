@@ -30,6 +30,8 @@ void AOBPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	
 	DOREPLIFETIME(AOBPlayerStateBase, SelectedWeapons);
 	DOREPLIFETIME(AOBPlayerStateBase, bReady);
+	DOREPLIFETIME(AOBPlayerStateBase, ExpeditionStatus);
+	DOREPLIFETIME(AOBPlayerStateBase, TeamId);
 }
 
 void AOBPlayerStateBase::SetWeaponForSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
@@ -60,6 +62,21 @@ void AOBPlayerStateBase::SetReady(bool bInReady)
 	OnLobbyStateChanged.Broadcast();
 }
 
+void AOBPlayerStateBase::SetExpeditionStatus(EOBPlayerExpeditionStatus NewStatus)
+{
+	if (!HasAuthority() || ExpeditionStatus == NewStatus) return;
+	
+	ExpeditionStatus = NewStatus;
+	OnExpeditionStatusChanged.Broadcast(); // 리슨 호스트 로컬 갱신
+}
+
+void AOBPlayerStateBase::SetTeamId(uint8 NewTeamId)
+{
+	if (!HasAuthority()) return;
+	
+	TeamId = NewTeamId;
+}
+
 void AOBPlayerStateBase::OnRep_SelectedWeapons()
 {
 	OnLobbyStateChanged.Broadcast();
@@ -68,6 +85,11 @@ void AOBPlayerStateBase::OnRep_SelectedWeapons()
 void AOBPlayerStateBase::OnRep_Ready()
 {
 	OnLobbyStateChanged.Broadcast();
+}
+
+void AOBPlayerStateBase::OnRep_ExpeditionStatus()
+{
+	OnExpeditionStatusChanged.Broadcast();
 }
 
 void AOBPlayerStateBase::CopyProperties(APlayerState* NewPlayerState)

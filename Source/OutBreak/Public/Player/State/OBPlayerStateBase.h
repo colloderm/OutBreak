@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
+#include "Game/Expedition/OBExpeditionTypes.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "OBPlayerStateBase.generated.h"
 
@@ -33,10 +34,22 @@ public:
 
 	const TArray<TSubclassOf<AOBWeaponBase>>& GetSelectedWeapons() const { return SelectedWeapons; }
 	bool IsReady() const { return bReady; }
+	
+	EOBPlayerExpeditionStatus GetExpeditionStatus() const { return ExpeditionStatus; }
+	bool IsAliveInExpedition() const { return ExpeditionStatus == EOBPlayerExpeditionStatus::Alive; }
+	uint8 GetTeamId() const { return TeamId; }
 
+	void SetExpeditionStatus(EOBPlayerExpeditionStatus NewStatus);
+	void SetTeamId(uint8 NewTeamId);
+	
+public:
 	// 로비 UI 갱신.
 	DECLARE_MULTICAST_DELEGATE(FOBOnLobbyStateChanged);
 	FOBOnLobbyStateChanged OnLobbyStateChanged;
+	
+	// 결과/HUD 갱신 알림.
+	DECLARE_MULTICAST_DELEGATE(FOBOnExpeditionStatusChanged);
+	FOBOnExpeditionStatusChanged OnExpeditionStatusChanged;
 	
 protected:
 	UFUNCTION() 
@@ -44,6 +57,9 @@ protected:
 	
 	UFUNCTION() 
 	void OnRep_Ready();
+	
+	UFUNCTION() 
+	void OnRep_ExpeditionStatus();
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ability", Meta = (AllowPrivateAccess = "true"))
@@ -57,4 +73,11 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_Ready, BlueprintReadOnly, Category = "Lobby")
 	bool bReady = false;
+	
+	UPROPERTY(ReplicatedUsing = OnRep_ExpeditionStatus, BlueprintReadOnly, Category = "Expedition")
+	EOBPlayerExpeditionStatus ExpeditionStatus = EOBPlayerExpeditionStatus::Alive;
+
+	// 솔로=고유값 / 파티=공유값. GameMode가 진입 시 부여.
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	uint8 TeamId = 0;
 };
