@@ -13,4 +13,8 @@ UCLASS()
 class OUTBREAK_API UHordeNetworkSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
+	
+	
+	
+	friend class UBudgetOverlordSubsystem;
 };

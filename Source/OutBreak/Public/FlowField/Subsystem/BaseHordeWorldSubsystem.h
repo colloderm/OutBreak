@@ -24,4 +24,9 @@ protected:
 	virtual void ProcessSystem(const float DeltaSeconds) {};
 	UPROPERTY()
 	TObjectPtr<class UFlowFieldSettings> Settings;
+	
+	UPROPERTY()
+	TObjectPtr<class UBudgetOverlordSubsystem> BudgetOverlord;
+	
+	friend class UBudgetOverlordSubsystem;
 };

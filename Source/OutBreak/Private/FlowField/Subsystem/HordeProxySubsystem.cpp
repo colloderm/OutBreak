@@ -4,6 +4,7 @@
 #include "FlowField/Subsystem/HordeProxySubsystem.h"
 
 #include "GeometryTypes.h"
+#include "Components/CapsuleComponent.h"
 #include "FlowField/HordeProxyHost.h"
 #include "FlowField/Subsystem/HordeMovementSubsystem.h"
 #include "FlowField/Settings/FlowFieldSettings.h"
@@ -21,10 +22,10 @@ void UHordeProxySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UHordeProxySubsystem::InitializeStorage(int32 Capacity)
 {
-	ProxyEntity.Initialize(Capacity);
+	ProxyStorage.Initialize(Capacity);
 }
 
-void UHordeProxySubsystem::Register(FTransform&	Transform)
+ProxyRegisterResult UHordeProxySubsystem::Register(FTransform&	Transform)
 {
 	check(HordeProxy);
 	const int32 InstanceId = HordeProxy->AddInstance(Transform);
@@ -40,7 +41,7 @@ void UHordeProxySubsystem::Register(FTransform&	Transform)
 		HordeProxyActorClass,
 		TEXT("Flow Field 설정에 HordeProxyActorClass가 지정되지 않았습니다.")))
 	{
-		return;
+		return ProxyRegisterResult();
 	}
 	
 	FActorSpawnParameters SpawnParameters;
@@ -55,8 +56,16 @@ void UHordeProxySubsystem::Register(FTransform&	Transform)
 		SpawnParameters
 	);
 	
-	
-	ProxyEntity.Add(SpawnActor, InstanceId);
+	// SpawnActor->Capsule->OnComponentBeginOverlap.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleBeginOverlap);
+	// SpawnActor->Capsule->OnComponentEndOverlap.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleEndOverlap);
+	// SpawnActor->Capsule->OnComponentHit.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleHit);
+	int32 Index = ProxyStorage.Add(SpawnActor, InstanceId);
+	return ProxyRegisterResult(SpawnActor, Index);
+}
+
+void UHordeProxySubsystem::Unregister(int32 Index)
+{
+	ProxyStorage.RemoveAtSwap(Index);
 }
 
 
@@ -113,14 +122,14 @@ void UHordeProxySubsystem::ParallelProxy()
 		MovementSubsystem->MovementStorage.Transforms;
 
 	const int32 UpdateCount = FMath::Min(
-		ProxyEntity.PawnProxies.Num(),
+		ProxyStorage.PawnProxies.Num(),
 		Transforms.Num());
 
 	for (int32 AgentIndex = 0;
 		 AgentIndex < UpdateCount;
 		 ++AgentIndex)
 	{
-		TObjectPtr<AActor> PawnProxy = ProxyEntity.PawnProxies[AgentIndex];
+		TObjectPtr<AActor> PawnProxy = ProxyStorage.PawnProxies[AgentIndex];
 
 		if (!IsValid(PawnProxy))
 		{
@@ -133,6 +142,24 @@ void UHordeProxySubsystem::ParallelProxy()
 			nullptr,
 			ETeleportType::TeleportPhysics);
 	}
+}
+
+void UHordeProxySubsystem::HandleCapsuleBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	
+}
+
+void UHordeProxySubsystem::HandleCapsuleEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex)
+{
+	
+}
+
+void UHordeProxySubsystem::HandleCapsuleHit(UPrimitiveComponent* HitComponent, AActor* OtherActor,
+	UPrimitiveComponent* OtherComponent, FVector NormalImpulse, const FHitResult& Hit)
+{
+	
 }
 
 

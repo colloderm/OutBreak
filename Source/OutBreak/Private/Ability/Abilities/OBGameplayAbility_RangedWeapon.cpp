@@ -264,7 +264,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	const bool bHit = GetWorld()->LineTraceSingleByChannel(
 		Hit, TraceStart, TraceEnd, OB_TraceChannel_Weapon, QueryParams
 	);
-
+	
 #if ENABLE_DRAW_DEBUG
 	const FVector DebugEnd = bHit ? Hit.ImpactPoint : TraceEnd;
 	if (bDrawDebugTrace)

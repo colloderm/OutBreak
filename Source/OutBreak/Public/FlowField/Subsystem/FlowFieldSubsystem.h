@@ -33,7 +33,7 @@ public:
 public:
 	/** Builds the shared field toward GoalWorldLocation. Call after navigation generation is complete. */
 	UFUNCTION(BlueprintCallable, Category = "FlowField")
-	bool SetGoal(const FVector& GoalWorldLocation);
+	bool SetGoal(const FVector& WorldLocation);
 
 	/** Returns the horizontal direction from WorldLocation toward the active flow-field goal. */
 	UFUNCTION(BlueprintPure, Category = "FlowField")
@@ -48,6 +48,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "FlowField")
 	bool HasFlowField() const;
+	
+	NavNodeRef GoalNodeRef = -1;
+	FVector CurrentGoal = FVector::ZeroVector;
 
 private:
 	AFlowFieldRecastNavMesh* FindNavMesh() const;
@@ -57,5 +60,5 @@ private:
 	TMap<TWeakObjectPtr<UFlowFieldDensityComponent>, FVector> PreviousDensityComponentPositions;
 	double LastSetGoalFailureLogTime = -1.0;
 	bool bHasFlowField = false;
-	FVector CurrentGoal = FVector::ZeroVector;
+	
 };

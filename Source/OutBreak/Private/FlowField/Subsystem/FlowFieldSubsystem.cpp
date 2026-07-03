@@ -50,10 +50,10 @@ TStatId UFlowFieldSubsystem::GetStatId() const
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UFlowFieldSubsystem, STATGROUP_Tickables);
 }
 
-bool UFlowFieldSubsystem::SetGoal(const FVector& GoalWorldLocation)
+bool UFlowFieldSubsystem::SetGoal(const FVector& WorldLocation)
 {
 	if (bHasFlowField
-		&& GoalWorldLocation.Equals(CurrentGoal)
+		&& WorldLocation.Equals(CurrentGoal)
 		&& CachedNavMesh.IsValid()
 		&& CachedNavMesh->HasFlowField())
 	{
@@ -63,7 +63,7 @@ bool UFlowFieldSubsystem::SetGoal(const FVector& GoalWorldLocation)
 	bHasFlowField = false;
 
 	AFlowFieldRecastNavMesh* NavMesh = FindNavMesh();
-	if (NavMesh == nullptr || !NavMesh->BuildFlowField(GoalWorldLocation))
+	if (NavMesh == nullptr || !NavMesh->BuildFlowField(WorldLocation))
 	{
 		if (IsFlowFieldNetworkDiagnosticsEnabled())
 		{
@@ -78,7 +78,8 @@ bool UFlowFieldSubsystem::SetGoal(const FVector& GoalWorldLocation)
 	}
 
 	CachedNavMesh = NavMesh;
-	CurrentGoal = GoalWorldLocation;
+	QueryNodeRef(WorldLocation, GoalNodeRef);
+	CurrentGoal = WorldLocation;
 	bHasFlowField = true;
 	LastSetGoalFailureLogTime = -1.0;
 	return true;

@@ -25,6 +25,11 @@ void UHordeMovementSubsystem::Register(FTransform& Transform, float MoveSpeed)
 	MovementStorage.Add(Transform, MoveSpeed);
 }
 
+void UHordeMovementSubsystem::Unregister(int32 Index)
+{
+	MovementStorage.RemoveAtSwap(Index);
+}
+
 void UHordeMovementSubsystem::ProcessSystem(const float DeltaSeconds)
 {
 	Super::ProcessSystem(DeltaSeconds);

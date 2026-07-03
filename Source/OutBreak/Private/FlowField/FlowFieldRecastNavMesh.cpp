@@ -7,6 +7,7 @@
 #include "EngineUtils.h"
 #include "FlowField/FlowFieldNavLinkProxy.h"
 #include "Navigation/NavLinkProxy.h"
+#include "FlowField/Subsystem/FlowFieldSubsystem.h"
 
 #if WITH_RECAST
 #include "Detour/DetourNavMesh.h"
@@ -145,7 +146,7 @@ FSharedConstNavQueryFilter AFlowFieldRecastNavMesh::GetFlowQueryFilter() const
 }
 
 bool AFlowFieldRecastNavMesh::QueryDirection(
-	const FVector& WorldLocation,
+	const FVector& WorldLocation, 
 	FVector& OutDirection) const
 {
 	OutDirection = FVector::ZeroVector;
@@ -162,35 +163,81 @@ bool AFlowFieldRecastNavMesh::QueryDirection(
 	}
 
 	const FFlowFieldPolyNode* CurrentNode = FlowNodes.Find(CurrentNodeRef);
-	if (CurrentNode == nullptr || CurrentNode->IntegrationCost == TNumericLimits<float>::Max())
+	if (CurrentNode == nullptr ||
+		CurrentNode->IntegrationCost == TNumericLimits<float>::Max())
 	{
 		return false;
 	}
 
+	/*
+	 * 현재 위치와 목표 위치가 같은 내비게이션 노드에 있다면,
+	 * Flow Field를 사용하지 않고 목표 위치를 직접 바라보는
+	 * XY 평면 방향 벡터를 반환한다.
+	 */
+	const UWorld* World = GetWorld();
+	if (World == nullptr)
+	{
+		return false;
+	}
+
+	const UFlowFieldSubsystem* FlowFieldSubsystem =
+		World->GetSubsystem<UFlowFieldSubsystem>();
+
+	if (FlowFieldSubsystem == nullptr)
+	{
+		return false;
+	}
+	
+	if (CurrentNodeRef == FlowFieldSubsystem->GoalNodeRef)
+	{
+		FVector LookAtDirection = FlowFieldSubsystem->CurrentGoal - WorldLocation;
+		LookAtDirection.Z = 0.0f;
+
+		OutDirection = LookAtDirection.GetSafeNormal();
+
+		return !OutDirection.IsNearlyZero();
+	}
+
 	FVector DescentGradient = FVector::ZeroVector;
+
 	for (const NavNodeRef NeighborRef : CurrentNode->OutgoingNeighbors)
 	{
 		const FFlowFieldPolyNode* NeighborNode = FlowNodes.Find(NeighborRef);
-		if (NeighborNode == nullptr || NeighborNode->IntegrationCost == TNumericLimits<float>::Max())
+
+		if (NeighborNode == nullptr ||
+			NeighborNode->IntegrationCost == TNumericLimits<float>::Max())
 		{
 			continue;
 		}
 
-		FVector ToNeighbor = NeighborNode->Center - CurrentNode->Center;
+		FVector ToNeighbor =
+			NeighborNode->Center - CurrentNode->Center;
+
 		ToNeighbor.Z = 0.0f;
+
 		const float NeighborDistance = ToNeighbor.Size();
+
 		if (NeighborDistance > KINDA_SMALL_NUMBER)
 		{
-			const float CostSlope = (CurrentNode->IntegrationCost - NeighborNode->IntegrationCost) / NeighborDistance;
-			DescentGradient += ToNeighbor.GetSafeNormal() * CostSlope;
+			const float CostSlope =
+				(CurrentNode->IntegrationCost -
+				 NeighborNode->IntegrationCost)
+				/ NeighborDistance;
+
+			DescentGradient +=
+				ToNeighbor.GetSafeNormal() * CostSlope;
 		}
 	}
 
 	OutDirection = DescentGradient.GetSafeNormal2D();
+
 	if (OutDirection.IsNearlyZero())
 	{
 		OutDirection = CurrentNode->FlowDirection;
 	}
+
+	OutDirection.Z = 0.0f;
+	OutDirection.Normalize();
 
 	return !OutDirection.IsNearlyZero();
 }

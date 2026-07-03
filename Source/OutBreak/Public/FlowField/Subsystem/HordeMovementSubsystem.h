@@ -21,8 +21,11 @@ public:
 	
 protected:
 	void Register(FTransform& Transform, float MoveSpeed);
+	void Unregister(int32 Index);
 	virtual void ProcessSystem(const float DeltaSeconds) override;
 	void Parallel(const float DeltaSeconds);
+	
+	friend class UBudgetOverlordSubsystem;
 		
 private:
 	HordeMovementStorage MovementStorage;
@@ -30,6 +33,5 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<class UFlowFieldSubsystem> FlowFieldSubsystem;
 	
-	friend class UBudgetOverlordSubsystem;
 	friend class UHordeProxySubsystem;
 };

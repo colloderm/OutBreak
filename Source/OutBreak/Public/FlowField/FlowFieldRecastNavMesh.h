@@ -21,7 +21,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "FlowField")
 	bool BuildFlowField(const FVector& GoalWorldLocation);
 
-	bool QueryDirection(const FVector& WorldLocation, FVector& OutDirection) const;
+	bool QueryDirection(
+		const FVector& WorldLocation, 
+		FVector& OutDirection) const;
 	bool QueryNodeRef(const FVector& WorldLocation, NavNodeRef& OutNodeRef) const;
 	bool QueryConstrainedMove(const FVector& WorldLocation, float MaxTravelDistance, FVector& OutMoveOffset) const;
 	bool QueryNavLink(const FVector& WorldLocation, FFlowFieldNavLinkInfo& OutNavLink) const;

@@ -10,8 +10,16 @@
 
 using HordeAgentID = int32;
 
+
+struct ProxyRegisterResult
+{
+	AActor* Actor = nullptr;
+	int32 Index = INDEX_NONE;
+};
+
 struct HordeDamageEvent
 {
+	int32 StatusIndex = INDEX_NONE;
 	TWeakObjectPtr<AActor> DamagedActor;
 	double Damage;
 };
@@ -111,50 +119,42 @@ struct HordeMovementStorage
 	
 };
 
-struct HordeAgentType
+struct HordeStatusStorage
 {
-	TArray<float>					FlowQueryAges;
-	TArray<float>					NetworkUpdateAges;
-				
-	TArray<uint32>					AgentIDs;
-	TArray<uint16>					HealthValues;
-	TArray<uint16>					FlowRevisions;
+	TArray<float>					MaxHealths;
+	TArray<float>					CurrentHealths;
 	
 	int32 Size() const
 	{
-		return FlowQueryAges.Num();
+		return MaxHealths.Num();
 	}
 
 	void Initialize(const int32 Capacity)
 	{
-		FlowQueryAges.Reserve(Capacity);
-		NetworkUpdateAges.Reserve(Capacity);
-
-		AgentIDs.Reserve(Capacity);
-		HealthValues.Reserve(Capacity);
-		FlowRevisions.Reserve(Capacity);
+		MaxHealths.Reserve(Capacity);
+	}
+	
+	/* Percent는 MaxHealth에 대한 현재 체력 비중 입니다.*/
+	int32 Add(float inMaxHealth, float Pecsent = 1.0)
+	{
+		const float CurrentHP = inMaxHealth * Pecsent;
+		CurrentHealths.Add(CurrentHP);
+		return MaxHealths.Add(inMaxHealth);
 	}
 	
 	bool IsValid() const
 	{
-		const int32 AgentCount = FlowQueryAges.Num();
+		const int32 AgentCount = MaxHealths.Num();
 		
-		return NetworkUpdateAges.Num() == AgentCount
-			&& AgentIDs.Num() == AgentCount
-			&& HealthValues.Num() == AgentCount
-			&& FlowRevisions.Num() == AgentCount;
+		return static_cast<bool>(AgentCount);
 	}
 	
 	void RemoveAtSwap(const int32 PackedIndex)
 	{
 		check(IsValid());
-		check(AgentIDs.IsValidIndex(PackedIndex));
+		check(MaxHealths.IsValidIndex(PackedIndex));
 		
-		FlowQueryAges.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
-		NetworkUpdateAges.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
-		AgentIDs.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
-		HealthValues.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
-		FlowRevisions.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		MaxHealths.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 	}
 };
 
@@ -181,23 +181,6 @@ struct HordeProxyStorage
 		PoseIndices.Reserve(Capacity);
 		PawnProxies.Reserve(Capacity);
 		
-		// check(World)
-		//
-		// FActorSpawnParameters SpawnParameters;
-		// SpawnParameters.Name = TEXT("HordeProxy");
-		// SpawnParameters.SpawnCollisionHandlingOverride =
-		// 	ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		//
-		// for (int32 i = 0 ; i < Capacity ; i++)
-		// {
-		// 	APawn* SpawnActor = World->SpawnActor<APawn>
-		// 	(
-		// 		APawn::StaticClass(),
-		// 		FTransform::Identity,
-		// 		SpawnParameters
-		// 	);
-		// 	PawnProxies.Add(SpawnActor);
-		// }
 	}
 	
 	bool IsValid() const
