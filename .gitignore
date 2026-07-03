@@ -79,3 +79,6 @@ DerivedDataCache/*
 # Dev B ignore
 Content/Infected
 Content/Zombie_Pack
+Content/PostABundle
+Content/__ExternalActors__
+Content/__ExternalObjects__
