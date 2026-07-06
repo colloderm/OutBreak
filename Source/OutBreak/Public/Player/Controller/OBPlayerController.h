@@ -6,6 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "OBPlayerController.generated.h"
 
+class AOBInteractableActor;
+class UUserWidget;
 class AOBWeaponBase;
 enum class EOBWeaponSlot : uint8;
 class UOBAbilitySystemComponent;
@@ -39,6 +41,13 @@ private:
 	// 현재 무기의 복구 속도(ApplyWeaponRecoil에서 갱신).
 	float CurrentRecoilRecoverySpeed = 8.0f;
 	
+	// 현재 상호작용 가능한 대상(범위 안). 약참조.
+	TWeakObjectPtr<AOBInteractableActor> CurrentInteractable;
+
+	// 현재 열려있는 상호작용 위젯(중복 오픈 방지 + 닫기용).
+	UPROPERTY()
+	TObjectPtr<UUserWidget> ActiveInteractionWidget;
+	
 protected:
 	//~ APlayerController interface
 	virtual void SetupInputComponent() override;
@@ -59,7 +68,9 @@ protected:
 	
 	void Input_EquipSlot(EOBWeaponSlot Slot);
 	
-	virtual void AcknowledgePossession(class APawn* P) override;
+	virtual void AcknowledgePossession(APawn* P) override;
+	
+	void Input_Interact();
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -87,6 +98,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Weapon")
 	TObjectPtr<UInputAction> SlotMeleeAction;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> InteractAction;
+	
 public:
 	UFUNCTION(Server, Reliable) 
 	void Server_SetWeaponSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass);
@@ -97,4 +111,15 @@ public:
 	UFUNCTION(Server, Reliable) 
 	void Server_StartGame();
 	
+	// 클라 → 서버: 내 GameInstance Loadout을 PlayerState로 적용.
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyLoadout(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
+	
+	// 상호작용 위젯 오픈/클로즈(커서·UIOnly·이동잠금을 여기서 일괄 처리).
+	void OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass);
+	void CloseInteractionWidget();
+
+	// 범위 내 상호작용 대상 등록(액터가 호출).
+	void SetCurrentInteractable(AOBInteractableActor* Interactable);
+	AOBInteractableActor* GetCurrentInteractable() const;
 };

@@ -112,6 +112,14 @@ void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, A
 	Super::RestartPlayerAtPlayerStart(NewPlayer, StartSpot);
 }
 
+void AOBExpeditionGameMode::Logout(AController* Exiting)
+{
+	Super::Logout(Exiting);
+	
+	// 남은 인원 기준으로 종료 여부 재평가.
+	CheckEndConditions();
+}
+
 void AOBExpeditionGameMode::ValidateZoneSeparation() const
 {
 	// 3~5분 이격 검증(디자이너 배치 싨 ㅜ감지). 실패해도 게임은 진행(경고만)
@@ -222,9 +230,21 @@ int32 AOBExpeditionGameMode::ResolveSessionLength() const
 
 void AOBExpeditionGameMode::RequestRespawn(AController* Controller, APawn* DeadPawn)
 {
-	// [무리스폰] 베이스처럼 RestartPlayer 하지 않는다. Expedition에선 사망=탈락.
-	// 죽은 폰은 남겨두거나 관전 처리(Step 6/8에서 결정). 여기선 아무 것도 하지 않음.
-	//
-	// TODO(Step 4): 여기서 Controller의 PlayerState.ExpeditionStatus를 Dead(또는 Downed)로 마킹하고, 팀 전멸 검사 → CheckEndConditions() 호출.
-	UE_LOG(LogTemp, Log, TEXT("[Expedition] RequestRespawn suppressed (no respawn)."));
+	// [무리스폰 + 탈락 확정] Expedition은 리스폰하지 않는다.
+	// - 여기서 개인 상태를 Dead로 확정하고, 세션 종료 조건을 다시 검사한다.
+	if (!Controller) return;
+
+	if (AOBPlayerStateBase* PS = Controller->GetPlayerState<AOBPlayerStateBase>())
+	{
+		// TODO(Step 6): 다운/부활 도입 시 → 여기서 Alive를 우선 Downed로 두고,
+		//   블리드아웃 만료 또는 팀 전멸 시점에 Dead로 확정하도록 분기 예정.
+		//   현재(Step 4)는 다운 단계 없이 즉시 Dead.
+		PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Dead);
+	}
+
+	// 죽은 폰: 서버측 이동/충돌 정지는 Character::StartDeath가 이미 처리.
+	// (관전/시체 정리는 Step 6/8에서 결정 — 여기선 그대로 둔다)
+
+	// 살아있는(또는 다운) 플레이어가 남았는지 재평가 → 없으면 세션 종료.
+	CheckEndConditions();
 }

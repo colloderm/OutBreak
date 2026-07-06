@@ -32,6 +32,7 @@ void AOBPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AOBPlayerStateBase, bReady);
 	DOREPLIFETIME(AOBPlayerStateBase, ExpeditionStatus);
 	DOREPLIFETIME(AOBPlayerStateBase, TeamId);
+	DOREPLIFETIME(AOBPlayerStateBase, bIsPartyLeader);
 }
 
 void AOBPlayerStateBase::SetWeaponForSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
@@ -75,6 +76,22 @@ void AOBPlayerStateBase::SetTeamId(uint8 NewTeamId)
 	if (!HasAuthority()) return;
 	
 	TeamId = NewTeamId;
+}
+
+void AOBPlayerStateBase::SetPartyLeader(bool bInLeader)
+{
+	if (!HasAuthority()) return;
+	
+	bIsPartyLeader = bInLeader;
+	OnLobbyStateChanged.Broadcast();
+}
+
+void AOBPlayerStateBase::SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeaponBase>>& InWeapons)
+{
+	if (!HasAuthority()) return;
+
+	SelectedWeapons = InWeapons;   // 통째 교체(슬롯 유효성은 클라 Loadout이 이미 보장)
+	OnLobbyStateChanged.Broadcast();
 }
 
 void AOBPlayerStateBase::OnRep_SelectedWeapons()

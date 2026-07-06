@@ -10,6 +10,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "TimerManager.h"
+#include "LoadOut/OBLoadoutSubsystem.h"
 
 void UOBLobbyWidget::NativeConstruct()
 {
@@ -20,20 +21,14 @@ void UOBLobbyWidget::NativeConstruct()
 		WeaponSelect->BuildList(WeaponCatalog);
 		WeaponSelect->OnWeaponChosen.AddUObject(this, &UOBLobbyWidget::HandleWeaponChosen);
 	}
-	if (ReadyButton) ReadyButton->OnClicked.AddDynamic(this, &UOBLobbyWidget::HandleReadyClicked);
+	if (ReadyButton)
+		ReadyButton->OnClicked.AddDynamic(this, &UOBLobbyWidget::HandleReadyClicked);
+	
 	if (StartButton)
-	{
 		StartButton->OnClicked.AddDynamic(this, &UOBLobbyWidget::HandleStartClicked);
-		const bool bHost = GetOwningPlayer() && GetOwningPlayer()->HasAuthority();
-		StartButton->SetVisibility(bHost ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
-	}
-
-	if (APlayerController* PC = GetOwningPlayer())
-	{
-		FInputModeUIOnly Mode;
-		PC->SetInputMode(Mode);
-		PC->SetShowMouseCursor(true);
-	}
+	
+	if (CloseButton)
+		CloseButton->OnClicked.AddDynamic(this, &UOBLobbyWidget::HandleCloseClicked);
 
 	if (UWorld* W = GetWorld())
 	{
@@ -44,23 +39,25 @@ void UOBLobbyWidget::NativeConstruct()
 
 void UOBLobbyWidget::NativeDestruct()
 {
-	if (UWorld* W = GetWorld()) W->GetTimerManager().ClearTimer(RefreshTimer);
-	
-	if (APlayerController* PC = GetOwningPlayer())
-	{
-		FInputModeGameOnly Mode;
-		PC->SetInputMode(Mode);
-		PC->SetShowMouseCursor(false);
-	}
+	if (UWorld* W = GetWorld()) 
+		W->GetTimerManager().ClearTimer(RefreshTimer);
 	
 	Super::NativeDestruct();
 }
 
 void UOBLobbyWidget::HandleWeaponChosen(TSubclassOf<AOBWeaponBase> WeaponClass, EOBWeaponSlot WeaponSlot)
 {
+	// 1) 로컬 영속(즉시 저장) — 요구사항 "선택 시 바로 Loadout 저장".
+	if (UGameInstance* GI = GetGameInstance())
+		if (UOBLoadoutSubsystem* LoadoutSys = GI->GetSubsystem<UOBLoadoutSubsystem>())
+			LoadoutSys ->SetWeapon(WeaponSlot, WeaponClass);
+
+	// 2) 현재 맵 서버 PlayerState에도 반영(로비가 세션과 같은 서버일 때).
 	if (AOBPlayerController* PC = GetOwningPlayer<AOBPlayerController>())
 		PC->Server_SetWeaponSlot(WeaponSlot, WeaponClass);
-	if (Loadout) Loadout->ShowStats(WeaponClass);
+	
+	if (Loadout) 
+		Loadout->ShowStats(WeaponClass);
 }
 
 void UOBLobbyWidget::HandleReadyClicked()
@@ -82,9 +79,24 @@ void UOBLobbyWidget::RefreshDynamic()
 	AOBPlayerStateBase* PS = PC ? PC->GetPlayerState<AOBPlayerStateBase>() : nullptr;
 	if (PS)
 	{
-		if (WeaponSelect) WeaponSelect->RefreshChecks(PS->GetSelectedWeapons());
-		if (Loadout)      Loadout->RefreshLoadout(PS->GetSelectedWeapons());
+		if (WeaponSelect)
+			WeaponSelect->RefreshChecks(PS->GetSelectedWeapons());
+		
+		if (Loadout)      
+			Loadout->RefreshLoadout(PS->GetSelectedWeapons());
+		
+		if (StartButton) 
+			StartButton->SetIsEnabled(PS->IsPartyLeader()); // 팀원=비활성
+		
 		bMyReady = PS->IsReady();
 	}
-	if (PlayerListW) PlayerListW->RefreshPlayers();
+	
+	if (PlayerListW) 
+		PlayerListW->RefreshPlayers();
+}
+
+void UOBLobbyWidget::HandleCloseClicked()
+{
+	if (AOBPlayerController* PC = GetOwningPlayer<AOBPlayerController>())
+		PC->CloseInteractionWidget();   // 커서/이동잠금 복구 + 위젯 제거
 }

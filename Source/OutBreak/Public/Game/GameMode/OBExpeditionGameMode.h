@@ -35,6 +35,9 @@ public:
 	// 존이면 반경 내 랜덤 위치로 스폰(파티원 산개).
 	virtual void RestartPlayerAtPlayerStart(AController* NewPlayer, AActor* StartSpot) override;
 	
+	// 플레이어 접속 종료. 마지막 생존자가 나갔을 수 있어 종료 조건을 재평가.
+	virtual void Logout(AController* Exiting) override;
+	
 protected:
 	virtual void StartPlay() override;
 

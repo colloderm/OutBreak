@@ -36,7 +36,11 @@ protected:
 	void HandleStartClicked();
 	
 	void RefreshDynamic();
-
+	
+	UFUNCTION()
+	void HandleCloseClicked();
+	
+protected:
 	UPROPERTY(meta=(BindWidget)) 
 	TObjectPtr<UOBWeaponSelectWidget> WeaponSelect;
 	
@@ -51,6 +55,9 @@ protected:
 	
 	UPROPERTY(meta=(BindWidget)) 
 	TObjectPtr<UButton> StartButton;
+	
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> CloseButton;
 	
 	UPROPERTY(meta=(BindWidgetOptional)) 
 	TObjectPtr<UTextBlock> HostCountText;
