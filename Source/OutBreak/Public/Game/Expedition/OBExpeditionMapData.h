@@ -6,9 +6,8 @@
 #include "Engine/DataAsset.h"
 #include "OBExpeditionMapData.generated.h"
 
-/**
- * 
- */
+class UTexture2D;
+
 UCLASS(BlueprintType)
 class OUTBREAK_API UOBExpeditionMapData : public UPrimaryDataAsset
 {
@@ -22,6 +21,18 @@ public:
 	// 실제 로드할 레벨(ServerTravel 대상).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map")
 	TSoftObjectPtr<UWorld> Level;
+	
+	// 지역 카드 썸네일.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map")
+	TObjectPtr<UTexture2D> Thumbnail;
+
+	// 난이도(★ 개수 표시용).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map", meta = (ClampMin = "0", ClampMax = "5"))
+	int32 DifficultyStars = 1;
+
+	// 카드 부제/설명(선택).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map")
+	FText Description;
 
 	// [핵심] 이 세션의 총 정원(PvPvE 전체). 기본 맵 12. 큰 맵은 이 값을 올림.
 	// - GameSession->MaxPlayers로 들어가 PreLogin 단계에서 초과 접속을 거부.

@@ -4,13 +4,10 @@
 
 #include "UI/Widgets/Lobby/OBWeaponSelectWidget.h"
 #include "UI/Widgets/Lobby/OBLoadoutWidget.h"
-#include "UI/Widgets/Lobby/OBPlayerListWidget.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
-#include "Components/Button.h"
-#include "Components/TextBlock.h"
-#include "TimerManager.h"
 #include "LoadOut/OBLoadoutSubsystem.h"
+#include "TimerManager.h"
 
 void UOBLobbyWidget::NativeConstruct()
 {
@@ -21,14 +18,6 @@ void UOBLobbyWidget::NativeConstruct()
 		WeaponSelect->BuildList(WeaponCatalog);
 		WeaponSelect->OnWeaponChosen.AddUObject(this, &UOBLobbyWidget::HandleWeaponChosen);
 	}
-	if (ReadyButton)
-		ReadyButton->OnClicked.AddDynamic(this, &UOBLobbyWidget::HandleReadyClicked);
-	
-	if (StartButton)
-		StartButton->OnClicked.AddDynamic(this, &UOBLobbyWidget::HandleStartClicked);
-	
-	if (CloseButton)
-		CloseButton->OnClicked.AddDynamic(this, &UOBLobbyWidget::HandleCloseClicked);
 
 	if (UWorld* W = GetWorld())
 	{
@@ -56,25 +45,16 @@ void UOBLobbyWidget::HandleWeaponChosen(TSubclassOf<AOBWeaponBase> WeaponClass, 
 	if (AOBPlayerController* PC = GetOwningPlayer<AOBPlayerController>())
 		PC->Server_SetWeaponSlot(WeaponSlot, WeaponClass);
 	
+	// 3) 스탯 표시(UI 멤버 Loadout).
 	if (Loadout) 
 		Loadout->ShowStats(WeaponClass);
 }
 
-void UOBLobbyWidget::HandleReadyClicked()
-{
-	bMyReady = !bMyReady;
-	if (AOBPlayerController* PC = GetOwningPlayer<AOBPlayerController>())
-		PC->Server_SetReady(bMyReady);
-}
-
-void UOBLobbyWidget::HandleStartClicked()
-{
-	if (AOBPlayerController* PC = GetOwningPlayer<AOBPlayerController>())
-		PC->Server_StartGame();
-}
-
 void UOBLobbyWidget::RefreshDynamic()
 {
+	UWorld* W = GetWorld();
+	if (!W || W->bIsTearingDown) return;
+	
 	APlayerController* PC = GetOwningPlayer();
 	AOBPlayerStateBase* PS = PC ? PC->GetPlayerState<AOBPlayerStateBase>() : nullptr;
 	if (PS)
@@ -84,19 +64,5 @@ void UOBLobbyWidget::RefreshDynamic()
 		
 		if (Loadout)      
 			Loadout->RefreshLoadout(PS->GetSelectedWeapons());
-		
-		if (StartButton) 
-			StartButton->SetIsEnabled(PS->IsPartyLeader()); // 팀원=비활성
-		
-		bMyReady = PS->IsReady();
 	}
-	
-	if (PlayerListW) 
-		PlayerListW->RefreshPlayers();
-}
-
-void UOBLobbyWidget::HandleCloseClicked()
-{
-	if (AOBPlayerController* PC = GetOwningPlayer<AOBPlayerController>())
-		PC->CloseInteractionWidget();   // 커서/이동잠금 복구 + 위젯 제거
 }

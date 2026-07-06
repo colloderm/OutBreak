@@ -7,13 +7,10 @@
 #include "Weapon/Data/OBWeaponData.h"
 #include "OBLobbyWidget.generated.h"
 
-class UButton; 
-class UTextBlock; 
 class AOBWeaponBase; 
 class UOBWeaponCatalog;
 class UOBWeaponSelectWidget; 
 class UOBLoadoutWidget; 
-class UOBPlayerListWidget;
 
 UCLASS()
 class OUTBREAK_API UOBLobbyWidget : public UUserWidget
@@ -27,18 +24,11 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	// 무기 선택 시: 로컬 저장(GameInstance) + 서버 PlayerState 반영 + 스탯 표시.
 	void HandleWeaponChosen(TSubclassOf<AOBWeaponBase> WeaponClass, EOBWeaponSlot WeaponSlot);
 	
-	UFUNCTION() 
-	void HandleReadyClicked();
-	
-	UFUNCTION() 
-	void HandleStartClicked();
-	
+	// PlayerState.SelectedWeapons 기준으로 체크표시/로드아웃 갱신(0.3s 타이머).
 	void RefreshDynamic();
-	
-	UFUNCTION()
-	void HandleCloseClicked();
 	
 protected:
 	UPROPERTY(meta=(BindWidget)) 
@@ -46,25 +36,9 @@ protected:
 	
 	UPROPERTY(meta=(BindWidget)) 
 	TObjectPtr<UOBLoadoutWidget> Loadout;
-	
-	UPROPERTY(meta=(BindWidget)) 
-	TObjectPtr<UOBPlayerListWidget> PlayerListW;
-	
-	UPROPERTY(meta=(BindWidget)) 
-	TObjectPtr<UButton> ReadyButton;
-	
-	UPROPERTY(meta=(BindWidget)) 
-	TObjectPtr<UButton> StartButton;
-	
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UButton> CloseButton;
-	
-	UPROPERTY(meta=(BindWidgetOptional)) 
-	TObjectPtr<UTextBlock> HostCountText;
 
 	UPROPERTY(EditAnywhere, Category="Lobby") 
 	TObjectPtr<UOBWeaponCatalog> WeaponCatalog;
 
-	bool bMyReady = false;
 	FTimerHandle RefreshTimer;
 };
