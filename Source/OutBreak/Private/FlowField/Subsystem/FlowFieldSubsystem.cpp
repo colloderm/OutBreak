@@ -5,7 +5,7 @@
 #include "EngineUtils.h"
 #include "FlowField/FlowFieldRecastNavMesh.h"
 #include "GameFramework/Actor.h"
-#include "FlowField/FlowFieldAgentPawn.h"
+#include "FlowField/FlowFieldGoalActor.h"
 #include "HAL/IConsoleManager.h"
 
 DEFINE_LOG_CATEGORY(LogFlowField);
@@ -90,11 +90,12 @@ bool UFlowFieldSubsystem::QueryDirection(const FVector& WorldLocation, FVector& 
 	OutDirection = FVector::ZeroVector;
 
 	const AFlowFieldRecastNavMesh* NavMesh = FindNavMesh();
-	bool HasFlowField = NavMesh->HasFlowField();
-	bool QueryResult = NavMesh->QueryDirection(WorldLocation, OutDirection);
-	return NavMesh != nullptr
-		&& HasFlowField
-		&& QueryResult;
+	if (NavMesh == nullptr || !NavMesh->HasFlowField())
+	{
+		return false;
+	}
+
+	return NavMesh->QueryDirection(WorldLocation, OutDirection);
 }
 
 bool UFlowFieldSubsystem::QueryConstrainedMove(

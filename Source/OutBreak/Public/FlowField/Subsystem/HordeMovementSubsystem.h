@@ -28,6 +28,9 @@ protected:
 	friend class UBudgetOverlordSubsystem;
 		
 private:
+	void SimulateClient(const float DeltaSeconds);
+	void SimulateAuthority(const float DeltaSeconds);
+
 	HordeMovementStorage MovementStorage;
 	
 	UPROPERTY(Transient)

@@ -39,7 +39,6 @@ protected:
 	
 	
 private:
-	int32 PatchBudget = 32;
 	TMap<TObjectPtr<APlayerController>,
 		 TObjectPtr<AHordeNetworkBridgeActor>> Bridges;
 	TArray<FHordeNetworkFormat> Payloads;

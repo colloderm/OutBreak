@@ -5,8 +5,10 @@
 
 #include "GeometryTypes.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "FlowField/HordeProxyHost.h"
 #include "FlowField/Subsystem/HordeMovementSubsystem.h"
+#include "FlowField/Subsystem/FlowFieldSubsystem.h"
 #include "FlowField/Settings/FlowFieldSettings.h"
 #include "FlowField/HordeProxyHost.h"
 #include "FlowField/HordeProxyActor.h"
@@ -86,9 +88,141 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 	}
 	
 	const TArray<FTransform>& Transforms = MovementSubsystem->MovementStorage.Transforms;
+
+	const bool bDiagnosticsEnabled =
+		IsFlowFieldNetworkDiagnosticsEnabled();
+
+	FVector DebugMovementLocation =
+		FVector::ZeroVector;
+
+	FVector DebugInstanceBeforeLocation =
+		FVector::ZeroVector;
+
+	FVector DebugInstanceAfterLocation =
+		FVector::ZeroVector;
+
+	FVector DebugPawnBeforeLocation =
+		FVector::ZeroVector;
+
+	FVector DebugPawnAfterLocation =
+		FVector::ZeroVector;
+
+	bool bDebugHasMovementTransform =
+		false;
+
+	bool bDebugHasInstanceBefore =
+		false;
+
+	bool bDebugHasInstanceAfter =
+		false;
+
+	bool bDebugHasPawnBefore =
+		false;
+
+	bool bDebugHasPawnAfter =
+		false;
+
+	if (bDiagnosticsEnabled)
+	{
+		bDebugHasMovementTransform =
+			Transforms.IsValidIndex(0);
+
+		if (bDebugHasMovementTransform)
+		{
+			DebugMovementLocation =
+				Transforms[0].GetLocation();
+		}
+
+		if (IsValid(HordeProxy->InstancedStaticMesh)
+			&& HordeProxy->InstancedStaticMesh->GetInstanceCount() > 0)
+		{
+			FTransform DebugInstanceBefore =
+				FTransform::Identity;
+
+			bDebugHasInstanceBefore =
+				HordeProxy->InstancedStaticMesh->GetInstanceTransform(
+					0,
+					DebugInstanceBefore,
+					true);
+
+			DebugInstanceBeforeLocation =
+				DebugInstanceBefore.GetLocation();
+		}
+
+		if (ProxyStorage.PawnProxies.IsValidIndex(0)
+			&& IsValid(ProxyStorage.PawnProxies[0]))
+		{
+			bDebugHasPawnBefore =
+				true;
+
+			DebugPawnBeforeLocation =
+				ProxyStorage.PawnProxies[0]->GetActorLocation();
+		}
+	}
 	
 	HordeProxy->UpdateInstances(Transforms);
 	ParallelProxy();
+
+	if (bDiagnosticsEnabled)
+	{
+		if (IsValid(HordeProxy->InstancedStaticMesh)
+			&& HordeProxy->InstancedStaticMesh->GetInstanceCount() > 0)
+		{
+			FTransform DebugInstanceAfter =
+				FTransform::Identity;
+
+			bDebugHasInstanceAfter =
+				HordeProxy->InstancedStaticMesh->GetInstanceTransform(
+					0,
+					DebugInstanceAfter,
+					true);
+
+			DebugInstanceAfterLocation =
+				DebugInstanceAfter.GetLocation();
+		}
+
+		if (ProxyStorage.PawnProxies.IsValidIndex(0)
+			&& IsValid(ProxyStorage.PawnProxies[0]))
+		{
+			bDebugHasPawnAfter =
+				true;
+
+			DebugPawnAfterLocation =
+				ProxyStorage.PawnProxies[0]->GetActorLocation();
+		}
+
+		UWorld* World =
+			GetWorld();
+
+		if (World)
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT(
+					"[HordeProxy] World=%s WorldType=%d NetMode=%d "
+					"TransformCount=%d PawnProxyCount=%d Function=%s "
+					"HasMove=%d Move=%s HasInstanceBefore=%d InstanceBefore=%s "
+					"HasInstanceAfter=%d InstanceAfter=%s "
+					"HasPawnBefore=%d PawnBefore=%s HasPawnAfter=%d PawnAfter=%s"),
+				*World->GetName(),
+				static_cast<int32>(World->WorldType),
+				static_cast<int32>(World->GetNetMode()),
+				Transforms.Num(),
+				ProxyStorage.PawnProxies.Num(),
+				TEXT(__FUNCTION__),
+				bDebugHasMovementTransform,
+				*DebugMovementLocation.ToCompactString(),
+				bDebugHasInstanceBefore,
+				*DebugInstanceBeforeLocation.ToCompactString(),
+				bDebugHasInstanceAfter,
+				*DebugInstanceAfterLocation.ToCompactString(),
+				bDebugHasPawnBefore,
+				*DebugPawnBeforeLocation.ToCompactString(),
+				bDebugHasPawnAfter,
+				*DebugPawnAfterLocation.ToCompactString());
+		}
+	}
 }
 
 

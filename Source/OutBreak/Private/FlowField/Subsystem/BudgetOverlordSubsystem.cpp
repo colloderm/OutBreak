@@ -10,6 +10,7 @@
 #include "FlowField/Subsystem/HordeNetworkSubsystem.h"
 #include "FlowField/Subsystem/HordeProxySubsystem.h"
 #include "FlowField/Subsystem/HordeStatusSubsystem.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
 
@@ -205,11 +206,20 @@ void UBudgetOverlordSubsystem::DispatchPayload(const FHordeNetworkFormat& Payloa
 }
 void UBudgetOverlordSubsystem::BuildPacket()
 {
+	UWorld* World =
+		GetWorld();
+
+	if (!World || World->GetNetMode() == NM_Client)
+	{
+		CacheTestIndex = 0;
+		return;
+	}
+
 	const HordeMovementStorage& Storage =
 		MovementSubsystem->MovementStorage;
 
 	const int32 AgentCount = Storage.Size();
-	constexpr int32 MaxPayloadCount = 32;
+	constexpr int32 MaxPayloadCount = 8;
 
 	if (AgentCount <= 0)
 	{
@@ -235,7 +245,11 @@ void UBudgetOverlordSubsystem::BuildPacket()
 		if (!PackedIndexToHandle.IsValidIndex(PackedIndex)
 			|| !Storage.Transforms.IsValidIndex(PackedIndex)
 			|| !Storage.CachedFlowDirections.IsValidIndex(PackedIndex)
-			|| !Storage.MoveSpeeds.IsValidIndex(PackedIndex))
+			|| !Storage.MoveSpeeds.IsValidIndex(PackedIndex)
+			|| !Storage.Velocities.IsValidIndex(PackedIndex)
+			|| !Storage.MovementStates.IsValidIndex(PackedIndex)
+			|| !Storage.TraversalStates.IsValidIndex(PackedIndex)
+			|| !Storage.PriorityTiers.IsValidIndex(PackedIndex))
 		{
 			CacheTestIndex =
 				(CacheTestIndex + 1) % AgentCount;
@@ -255,6 +269,18 @@ void UBudgetOverlordSubsystem::BuildPacket()
 
 		Payload.MoveSpeed =
 			Storage.MoveSpeeds[PackedIndex];
+
+		Payload.Velocities =
+			Storage.Velocities[PackedIndex];
+
+		Payload.MovementStates =
+			Storage.MovementStates[PackedIndex];
+
+		Payload.TraversalStates =
+			Storage.TraversalStates[PackedIndex];
+
+		Payload.PriorityTiers =
+			Storage.PriorityTiers[PackedIndex];
 
 		NetworkSubsystem->AddPayload(Payload);
 

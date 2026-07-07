@@ -6,6 +6,7 @@
 #include "FlowField/HordeNetworkBridgeActor.h"
 #include "Engine/World.h"
 #include "FlowField/Subsystem/BudgetOverlordSubsystem.h"
+#include "FlowField/Subsystem/FlowFieldSubsystem.h"
 #include "FlowField/Subsystem/HordeStatusSubsystem.h"
 #include "GameFramework/PlayerController.h"
 
@@ -48,6 +49,7 @@ void UHordeNetworkSubsystem::SendPayloads()
 
 	if (World->GetNetMode() == NM_Client)
 	{
+		Payloads.Reset();
 		return;
 	}
 
@@ -94,6 +96,49 @@ void UHordeNetworkSubsystem::SendPayloads()
 
 void UHordeNetworkSubsystem::ReceivePayloads(const TArray<FHordeNetworkFormat>& InPayloads)
 {
+	UWorld* World =
+		GetWorld();
+
+	if (!World)
+	{
+		return;
+	}
+
+	if (World->GetNetMode() != NM_Client)
+	{
+		if (IsFlowFieldNetworkDiagnosticsEnabled())
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT(
+					"[HordeNetwork] World=%s WorldType=%d NetMode=%d "
+					"PayloadCount=%d Function=%s IgnoredNonClientReceive=1"),
+				*World->GetName(),
+				static_cast<int32>(World->WorldType),
+				static_cast<int32>(World->GetNetMode()),
+				InPayloads.Num(),
+				TEXT(__FUNCTION__));
+		}
+
+		return;
+	}
+
+	if (IsFlowFieldNetworkDiagnosticsEnabled())
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT(
+				"[HordeNetwork] World=%s WorldType=%d NetMode=%d "
+				"PayloadCount=%d Function=%s"),
+			*World->GetName(),
+			static_cast<int32>(World->WorldType),
+			static_cast<int32>(World->GetNetMode()),
+			InPayloads.Num(),
+			TEXT(__FUNCTION__));
+	}
+
 	for (const FHordeNetworkFormat& Payload : InPayloads)
 	{
 		BudgetOverlord->DispatchPayload(Payload);
