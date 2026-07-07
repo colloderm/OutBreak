@@ -115,6 +115,10 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyLoadout(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
 	
+	// 파티 리더십을 서버 PlayerState에 반영(게이팅용).
+	UFUNCTION(Server, Reliable)
+	void Server_SetPartyLeader(bool bLeader);
+	
 	// 상호작용 위젯 오픈/클로즈(커서·UIOnly·이동잠금을 여기서 일괄 처리).
 	void OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass);
 	void CloseInteractionWidget();

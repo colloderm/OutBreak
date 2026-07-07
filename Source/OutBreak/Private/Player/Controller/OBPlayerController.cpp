@@ -17,6 +17,7 @@
 #include "Game/GameMode/OBLobbyGameMode.h"
 #include "Interaction/OBInteractableActor.h"
 #include "LoadOut/OBLoadoutSubsystem.h"
+#include "Party/OBPartySubsystem.h"
 #include "Weapon/Data/OBWeaponData.h"
 
 void AOBPlayerController::BeginPlay()
@@ -43,7 +44,11 @@ void AOBPlayerController::BeginPlay()
 			{
 				Server_ApplyLoadout(Classes);
 			}
+			
 		}
+		
+		if (UOBPartySubsystem* Party = GI->GetSubsystem<UOBPartySubsystem>())
+			Server_SetPartyLeader(Party->IsLocalLeader());
 	}
 }
 
@@ -308,6 +313,12 @@ void AOBPlayerController::CloseInteractionWidget()
 	// 잠금 해제(Open의 true와 1:1 균형).
 	SetIgnoreMoveInput(false);
 	SetIgnoreLookInput(false);
+}
+
+void AOBPlayerController::Server_SetPartyLeader_Implementation(bool bLeader)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetPartyLeader(bLeader);
 }
 
 void AOBPlayerController::Server_ApplyLoadout_Implementation(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons)

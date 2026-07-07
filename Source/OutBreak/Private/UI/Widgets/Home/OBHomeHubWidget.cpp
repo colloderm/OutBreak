@@ -24,6 +24,9 @@ void UOBHomeHubWidget::NativeConstruct()
 	
 	if (BtnClose)      
 		BtnClose->OnClicked.AddDynamic(this, &UOBHomeHubWidget::OnCloseClicked);
+	
+	if (BtnParty) 
+		BtnParty->OnClicked.AddDynamic(this, &UOBHomeHubWidget::OnPartyClicked);
 
 	// 처음엔 아무 패널도 안 보이게(버튼 클릭 전 빈 화면).
 	if (ContentSwitcher)
@@ -39,6 +42,11 @@ void UOBHomeHubWidget::ShowPanel(UWidget* Panel)
 
 	ContentSwitcher->SetVisibility(ESlateVisibility::Visible); // 첫 클릭 시 등장
 	ContentSwitcher->SetActiveWidget(Panel);
+}
+
+void UOBHomeHubWidget::OnPartyClicked()
+{
+	ShowPanel(PartyPanel);
 }
 
 void UOBHomeHubWidget::OnExpeditionClicked()

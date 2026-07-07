@@ -37,7 +37,11 @@ protected:
 	void OnCloseClicked();
 
 	void ShowPanel(UWidget* Panel);
-
+	
+	UFUNCTION()
+	void OnPartyClicked();
+	
+protected:
 	// 좌측 메뉴 버튼(상시 표시).
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> BtnExpedition;
@@ -53,6 +57,9 @@ protected:
 	
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> BtnClose;
+	
+	UPROPERTY(meta = (BindWidgetOptional)) 
+	TObjectPtr<UButton> BtnParty;
 
 	// 우측 콘텐츠.
 	UPROPERTY(meta = (BindWidget))
@@ -70,4 +77,7 @@ protected:
 	
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> BoardPanel;        // 껍데기
+	
+	UPROPERTY(meta = (BindWidgetOptional)) 
+	TObjectPtr<UWidget> PartyPanel;
 };
