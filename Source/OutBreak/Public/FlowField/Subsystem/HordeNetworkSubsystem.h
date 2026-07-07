@@ -18,25 +18,31 @@ class OUTBREAK_API UHordeNetworkSubsystem : public UBaseHordeWorldSubsystem
 	GENERATED_BODY()
 	
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
-	
-	
-	
-	
+	virtual void Deinitialize() override;
+		
 public:
-	FORCEINLINE void AddPayload(const HordeNetworkFormat Payload) { Payloads.Add(Payload); }
 	
+	
+	FORCEINLINE void AddPayload(const FHordeNetworkFormat& Payload)
+	{
+		Payloads.Add(Payload);
+	}
 	
 	void SendPayloads();
 	
-	void ReceivePayloads(const HordeNetworkFormat& Payload);
+	void ReceivePayloads(const TArray<FHordeNetworkFormat>& InPayloads);
 	
 protected:
+	virtual void ProcessSystem(const float DeltaSeconds) override;
 	AHordeNetworkBridgeActor* RegisterConnection(APlayerController* PlayerController);
 	virtual void BeginSystem() override;
+	
+	
 private:
+	int32 PatchBudget = 32;
 	TMap<TObjectPtr<APlayerController>,
 		 TObjectPtr<AHordeNetworkBridgeActor>> Bridges;
-	TArray<HordeNetworkFormat> Payloads;
+	TArray<FHordeNetworkFormat> Payloads;
 	
 	friend class UBudgetOverlordSubsystem;
 };

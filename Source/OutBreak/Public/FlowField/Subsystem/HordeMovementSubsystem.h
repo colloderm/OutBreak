@@ -20,7 +20,7 @@ public:
 	void InitializeStorage(int32 Capacity);
 	
 protected:
-	void Register(FTransform& Transform, float MoveSpeed);
+	void Register(const FTransform& Transform, float MoveSpeed);
 	void Unregister(int32 Index);
 	virtual void ProcessSystem(const float DeltaSeconds) override;
 	void Parallel(const float DeltaSeconds);

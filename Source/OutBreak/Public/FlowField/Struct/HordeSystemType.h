@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "HordeSystemType.generated.h"
 
 /**
  * 
@@ -25,9 +26,15 @@ struct HordeDamageEvent
 };
 
 
-struct HordeAgentHandle
+USTRUCT(Blueprintable)
+struct FHordeAgentHandle
 {
+	GENERATED_BODY()
+	
+	UPROPERTY()
 	uint32 AgentID = MAX_uint32;
+	
+	UPROPERTY()
 	uint32 Generation = 0;
 	
 	bool IsValid() const
@@ -35,12 +42,14 @@ struct HordeAgentHandle
 		return AgentID != MAX_uint32;
 	}
 	
-	bool operator==(const HordeAgentHandle& Other) const
+	bool operator==(const FHordeAgentHandle& Other) const
 	{
 		return AgentID == Other.AgentID
 			&& Generation == Other.Generation;
 	}
 };
+
+using HordeAgentHandle = FHordeAgentHandle;
 
 struct HordeRemoveResult
 {
@@ -208,21 +217,43 @@ struct HordeProxyStorage
 	}
 };
 
-struct HordeNetworkFormat
+USTRUCT()
+struct FHordeNetworkFormat
 {
+	GENERATED_BODY()
+	
 	/* Handle */
-	HordeAgentHandle				Handle;
+	UPROPERTY()
+	FHordeAgentHandle				Handle;
 	
 	/* Movement Storage Info */
-	FTransform						Transforms;
-	float							MoveSpeeds;
-	FVector							Velocities;
-	FVector							CachedFlowDirections;
-	uint8							MovementStates;
-	uint8							TraversalStates;
-	uint8							PriorityTiers;
+	UPROPERTY()
+	FTransform						Transforms = FTransform::Identity;
+	
+	UPROPERTY()
+	float							MoveSpeed = 0.0f;
+	
+	UPROPERTY()
+	FVector							Velocities = FVector::ZeroVector;
+	
+	UPROPERTY()
+	FVector							CachedFlowDirections = FVector::ZeroVector;
+	
+	UPROPERTY()
+	uint8							MovementStates = 0;
+	
+	UPROPERTY()
+	uint8							TraversalStates = 0;
+	
+	UPROPERTY()
+	uint8							PriorityTiers = 0;
 	
 	/* Horde Proxy Storage Info */
-	FIntVector2						PoseIndex;
-	int32							InstanceId;
+	UPROPERTY()
+	FIntVector2						PoseIndex = FIntVector2::ZeroValue;
+	
+	UPROPERTY()
+	int32							InstanceId = INDEX_NONE;
 };
+
+using HordeNetworkFormat = FHordeNetworkFormat;

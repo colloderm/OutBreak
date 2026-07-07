@@ -14,10 +14,10 @@
 // Sets default values
 AHordeProxyHost::AHordeProxyHost()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 	
 	InstancedStaticMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(FName("StaticMeshComponent"));
+	RootComponent = InstancedStaticMesh;
 }
 
 void AHordeProxyHost::RegisterInstances(
@@ -40,7 +40,19 @@ void AHordeProxyHost::RemoveInstance(const int32 InstanceId) const
 
 void AHordeProxyHost::UpdateInstances(const TArray<FTransform>& Transforms) const
 {
-	check(Transforms.Num() == InstancedStaticMesh->GetInstanceCount());
+	if (!ensureAlwaysMsgf(
+		IsValid(InstancedStaticMesh),
+		TEXT("HordeProxyHost has no valid InstancedStaticMesh component.")))
+	{
+		return;
+	}
+	
+	if (Transforms.Num() != InstancedStaticMesh->GetInstanceCount())
+	{
+		InstancedStaticMesh->ClearInstances();
+		InstancedStaticMesh->AddInstances(Transforms, true, true);
+		return;
+	}
 	
 	InstancedStaticMesh->BatchUpdateInstancesTransforms(
 		0, Transforms, true);

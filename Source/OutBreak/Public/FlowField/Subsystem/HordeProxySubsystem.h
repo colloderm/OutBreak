@@ -24,7 +24,7 @@ public:
 	void InitializeStorage(int32 Capacity);
 	
 protected:
-	ProxyRegisterResult Register(FTransform& Transform);
+	ProxyRegisterResult Register(const FTransform& Transform);
 	void Unregister(int32 Index);
 	virtual void ProcessSystem(const float DeltaSeconds) override;
 	void CreateProxyHost();

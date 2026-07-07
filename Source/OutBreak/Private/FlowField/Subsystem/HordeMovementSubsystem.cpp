@@ -19,7 +19,7 @@ void UHordeMovementSubsystem::InitializeStorage(int32 Capacity)
 	MovementStorage.Initialize(Capacity);
 }
 
-void UHordeMovementSubsystem::Register(FTransform& Transform, float MoveSpeed)
+void UHordeMovementSubsystem::Register(const FTransform& Transform, float MoveSpeed)
 {
 	MovementStorage.Add(Transform, MoveSpeed);
 }
@@ -32,6 +32,12 @@ void UHordeMovementSubsystem::Unregister(int32 Index)
 void UHordeMovementSubsystem::ProcessSystem(const float DeltaSeconds)
 {
 	Super::ProcessSystem(DeltaSeconds);
+	
+	if (UWorld* World = GetWorld();
+		World && World->GetNetMode() == NM_Client)
+	{
+		return;
+	}
 	
 	Parallel(DeltaSeconds);
 }

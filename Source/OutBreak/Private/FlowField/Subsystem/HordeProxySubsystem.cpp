@@ -25,7 +25,7 @@ void UHordeProxySubsystem::InitializeStorage(int32 Capacity)
 	ProxyStorage.Initialize(Capacity);
 }
 
-ProxyRegisterResult UHordeProxySubsystem::Register(FTransform&	Transform)
+ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 {
 	check(HordeProxy);
 	const int32 InstanceId = HordeProxy->AddInstance(Transform);
@@ -75,6 +75,16 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 	
 	check(MovementSubsystem);
 	
+	if (!IsValid(HordeProxy))
+	{
+		CreateProxyHost();
+	}
+	
+	if (!IsValid(HordeProxy))
+	{
+		return;
+	}
+	
 	const TArray<FTransform>& Transforms = MovementSubsystem->MovementStorage.Transforms;
 	
 	HordeProxy->UpdateInstances(Transforms);
@@ -84,7 +94,10 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 
 void UHordeProxySubsystem::CreateProxyHost()
 {
-	if (HordeProxy) return;
+	if (IsValid(HordeProxy))
+	{
+		return;
+	}
 	
 	const TSubclassOf<AHordeProxyHost> HordeProxyClass =
 		Settings->GetHordeProxyHostClass();
@@ -100,7 +113,6 @@ void UHordeProxySubsystem::CreateProxyHost()
 	check(World);
 	
 	FActorSpawnParameters SpawnParameters;
-	SpawnParameters.Name = TEXT("HordeProxyHost");
 	SpawnParameters.SpawnCollisionHandlingOverride =
 		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	
@@ -111,7 +123,9 @@ void UHordeProxySubsystem::CreateProxyHost()
 			SpawnParameters
 		); 
 	
-	check(HordeProxy);
+	ensureAlwaysMsgf(
+		IsValid(HordeProxy),
+		TEXT("Failed to spawn HordeProxyHost."));
 }
 
 void UHordeProxySubsystem::ParallelProxy()
