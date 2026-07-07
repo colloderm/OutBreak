@@ -58,4 +58,7 @@ private:
 	int32 SearchMaxSeconds = 10; //300
 
 	FTimerHandle SearchTimer;
+	
+	// 알파 기본 접속 주소(MapData.TestServerAddress가 비었을 때).
+	FString DefaultServerAddress = TEXT("127.0.0.1:7777");
 };

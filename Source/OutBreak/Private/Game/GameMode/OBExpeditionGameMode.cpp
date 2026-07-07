@@ -3,12 +3,14 @@
 #include "Game/GameMode/OBExpeditionGameMode.h"
 
 #include "EngineUtils.h"
+#include "Game/Expedition/OBExpeditionMapCatalog.h"
 #include "Game/Expedition/OBExpeditionMapData.h"
 #include "Game/Expedition/OBExpeditionSpawnZone.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "GameFramework/GameSession.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "GameFramework/PlayerState.h"
+#include "Kismet/GameplayStatics.h"
 
 AOBExpeditionGameMode::AOBExpeditionGameMode()
 {
@@ -19,15 +21,13 @@ void AOBExpeditionGameMode::StartPlay()
 {
 	Super::StartPlay();
 	
+	ActiveMapData = ResolveMapData();
+	
 	// [데디 정원 강제] GameSession은 InitGame 단계에서 이미 생성됨.
 	// MaxPlayers는 원격 클라 접속 시 PreLogin의 AtCapacity() 판정에 사용됨.
 	if (GameSession)
-	{
 		GameSession->MaxPlayers = ResolveMaxPlayers();
-	}
 	
-	CollectSpawnZones();
-	ValidateZoneSeparation();
 	StartExpedition();
 }
 
@@ -66,6 +66,8 @@ void AOBExpeditionGameMode::CollectSpawnZones()
 	{
 		AvailableZones.Swap(i, FMath::RandRange(0, i));
 	}
+	
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] SpawnZones found = %d"), AvailableZones.Num());
 }
 
 AOBExpeditionSpawnZone* AOBExpeditionGameMode::GetOrAssignZoneForTeam(uint8 InTeamId)
@@ -86,18 +88,27 @@ AOBExpeditionSpawnZone* AOBExpeditionGameMode::GetOrAssignZoneForTeam(uint8 InTe
 
 AActor* AOBExpeditionGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
+	if (!bZonesCollected)   // ★ 첫 스폰 직전에 확실히 수집(존 배치 이후 시점 보장)
+	{
+		CollectSpawnZones();
+		ValidateZoneSeparation();
+		bZonesCollected = true;
+	}
+	
 	if (Player)
 	{
 		if (AOBPlayerStateBase* PS = Player->GetPlayerState<AOBPlayerStateBase>())
 		{
 			if (AOBExpeditionSpawnZone* Zone = GetOrAssignZoneForTeam(PS->GetTeamId()))
 			{
+				UE_LOG(LogTemp, Log, TEXT("[Expedition] Team %d → Zone %s"), PS->GetTeamId(), *Zone->GetName());
+				
 				return Zone;
 			}
 		}
 	}
 	
-	return Super::ChoosePlayerStart_Implementation(Player); // 폴백: 레벨의 PlayerStart.
+	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
 void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, AActor* StartSpot)
@@ -220,12 +231,34 @@ AOBExpeditionGameState* AOBExpeditionGameMode::GetExpeditionGameState() const
 
 int32 AOBExpeditionGameMode::ResolveMaxPlayers() const
 {
-	return MapData ? MapData->MaxSessionPlayers : 12;
+	return ActiveMapData ? ActiveMapData->MaxSessionPlayers : 12;
 }
 
 int32 AOBExpeditionGameMode::ResolveSessionLength() const
 {
-	return MapData ? MapData->SessionLength : SessionLength; // 폴백 = inline
+	return ActiveMapData ? ActiveMapData->SessionLength : SessionLength; // 폴백 = inline
+}
+
+UOBExpeditionMapData* AOBExpeditionGameMode::ResolveMapData()
+{
+	if (MapData) return MapData; // 명시 지정이 있으면 우선(특수 케이스)
+	
+	if (MapCatalog)
+	{
+		// 현재 레벨 이름과 카탈로그의 각 MapData.Level 이름을매칭
+		const FString CurrentLevel = UGameplayStatics::GetCurrentLevelName(this, /*bRemovePrefix=*/true);
+		for (UOBExpeditionMapData* M : MapCatalog->AvailableMaps)
+		{
+			if (!M || M->Level.IsNull()) continue;
+			const FString ShortName = FPackageName::GetShortName(M->Level.ToSoftObjectPath().GetLongPackageName());
+			if (ShortName.Equals(CurrentLevel, ESearchCase::IgnoreCase))
+				return M;
+		}
+		
+		UE_LOG(LogTemp, Warning, TEXT("[Expedition] 카탈로그에서 현재 레벨(%s) MapData 미발견 → 폴백값 사용"), *CurrentLevel);
+	}
+	
+	return nullptr;
 }
 
 void AOBExpeditionGameMode::RequestRespawn(AController* Controller, APawn* DeadPawn)

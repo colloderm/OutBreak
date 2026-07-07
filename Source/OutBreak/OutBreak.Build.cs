@@ -22,8 +22,6 @@ public class OutBreak : ModuleRules
 			"GameplayTasks",
 			"NavigationSystem",
 			"DeveloperSettings",
-			"AnimationDataController",
-			"AnimationData",
 			"AnimationBudgetAllocator",
 		});
 
@@ -38,6 +36,22 @@ public class OutBreak : ModuleRules
 			"AIModule",
 			"Navmesh"
 		});
+		
+		if (Target.Type == TargetType.Editor)
+		{
+			PrivateDependencyModuleNames.AddRange(
+				new string[]
+				{
+					"AnimationData",
+					"AnimationDataController"
+				});
+
+			PrivateDefinitions.Add("WITH_OUTBREAK_EDITOR=1");
+		}
+		else
+		{
+			PrivateDefinitions.Add("WITH_OUTBREAK_EDITOR=0");
+		}
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

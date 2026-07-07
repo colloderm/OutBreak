@@ -6,6 +6,7 @@
 #include "OBGameModeBase.h"
 #include "OBExpeditionGameMode.generated.h"
 
+class UOBExpeditionMapCatalog;
 class AOBExpeditionSpawnZone;
 class UOBExpeditionMapData;
 class AOBExpeditionGameState;
@@ -71,6 +72,9 @@ protected:
 	int32 ResolveMaxPlayers() const;
 	int32 ResolveSessionLength() const;
 
+	// 현재 맵에 해당하는 MapData(StartPlay에서 1회 결정).
+	UOBExpeditionMapData* ResolveMapData();
+
 protected:
 	// 이 맵의 세션 설정(정원/시간). 맵별 GameMode BP에서 해당 맵의 MapData 에셋을 지정.
 	// - 없으면 아래 inline 기본값 사용(안전 폴백).
@@ -93,12 +97,21 @@ protected:
 	// 존 간 최소 이격(cm). 미달 시 경고 로그. ~1000m(도보 약 3분).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Spawn")
 	float MinZoneSeparation = 100000.f;
+	
+	// 단일 GameMode로 여러 맵을 쓰기 위한 카탈로그. 현재 레벨과 매칭해 MapData 결정.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	TObjectPtr<UOBExpeditionMapCatalog> MapCatalog;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UOBExpeditionMapData> ActiveMapData;
 
 private:	
 	FTimerHandle SessionTimerHandle;
 
 	// 이미 종료 처리했는지(중복 EndExpedition 방지).
 	bool bExpeditionEnded = false;
+	
+	bool bZonesCollected = false;   // 존을 한 번만 수집했는지
 
 	// 개인전일 때 다음에 배정할 TeamId(1부터 증가). 0은 "미배정" 예약.
 	uint8 NextTeamId = 1;

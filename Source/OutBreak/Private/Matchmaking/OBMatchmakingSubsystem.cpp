@@ -67,13 +67,16 @@ void UOBMatchmakingSubsystem::StartSession()
 		return;
 	}
 	
-	// TODO(M7): 데디 세션 검색/생성 + join(ClientTravel). 지금은 로컬 이동 스텁.
-	UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 세션 시작(스텁) → %s"), *SelectedMap->DisplayName.ToString());
+	// 알파 IP-direct: MapData 테스트 주소 우선, 없으면 기본 주소.
+	const FString Address = SelectedMap->TestServerAddress.IsEmpty() ? DefaultServerAddress : SelectedMap->TestServerAddress;
 
-	if (UWorld* W = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr)
-		UGameplayStatics::OpenLevelBySoftObjectPtr(W, SelectedMap->Level);
+	UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 데디 접속 → %s"), *Address);
 
-	// 다음 회차를 위해 상태 초기화(레벨 전환 중이라 UI는 곧 파괴됨).
+	// TODO(실 매칭): 백엔드가 빈자리 있는 세션 서버 주소를 반환하도록 교체.
+	if (UGameInstance* GI = GetGameInstance())
+		if (APlayerController* PC = GI->GetFirstLocalPlayerController())
+			PC->ClientTravel(Address, TRAVEL_Absolute);   // 비seamless 전체 로드로 서버 접속
+	
 	SetState(EOBMatchmakingState::Idle);
 }
 

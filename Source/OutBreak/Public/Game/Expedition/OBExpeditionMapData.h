@@ -42,6 +42,11 @@ public:
 	// 세션 길이(초). 15~30분 범위. 기본 1200(20분).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session", meta = (ClampMin = "60"))
 	int32 SessionLength = 1200;
+	
+	// [알파 IP-direct 테스트] 이 지역을 호스팅하는 데디 서버 주소(예: "127.0.0.1:7777").
+	// 비우면 매칭 서브시스템의 기본 주소 사용. (실 매칭 붙으면 백엔드가 대체)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session|Test")
+	FString TestServerAddress;
 
 	// (이후 확장) 개인 탈출구 마감시간, 필요아이템 태그 등도 여기로 모을 예정.
 };
