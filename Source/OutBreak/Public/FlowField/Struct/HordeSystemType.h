@@ -9,7 +9,7 @@
  * 
  */
 
-using HordeAgentID = int32;
+using HordeAgentID = uint32;
 
 
 UENUM()
@@ -23,16 +23,10 @@ enum class EHordeNetworkOperation : uint8
 struct ProxyRegisterResult
 {
 	AActor* Actor = nullptr;
-	int32 Index = INDEX_NONE;
+	int32 ProxyStorageIndex = INDEX_NONE;
+	int32 InstanceIndex = INDEX_NONE;
+	bool bSucceeded = false;
 };
-
-struct HordeDamageEvent
-{
-	int32 StatusIndex = INDEX_NONE;
-	TWeakObjectPtr<AActor> DamagedActor;
-	double Damage;
-};
-
 
 USTRUCT(Blueprintable)
 struct FHordeAgentHandle
@@ -59,15 +53,35 @@ struct FHordeAgentHandle
 
 using HordeAgentHandle = FHordeAgentHandle;
 
+FORCEINLINE uint32 GetTypeHash(const FHordeAgentHandle& Handle)
+{
+	return HashCombine(
+		GetTypeHash(Handle.AgentID),
+		GetTypeHash(Handle.Generation));
+}
+
+struct HordeDamageEvent
+{
+	FHordeAgentHandle Handle;
+	TWeakObjectPtr<AActor> DamagedActor;
+	double Damage = 0.0;
+};
+
 struct HordeRemoveResult
 {
-	int32 RemovedIndex = INDEX_NONE;
-	int32 LastIndex = INDEX_NONE;
-	
-	HordeAgentHandle RemovedAgent;
-	HordeAgentHandle MovedAgent;
-	
+	int32 RemovedPackedIndex = INDEX_NONE;
+	int32 PreviousLastIndex = INDEX_NONE;
+
 	bool bMovedLastAgent = false;
+
+	HordeAgentHandle RemovedHandle;
+	HordeAgentHandle MovedHandle;
+
+	TWeakObjectPtr<AActor> RemovedActor;
+	TWeakObjectPtr<AActor> MovedActor;
+
+	int32 RemovedInstanceIndex = INDEX_NONE;
+	int32 MovedInstanceIndex = INDEX_NONE;
 };
 
 struct HordeMovementStorage
@@ -149,6 +163,7 @@ struct HordeStatusStorage
 	void Initialize(const int32 Capacity)
 	{
 		MaxHealths.Reserve(Capacity);
+		CurrentHealths.Reserve(Capacity);
 	}
 	
 	/* Percent는 MaxHealth에 대한 현재 체력 비중 입니다.*/
@@ -163,15 +178,19 @@ struct HordeStatusStorage
 	{
 		const int32 AgentCount = MaxHealths.Num();
 		
-		return static_cast<bool>(AgentCount);
+		return CurrentHealths.Num() == AgentCount;
 	}
 	
 	void RemoveAtSwap(const int32 PackedIndex)
 	{
 		check(IsValid());
 		check(MaxHealths.IsValidIndex(PackedIndex));
+		check(CurrentHealths.IsValidIndex(PackedIndex));
 		
 		MaxHealths.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		CurrentHealths.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+
+		check(IsValid());
 	}
 };
 
@@ -204,7 +223,8 @@ struct HordeProxyStorage
 	{
 		const int32 AgentCount = PawnProxies.Num();
 		
-		return PoseIndices.Num() == AgentCount;
+		return PoseIndices.Num() == AgentCount
+			&& InstanceIds.Num() == AgentCount;
 	}
 	
 	int32 Add(AActor* Pawn, int32 InstanceId)
@@ -217,11 +237,15 @@ struct HordeProxyStorage
 	void RemoveAtSwap(const int32 PackedIndex)
 	{
 		check(IsValid());
-		check(PoseIndices.IsValidIndex(PackedIndex));
+	check(PoseIndices.IsValidIndex(PackedIndex));
+	check(InstanceIds.IsValidIndex(PackedIndex));
+	check(PawnProxies.IsValidIndex(PackedIndex));
 		
-		PoseIndices.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
-		InstanceIds.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
-		PawnProxies.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+	PoseIndices.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+	InstanceIds.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+	PawnProxies.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+
+	check(IsValid());
 	}
 };
 
@@ -230,6 +254,7 @@ struct FHordeNetworkFormat
 {
 	GENERATED_BODY()
 	
+	UPROPERTY()
 	EHordeNetworkOperation Operation =
 		EHordeNetworkOperation::Update;
 	
@@ -243,6 +268,12 @@ struct FHordeNetworkFormat
 	
 	UPROPERTY()
 	float							MoveSpeed = 0.0f;
+
+	UPROPERTY()
+	float							MaxHealth = 0.0f;
+
+	UPROPERTY()
+	float							CurrentHealth = 0.0f;
 	
 	UPROPERTY()
 	FVector							Velocities = FVector::ZeroVector;
@@ -262,9 +293,6 @@ struct FHordeNetworkFormat
 	/* Horde Proxy Storage Info */
 	UPROPERTY()
 	FIntVector2						PoseIndex = FIntVector2::ZeroValue;
-	
-	UPROPERTY()
-	int32							InstanceId = INDEX_NONE;
 };
 
 using HordeNetworkFormat = FHordeNetworkFormat;

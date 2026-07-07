@@ -13,6 +13,8 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
+DEFINE_LOG_CATEGORY(LogHordeLifecycle);
+
 
 void UBudgetOverlordSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -84,16 +86,97 @@ int32 UBudgetOverlordSubsystem::GetIndexByActor(
 		: INDEX_NONE;
 }
 
+bool UBudgetOverlordSubsystem::TryGetHandleByActor(
+	const AActor* Actor,
+	FHordeAgentHandle& OutHandle) const
+{
+	OutHandle = FHordeAgentHandle();
+
+	const int32 PackedIndex =
+		GetIndexByActor(Actor);
+
+	if (!PackedIndexToHandle.IsValidIndex(PackedIndex))
+	{
+		return false;
+	}
+
+	OutHandle = PackedIndexToHandle[PackedIndex];
+	return OutHandle.IsValid();
+}
+
+FHordeAgentHandle UBudgetOverlordSubsystem::GetHandleByPackedIndex(
+	const int32 PackedIndex) const
+{
+	return PackedIndexToHandle.IsValidIndex(PackedIndex)
+		? PackedIndexToHandle[PackedIndex]
+		: FHordeAgentHandle();
+}
+
+bool UBudgetOverlordSubsystem::TryResolvePackedIndex(
+	const FHordeAgentHandle& Handle,
+	int32& OutPackedIndex) const
+{
+	OutPackedIndex = INDEX_NONE;
+
+	if (!Handle.IsValid()
+		|| Handle.AgentID > static_cast<uint32>(MAX_int32))
+	{
+		return false;
+	}
+
+	const int32 AgentID =
+		static_cast<int32>(Handle.AgentID);
+
+	if (!AgentGenerations.IsValidIndex(AgentID)
+		|| !AgentIDToPackedIndex.IsValidIndex(AgentID)
+		|| AgentGenerations[AgentID] != Handle.Generation)
+	{
+		return false;
+	}
+
+	const int32 PackedIndex =
+		AgentIDToPackedIndex[AgentID];
+
+	if (PackedIndex == INDEX_NONE
+		|| !PackedIndexToHandle.IsValidIndex(PackedIndex)
+		|| !(PackedIndexToHandle[PackedIndex] == Handle))
+	{
+		return false;
+	}
+
+	OutPackedIndex = PackedIndex;
+	return true;
+}
+
 FHordeAgentHandle UBudgetOverlordSubsystem::RegisterAgent(
 	const FTransform& InTransform,
 	const float InMoveSpeed,
 	const float MaxHealth,
 	const float HealthPercent)
 {
+	check(IsInGameThread());
 	check(MovementSubsystem);
 	check(ProxySubsystem);
 	check(StatusSubsystem);
 	check(NetworkSubsystem);
+
+	if (MaxHealth <= 0.0f
+		|| !FMath::IsFinite(MaxHealth)
+		|| !FMath::IsFinite(HealthPercent))
+	{
+		UE_LOG(
+			LogHordeLifecycle,
+			Warning,
+			TEXT("Invalid Horde register health. MaxHealth=%f HealthPercent=%f"),
+			MaxHealth,
+			HealthPercent);
+
+		return FHordeAgentHandle();
+	}
+
+#if DO_CHECK
+	ValidateAgentRegistry();
+#endif
 
 	const int32 PackedIndex =
 		MovementSubsystem->MovementStorage.Size();
@@ -101,16 +184,74 @@ FHordeAgentHandle UBudgetOverlordSubsystem::RegisterAgent(
 	const FHordeAgentHandle Handle =
 		AllocateAgentHandle();
 
-	MovementSubsystem->Register(
+	const int32 MovementIndex =
+		MovementSubsystem->Register(
 		InTransform,
 		InMoveSpeed);
 
 	const ProxyRegisterResult ProxyResult =
 		ProxySubsystem->Register(InTransform);
 
-	StatusSubsystem->Register(
+	if (MovementIndex != PackedIndex
+		|| !ProxyResult.bSucceeded
+		|| ProxyResult.ProxyStorageIndex != PackedIndex)
+	{
+		if (ProxyResult.bSucceeded)
+		{
+			ProxySubsystem->Unregister(
+				ProxyResult.ProxyStorageIndex);
+		}
+
+		if (MovementSubsystem->MovementStorage.Transforms.IsValidIndex(
+			MovementIndex))
+		{
+			MovementSubsystem->Unregister(
+				MovementIndex);
+		}
+
+		ProxySubsystem->RefreshInstancesFromMovement();
+		RollbackAgentHandleAllocation(Handle);
+
+		UE_LOG(
+			LogHordeLifecycle,
+			Warning,
+			TEXT("Failed to register Horde proxy. PackedIndex=%d MovementIndex=%d ProxyIndex=%d"),
+			PackedIndex,
+			MovementIndex,
+			ProxyResult.ProxyStorageIndex);
+
+		return FHordeAgentHandle();
+	}
+
+	const int32 StatusIndex =
+		StatusSubsystem->Register(
 		MaxHealth,
 		HealthPercent);
+
+	if (StatusIndex != PackedIndex)
+	{
+		if (StatusSubsystem->StatusStorage.MaxHealths.IsValidIndex(
+			StatusIndex))
+		{
+			StatusSubsystem->Unregister(StatusIndex);
+		}
+
+		MovementSubsystem->Unregister(MovementIndex);
+		ProxySubsystem->Unregister(ProxyResult.ProxyStorageIndex);
+		ProxySubsystem->RefreshInstancesFromMovement();
+		RollbackAgentHandleAllocation(Handle);
+
+		UE_LOG(
+			LogHordeLifecycle,
+			Error,
+			TEXT("Horde register storage index mismatch. Movement=%d Proxy=%d Status=%d Expected=%d"),
+			MovementIndex,
+			ProxyResult.ProxyStorageIndex,
+			StatusIndex,
+			PackedIndex);
+
+		return FHordeAgentHandle();
+	}
 
 	// 모든 Storage가 같은 PackedIndex에 추가됐는지 검증
 	check(PackedIndexToHandle.Num() == PackedIndex);
@@ -120,7 +261,8 @@ FHordeAgentHandle UBudgetOverlordSubsystem::RegisterAgent(
 	check(AgentIDToPackedIndex.IsValidIndex(
 		static_cast<int32>(Handle.AgentID)));
 
-	AgentIDToPackedIndex[Handle.AgentID] =
+	AgentIDToPackedIndex[
+		static_cast<int32>(Handle.AgentID)] =
 		PackedIndex;
 
 	if (IsValid(ProxyResult.Actor))
@@ -139,6 +281,9 @@ FHordeAgentHandle UBudgetOverlordSubsystem::RegisterAgent(
 	Payload.Handle = Handle;
 	Payload.Transforms = InTransform;
 	Payload.MoveSpeed = InMoveSpeed;
+	Payload.MaxHealth = MaxHealth;
+	Payload.CurrentHealth =
+		MaxHealth * FMath::Clamp(HealthPercent, 0.0f, 1.0f);
 	Payload.Velocities = FVector::ZeroVector;
 	Payload.CachedFlowDirections =
 		FVector::ZeroVector;
@@ -146,20 +291,59 @@ FHordeAgentHandle UBudgetOverlordSubsystem::RegisterAgent(
 	Payload.TraversalStates = 0;
 	Payload.PriorityTiers = 0;
 	Payload.PoseIndex = FIntVector2(0,0);
-	Payload.InstanceId = ProxyResult.Index;
 
-	NetworkSubsystem->AddPayload(Payload);
+	if (UWorld* World = GetWorld();
+		World && World->GetNetMode() != NM_Client)
+	{
+		NetworkSubsystem->AddPayload(Payload);
+	}
+
+#if DO_CHECK
+	ValidateAgentRegistry();
+#endif
 
 	return Handle;
 }
 
 bool UBudgetOverlordSubsystem::UnregisterAgent(
-	const int32 PackedIndex)
+	const FHordeAgentHandle& Handle)
 {
+	int32 PackedIndex = INDEX_NONE;
+	if (!TryResolvePackedIndex(Handle, PackedIndex))
+	{
+		return false;
+	}
+
+	return UnregisterAgentByPackedIndex(
+		PackedIndex,
+		true);
+}
+
+bool UBudgetOverlordSubsystem::UnregisterAgent(
+	const AActor* Actor)
+{
+	FHordeAgentHandle Handle;
+	if (!TryGetHandleByActor(Actor, Handle))
+	{
+		return false;
+	}
+
+	return UnregisterAgent(Handle);
+}
+
+bool UBudgetOverlordSubsystem::UnregisterAgentByPackedIndex(
+	const int32 PackedIndex,
+	const bool bQueueNetworkPayload)
+{
+	check(IsInGameThread());
 	check(MovementSubsystem);
 	check(ProxySubsystem);
 	check(StatusSubsystem);
 	check(NetworkSubsystem);
+
+#if DO_CHECK
+	ValidateAgentRegistry();
+#endif
 
 	const int32 AgentCount =
 		PackedIndexToHandle.Num();
@@ -167,7 +351,7 @@ bool UBudgetOverlordSubsystem::UnregisterAgent(
 	if (!PackedIndexToHandle.IsValidIndex(PackedIndex))
 	{
 		UE_LOG(
-			LogTemp,
+			LogHordeLifecycle,
 			Warning,
 			TEXT(
 				"%s::%s: Invalid PackedIndex. "
@@ -180,61 +364,44 @@ bool UBudgetOverlordSubsystem::UnregisterAgent(
 		return false;
 	}
 
-	check(MovementSubsystem->MovementStorage.Size()
-		== AgentCount);
-
-	/*
-	 * Status 및 Proxy Storage도 같은 AgentCount를 가지는지
-	 * 각 Storage의 Size()에 맞게 검증하는 것이 좋다.
-	 */
-	check(StatusSubsystem->StatusStorage.Size()
-		== AgentCount);
-
-	const int32 PreviousLastIndex =
+	HordeRemoveResult RemoveResult;
+	RemoveResult.RemovedPackedIndex =
+		PackedIndex;
+	RemoveResult.PreviousLastIndex =
 		AgentCount - 1;
-
-	const bool bMovesLastAgent =
-		PackedIndex != PreviousLastIndex;
-
-	/*
-	 * RemoveAtSwap 전에 삭제될 Agent와 이동될 Agent 정보를
-	 * 반드시 저장한다.
-	 */
-	const FHordeAgentHandle RemovedHandle =
+	RemoveResult.bMovedLastAgent =
+		PackedIndex != RemoveResult.PreviousLastIndex;
+	RemoveResult.RemovedHandle =
 		PackedIndexToHandle[PackedIndex];
+	RemoveResult.RemovedActor =
+		ProxySubsystem->GetRegisteredActor(PackedIndex);
+	RemoveResult.RemovedInstanceIndex =
+		ProxySubsystem->GetInstanceIndex(PackedIndex);
 
-	FHordeAgentHandle MovedHandle;
-
-	if (bMovesLastAgent)
+	if (RemoveResult.bMovedLastAgent)
 	{
-		MovedHandle =
-			PackedIndexToHandle[PreviousLastIndex];
-	}
-
-	AActor* RemovedActor =
-		ProxySubsystem->GetRegisteredActor(
-			PackedIndex);
-
-	AActor* MovedActor = nullptr;
-
-	if (bMovesLastAgent)
-	{
-		MovedActor =
+		RemoveResult.MovedHandle =
+			PackedIndexToHandle[RemoveResult.PreviousLastIndex];
+		RemoveResult.MovedActor =
 			ProxySubsystem->GetRegisteredActor(
-				PreviousLastIndex);
+				RemoveResult.PreviousLastIndex);
+		RemoveResult.MovedInstanceIndex =
+			ProxySubsystem->GetInstanceIndex(
+				RemoveResult.PreviousLastIndex);
 	}
 
-	/*
-	 * 클라이언트에는 삭제되는 시점의 기존 Generation을 가진
-	 * Handle을 전송해야 한다.
-	 */
-	FHordeNetworkFormat Payload;
-	Payload.Operation =
-		EHordeNetworkOperation::Unregister;
-	Payload.Handle =
-		RemovedHandle;
+	if (bQueueNetworkPayload)
+	{
+		FHordeNetworkFormat Payload;
+		Payload.Operation =
+			EHordeNetworkOperation::Unregister;
+		Payload.Handle =
+			RemoveResult.RemovedHandle;
 
-	NetworkSubsystem->AddPayload(Payload);
+		NetworkSubsystem->AddPayload(Payload);
+	}
+
+	IndexByActor.Remove(RemoveResult.RemovedActor);
 
 	/*
 	 * 모든 Storage는 반드시 같은 PackedIndex를
@@ -248,6 +415,8 @@ bool UBudgetOverlordSubsystem::UnregisterAgent(
 
 	ProxySubsystem->Unregister(
 		PackedIndex);
+
+	ProxySubsystem->RefreshInstancesFromMovement();
 
 	StatusSubsystem->Unregister(
 		PackedIndex);
@@ -266,48 +435,42 @@ bool UBudgetOverlordSubsystem::UnregisterAgent(
 	 * 삭제된 Handle은 더 이상 PackedIndex를 가지지 않는다.
 	 */
 	check(AgentIDToPackedIndex.IsValidIndex(
-		static_cast<int32>(RemovedHandle.AgentID)));
+		static_cast<int32>(RemoveResult.RemovedHandle.AgentID)));
 
-	AgentIDToPackedIndex[RemovedHandle.AgentID] =
+	AgentIDToPackedIndex[
+		static_cast<int32>(RemoveResult.RemovedHandle.AgentID)] =
 		INDEX_NONE;
 
 	/*
 	 * 마지막 Agent가 삭제 자리로 이동했다면
 	 * Handle → PackedIndex 역참조를 수정한다.
 	 */
-	if (bMovesLastAgent)
+	if (RemoveResult.bMovedLastAgent)
 	{
 		check(AgentIDToPackedIndex.IsValidIndex(
-			static_cast<int32>(MovedHandle.AgentID)));
+			static_cast<int32>(RemoveResult.MovedHandle.AgentID)));
 
-		AgentIDToPackedIndex[MovedHandle.AgentID] =
+		AgentIDToPackedIndex[
+			static_cast<int32>(RemoveResult.MovedHandle.AgentID)] =
 			PackedIndex;
 
 		check(
 			PackedIndexToHandle.IsValidIndex(
-				PackedIndex));
+			PackedIndex));
 
 		check(
 			PackedIndexToHandle[PackedIndex]
-			== MovedHandle);
-	}
-
-	/*
-	 * 삭제된 Actor의 매핑을 제거한다.
-	 */
-	if (IsValid(RemovedActor))
-	{
-		IndexByActor.Remove(RemovedActor);
+			== RemoveResult.MovedHandle);
 	}
 
 	/*
 	 * 마지막 Actor가 삭제 위치로 이동한 경우
 	 * Actor → PackedIndex를 수정한다.
 	 */
-	if (bMovesLastAgent
-		&& IsValid(MovedActor))
+	if (RemoveResult.bMovedLastAgent
+		&& RemoveResult.MovedActor.IsValid())
 	{
-		IndexByActor.FindOrAdd(MovedActor) =
+		IndexByActor.FindOrAdd(RemoveResult.MovedActor) =
 			PackedIndex;
 	}
 
@@ -317,7 +480,7 @@ bool UBudgetOverlordSubsystem::UnregisterAgent(
 	 * 오래된 네트워크 패킷이 이후 같은 AgentID를 재사용한
 	 * 새 Agent에 적용되는 것을 Generation으로 방지한다.
 	 */
-	ReleaseAgentHandle(RemovedHandle);
+	ReleaseAgentHandle(RemoveResult.RemovedHandle);
 
 	/*
 	 * 모든 Storage와 매핑의 논리 크기가 같은지 검증한다.
@@ -330,11 +493,34 @@ bool UBudgetOverlordSubsystem::UnregisterAgent(
 		StatusSubsystem->StatusStorage.Size()
 		== PackedIndexToHandle.Num());
 
+	check(
+		ProxySubsystem->ProxyStorage.Size()
+		== PackedIndexToHandle.Num());
+
+#if DO_CHECK
+	ValidateAgentRegistry();
+#endif
+
+	UE_LOG(
+		LogHordeLifecycle,
+		Verbose,
+		TEXT("Removed Horde agent. RemovedPackedIndex=%d PreviousLastIndex=%d RemovedAgentID=%u RemovedGeneration=%u MovedAgentID=%u MovedGeneration=%u RemovedInstance=%d MovedInstance=%d AgentCountAfter=%d FreeList=%d"),
+		RemoveResult.RemovedPackedIndex,
+		RemoveResult.PreviousLastIndex,
+		RemoveResult.RemovedHandle.AgentID,
+		RemoveResult.RemovedHandle.Generation,
+		RemoveResult.MovedHandle.AgentID,
+		RemoveResult.MovedHandle.Generation,
+		RemoveResult.RemovedInstanceIndex,
+		RemoveResult.MovedInstanceIndex,
+		PackedIndexToHandle.Num(),
+		FreeAgentIDs.Num());
+
 	return true;
 }
 
 void UBudgetOverlordSubsystem::ReleaseAgentHandle(
-	const FHordeAgentHandle Handle)
+	const FHordeAgentHandle& Handle)
 {
 	const int32 AgentID =
 		static_cast<int32>(Handle.AgentID);
@@ -343,7 +529,7 @@ void UBudgetOverlordSubsystem::ReleaseAgentHandle(
 		|| !AgentIDToPackedIndex.IsValidIndex(AgentID))
 	{
 		UE_LOG(
-			LogTemp,
+			LogHordeLifecycle,
 			Error,
 			TEXT(
 				"%s::%s: Invalid AgentID. "
@@ -363,7 +549,7 @@ void UBudgetOverlordSubsystem::ReleaseAgentHandle(
 		!= Handle.Generation)
 	{
 		UE_LOG(
-			LogTemp,
+			LogHordeLifecycle,
 			Warning,
 			TEXT(
 				"%s::%s: Generation mismatch. "
@@ -378,8 +564,41 @@ void UBudgetOverlordSubsystem::ReleaseAgentHandle(
 		return;
 	}
 
-	AgentIDToPackedIndex[AgentID] =
-		INDEX_NONE;
+	if (AgentIDToPackedIndex[AgentID] != INDEX_NONE)
+	{
+		UE_LOG(
+			LogHordeLifecycle,
+			Error,
+			TEXT(
+				"%s::%s: Active AgentID cannot be released. "
+				"AgentID=%u PackedIndex=%d"),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			Handle.AgentID,
+			AgentIDToPackedIndex[AgentID]);
+
+		return;
+	}
+
+	if (FreeAgentIDs.Contains(Handle.AgentID))
+	{
+		UE_LOG(
+			LogHordeLifecycle,
+			Error,
+			TEXT(
+				"%s::%s: Duplicate free AgentID. "
+				"AgentID=%u"),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			Handle.AgentID);
+
+		return;
+	}
+
+	ensureAlwaysMsgf(
+		AgentGenerations[AgentID] != MAX_uint32,
+		TEXT("Horde agent generation overflow. AgentID=%u"),
+		Handle.AgentID);
 
 	/*
 	 * 이전 Handle을 무효화한다.
@@ -394,46 +613,265 @@ void UBudgetOverlordSubsystem::ReleaseAgentHandle(
 		Handle.AgentID);
 }
 
-void UBudgetOverlordSubsystem::DispatchPayload(const FHordeNetworkFormat& Payload)
+void UBudgetOverlordSubsystem::RollbackAgentHandleAllocation(
+	const FHordeAgentHandle& Handle)
 {
-	const FHordeAgentHandle& Handle = Payload.Handle;
-	if (!Handle.IsValid())
+	if (!Handle.IsValid()
+		|| Handle.AgentID > static_cast<uint32>(MAX_int32))
 	{
-		ensureAlwaysMsgf(false, TEXT("Invalid horde network payload handle."));
 		return;
 	}
-	
-	const int32 ID = Handle.AgentID;
-	HordeMovementStorage& MovementStorage = MovementSubsystem->MovementStorage;
 
-	if (!MovementStorage.Transforms.IsValidIndex(ID)
-		|| !MovementStorage.CachedFlowDirections.IsValidIndex(ID)
-		|| !MovementStorage.MoveSpeeds.IsValidIndex(ID)
-		|| !MovementStorage.Velocities.IsValidIndex(ID)
-		|| !MovementStorage.MovementStates.IsValidIndex(ID)
-		|| !MovementStorage.TraversalStates.IsValidIndex(ID)
-		|| !MovementStorage.PriorityTiers.IsValidIndex(ID))
+	const int32 AgentID =
+		static_cast<int32>(Handle.AgentID);
+
+	if (!AgentGenerations.IsValidIndex(AgentID)
+		|| !AgentIDToPackedIndex.IsValidIndex(AgentID)
+		|| AgentGenerations[AgentID] != Handle.Generation
+		|| AgentIDToPackedIndex[AgentID] != INDEX_NONE
+		|| FreeAgentIDs.Contains(Handle.AgentID))
+	{
+		return;
+	}
+
+	FreeAgentIDs.Add(Handle.AgentID);
+}
+
+void UBudgetOverlordSubsystem::DispatchPayload(const FHordeNetworkFormat& Payload)
+{
+	switch (Payload.Operation)
+	{
+	case EHordeNetworkOperation::Register:
+		ApplyRegisterPayload(Payload);
+		return;
+
+	case EHordeNetworkOperation::Update:
+		ApplyUpdatePayload(Payload);
+		return;
+
+	case EHordeNetworkOperation::Unregister:
+		ApplyUnregisterPayload(Payload);
+		return;
+
+	default:
+		ensureAlwaysMsgf(
+			false,
+			TEXT("Unknown Horde network operation."));
+		return;
+	}
+}
+
+bool UBudgetOverlordSubsystem::RegisterAgentWithHandle(
+	const FHordeNetworkFormat& Payload)
+{
+	check(IsInGameThread());
+	check(MovementSubsystem);
+	check(ProxySubsystem);
+	check(StatusSubsystem);
+
+	const FHordeAgentHandle& Handle =
+		Payload.Handle;
+
+	if (!Handle.IsValid()
+		|| Handle.AgentID > static_cast<uint32>(MAX_int32))
+	{
+		return false;
+	}
+
+	int32 ExistingPackedIndex = INDEX_NONE;
+	if (TryResolvePackedIndex(Handle, ExistingPackedIndex))
+	{
+		ApplyUpdatePayload(Payload);
+		return true;
+	}
+
+	const int32 AgentID =
+		static_cast<int32>(Handle.AgentID);
+
+	while (AgentGenerations.Num() <= AgentID)
+	{
+		AgentGenerations.Add(0);
+		AgentIDToPackedIndex.Add(INDEX_NONE);
+	}
+
+	if (AgentGenerations[AgentID] > Handle.Generation)
+	{
+		return false;
+	}
+
+	if (AgentIDToPackedIndex[AgentID] != INDEX_NONE)
+	{
+		return false;
+	}
+
+	AgentGenerations[AgentID] =
+		Handle.Generation;
+	FreeAgentIDs.Remove(Handle.AgentID);
+
+	const int32 PackedIndex =
+		MovementSubsystem->MovementStorage.Size();
+
+	const int32 MovementIndex =
+		MovementSubsystem->Register(
+			Payload.Transforms,
+			Payload.MoveSpeed);
+
+	const ProxyRegisterResult ProxyResult =
+		ProxySubsystem->Register(Payload.Transforms);
+
+	if (MovementIndex != PackedIndex
+		|| !ProxyResult.bSucceeded
+		|| ProxyResult.ProxyStorageIndex != PackedIndex)
+	{
+		if (ProxyResult.bSucceeded)
+		{
+			ProxySubsystem->Unregister(
+				ProxyResult.ProxyStorageIndex);
+		}
+
+		if (MovementSubsystem->MovementStorage.Transforms.IsValidIndex(
+			MovementIndex))
+		{
+			MovementSubsystem->Unregister(MovementIndex);
+		}
+
+		ProxySubsystem->RefreshInstancesFromMovement();
+		AgentIDToPackedIndex[AgentID] =
+			INDEX_NONE;
+		return false;
+	}
+
+	const float PayloadMaxHealth =
+		Payload.MaxHealth > 0.0f
+			? Payload.MaxHealth
+			: 100.0f;
+
+	const float HealthPercent =
+		PayloadMaxHealth > 0.0f
+			? FMath::Clamp(
+				Payload.CurrentHealth / PayloadMaxHealth,
+				0.0f,
+				1.0f)
+			: 1.0f;
+
+	const int32 StatusIndex =
+		StatusSubsystem->Register(
+			PayloadMaxHealth,
+			HealthPercent);
+
+	if (StatusIndex != PackedIndex)
+	{
+		if (StatusSubsystem->StatusStorage.MaxHealths.IsValidIndex(
+			StatusIndex))
+		{
+			StatusSubsystem->Unregister(StatusIndex);
+		}
+
+		MovementSubsystem->Unregister(MovementIndex);
+		ProxySubsystem->Unregister(ProxyResult.ProxyStorageIndex);
+		ProxySubsystem->RefreshInstancesFromMovement();
+		AgentIDToPackedIndex[AgentID] =
+			INDEX_NONE;
+		return false;
+	}
+
+	PackedIndexToHandle.Add(Handle);
+	AgentIDToPackedIndex[AgentID] =
+		PackedIndex;
+
+	if (IsValid(ProxyResult.Actor))
+	{
+		IndexByActor.Add(
+			ProxyResult.Actor,
+			PackedIndex);
+	}
+
+	ApplyUpdatePayload(Payload);
+
+#if DO_CHECK
+	ValidateAgentRegistry();
+#endif
+
+	return true;
+}
+
+void UBudgetOverlordSubsystem::ApplyRegisterPayload(
+	const FHordeNetworkFormat& Payload)
+{
+	if (!RegisterAgentWithHandle(Payload))
+	{
+		UE_LOG(
+			LogHordeLifecycle,
+			Verbose,
+			TEXT("Ignored Horde register payload. AgentID=%u Generation=%u"),
+			Payload.Handle.AgentID,
+			Payload.Handle.Generation);
+	}
+}
+
+void UBudgetOverlordSubsystem::ApplyUpdatePayload(
+	const FHordeNetworkFormat& Payload)
+{
+	int32 PackedIndex = INDEX_NONE;
+	if (!TryResolvePackedIndex(
+		Payload.Handle,
+		PackedIndex))
+	{
+		return;
+	}
+
+	HordeMovementStorage& MovementStorage =
+		MovementSubsystem->MovementStorage;
+
+	if (!MovementStorage.Transforms.IsValidIndex(PackedIndex)
+		|| !MovementStorage.CachedFlowDirections.IsValidIndex(PackedIndex)
+		|| !MovementStorage.MoveSpeeds.IsValidIndex(PackedIndex)
+		|| !MovementStorage.Velocities.IsValidIndex(PackedIndex)
+		|| !MovementStorage.MovementStates.IsValidIndex(PackedIndex)
+		|| !MovementStorage.TraversalStates.IsValidIndex(PackedIndex)
+		|| !MovementStorage.PriorityTiers.IsValidIndex(PackedIndex))
 	{
 		ensureAlwaysMsgf(
 			false,
-			TEXT("Invalid horde network payload index. AgentID=%d Generation=%d TransformNum=%d VelocityNum=%d MoveSpeedNum=%d"),
-			ID,
-			Handle.Generation,
-			MovementStorage.Transforms.Num(),
-			MovementStorage.Velocities.Num(),
-			MovementStorage.MoveSpeeds.Num());
+			TEXT("Invalid Horde update payload local index. PackedIndex=%d AgentID=%u Generation=%u"),
+			PackedIndex,
+			Payload.Handle.AgentID,
+			Payload.Handle.Generation);
 		return;
 	}
-	
-	MovementStorage.Transforms[ID] = Payload.Transforms;
-	MovementStorage.MoveSpeeds[ID] = Payload.MoveSpeed;
-	MovementStorage.Velocities[ID] = Payload.Velocities;
-	MovementStorage.CachedFlowDirections[ID] = Payload.CachedFlowDirections;
-	MovementStorage.MovementStates[ID] = Payload.MovementStates;
-	MovementStorage.TraversalStates[ID] = Payload.TraversalStates;
-	MovementStorage.PriorityTiers[ID] = Payload.PriorityTiers;
-	
+
+	MovementStorage.Transforms[PackedIndex] =
+		Payload.Transforms;
+	MovementStorage.MoveSpeeds[PackedIndex] =
+		Payload.MoveSpeed;
+	MovementStorage.Velocities[PackedIndex] =
+		Payload.Velocities;
+	MovementStorage.CachedFlowDirections[PackedIndex] =
+		Payload.CachedFlowDirections;
+	MovementStorage.MovementStates[PackedIndex] =
+		Payload.MovementStates;
+	MovementStorage.TraversalStates[PackedIndex] =
+		Payload.TraversalStates;
+	MovementStorage.PriorityTiers[PackedIndex] =
+		Payload.PriorityTiers;
 }
+
+void UBudgetOverlordSubsystem::ApplyUnregisterPayload(
+	const FHordeNetworkFormat& Payload)
+{
+	int32 PackedIndex = INDEX_NONE;
+	if (!TryResolvePackedIndex(
+		Payload.Handle,
+		PackedIndex))
+	{
+		return;
+	}
+
+	UnregisterAgentByPackedIndex(
+		PackedIndex,
+		false);
+}
+
 void UBudgetOverlordSubsystem::BuildPacket()
 {
 	UWorld* World =
@@ -447,6 +885,10 @@ void UBudgetOverlordSubsystem::BuildPacket()
 
 	const HordeMovementStorage& Storage =
 		MovementSubsystem->MovementStorage;
+
+#if DO_CHECK
+	ValidateAgentRegistry();
+#endif
 
 	const int32 AgentCount = Storage.Size();
 	constexpr int32 MaxPayloadCount = 8;
@@ -503,6 +945,18 @@ void UBudgetOverlordSubsystem::BuildPacket()
 		Payload.MoveSpeed =
 			Storage.MoveSpeeds[PackedIndex];
 
+		Payload.MaxHealth =
+			StatusSubsystem->StatusStorage.MaxHealths.IsValidIndex(
+				PackedIndex)
+				? StatusSubsystem->StatusStorage.MaxHealths[PackedIndex]
+				: 0.0f;
+
+		Payload.CurrentHealth =
+			StatusSubsystem->StatusStorage.CurrentHealths.IsValidIndex(
+				PackedIndex)
+				? StatusSubsystem->StatusStorage.CurrentHealths[PackedIndex]
+				: 0.0f;
+
 		Payload.Velocities =
 			Storage.Velocities[PackedIndex];
 
@@ -556,4 +1010,103 @@ void UBudgetOverlordSubsystem::InitializeViceroy(int32 Capacity)
 	MovementSubsystem->InitializeStorage(Capacity);
 	ProxySubsystem->InitializeStorage(Capacity);
 	StatusSubsystem->InitializeStorage(Capacity);
+}
+
+void UBudgetOverlordSubsystem::ValidateAgentRegistry() const
+{
+#if DO_CHECK
+	check(MovementSubsystem);
+	check(ProxySubsystem);
+	check(StatusSubsystem);
+
+	const HordeMovementStorage& MovementStorage =
+		MovementSubsystem->MovementStorage;
+	const HordeProxyStorage& ProxyStorage =
+		ProxySubsystem->ProxyStorage;
+	const HordeStatusStorage& StatusStorage =
+		StatusSubsystem->StatusStorage;
+
+	check(MovementStorage.IsValid());
+	check(ProxyStorage.IsValid());
+	check(StatusStorage.IsValid());
+
+	const int32 AgentCount =
+		PackedIndexToHandle.Num();
+
+	check(MovementStorage.Size() == AgentCount);
+	check(ProxyStorage.Size() == AgentCount);
+	check(StatusStorage.Size() == AgentCount);
+
+	TSet<uint32> ActiveAgentIDs;
+	ActiveAgentIDs.Reserve(AgentCount);
+
+	for (int32 PackedIndex = 0;
+		 PackedIndex < AgentCount;
+		 ++PackedIndex)
+	{
+		const FHordeAgentHandle& Handle =
+			PackedIndexToHandle[PackedIndex];
+
+		check(Handle.IsValid());
+		check(Handle.AgentID <= static_cast<uint32>(MAX_int32));
+
+		const int32 AgentID =
+			static_cast<int32>(Handle.AgentID);
+
+		check(AgentGenerations.IsValidIndex(AgentID));
+		check(AgentIDToPackedIndex.IsValidIndex(AgentID));
+		check(AgentGenerations[AgentID] == Handle.Generation);
+		check(AgentIDToPackedIndex[AgentID] == PackedIndex);
+		check(!ActiveAgentIDs.Contains(Handle.AgentID));
+
+		ActiveAgentIDs.Add(Handle.AgentID);
+
+		if (AActor* ProxyActor =
+			ProxySubsystem->GetRegisteredActor(PackedIndex);
+			IsValid(ProxyActor))
+		{
+			const int32* FoundPackedIndex =
+				IndexByActor.Find(ProxyActor);
+
+			check(FoundPackedIndex);
+			check(*FoundPackedIndex == PackedIndex);
+		}
+	}
+
+	TSet<uint32> FreeAgentIDSet;
+	FreeAgentIDSet.Reserve(FreeAgentIDs.Num());
+
+	for (const uint32 FreeAgentID : FreeAgentIDs)
+	{
+		check(FreeAgentID <= static_cast<uint32>(MAX_int32));
+		check(!FreeAgentIDSet.Contains(FreeAgentID));
+		check(!ActiveAgentIDs.Contains(FreeAgentID));
+
+		FreeAgentIDSet.Add(FreeAgentID);
+
+		const int32 AgentID =
+			static_cast<int32>(FreeAgentID);
+
+		if (AgentIDToPackedIndex.IsValidIndex(AgentID))
+		{
+			check(AgentIDToPackedIndex[AgentID] == INDEX_NONE);
+		}
+	}
+
+	for (const TPair<TWeakObjectPtr<AActor>, int32>& Pair
+		: IndexByActor)
+	{
+		if (!Pair.Key.IsValid())
+		{
+			continue;
+		}
+
+		const int32 PackedIndex =
+			Pair.Value;
+
+		check(PackedIndexToHandle.IsValidIndex(PackedIndex));
+		check(ProxySubsystem->GetRegisteredActor(PackedIndex)
+			== Pair.Key.Get());
+	}
+#endif
 }

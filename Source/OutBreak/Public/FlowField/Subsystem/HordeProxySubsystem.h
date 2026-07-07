@@ -27,13 +27,17 @@ protected:
 	ProxyRegisterResult Register(const FTransform& Transform);
 	void Unregister(int32 Index);
 	AActor* GetRegisteredActor(int32 PackedIndex) const;
+	int32 GetInstanceIndex(int32 PackedIndex) const;
 	virtual void ProcessSystem(const float DeltaSeconds) override;
 	void CreateProxyHost();
 	void ParallelProxy();
+	void RefreshInstancesFromMovement();
 	HordeProxyStorage ProxyStorage;
 
 	friend class UBudgetOverlordSubsystem;
 private:
+	void DestroyProxyActor(AActor* Actor);
+
 	UPROPERTY(Transient)
 	TObjectPtr<class AHordeProxyHost> HordeProxy;
 	

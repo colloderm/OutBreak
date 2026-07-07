@@ -17,7 +17,8 @@ void UHordeNetworkSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UHordeNetworkSubsystem::Deinitialize()
 {
-	Payloads.Reset();
+	PendingLifecyclePayloads.Reset();
+	PendingSnapshotPayloads.Reset();
 
 	for (TPair<TObjectPtr<APlayerController>,
 		 TObjectPtr<AHordeNetworkBridgeActor>>& Pair : Bridges)
@@ -38,18 +39,53 @@ void UHordeNetworkSubsystem::BeginSystem()
 	Super::BeginSystem();
 }
 
+void UHordeNetworkSubsystem::AddPayload(
+	const FHordeNetworkFormat& Payload)
+{
+	if (!Payload.Handle.IsValid())
+	{
+		return;
+	}
+
+	if (Payload.Operation == EHordeNetworkOperation::Update)
+	{
+		for (FHordeNetworkFormat& PendingPayload
+			: PendingSnapshotPayloads)
+		{
+			if (PendingPayload.Handle == Payload.Handle)
+			{
+				PendingPayload = Payload;
+				return;
+			}
+		}
+
+		PendingSnapshotPayloads.Add(Payload);
+		return;
+	}
+
+	PendingSnapshotPayloads.RemoveAll(
+		[&Payload](const FHordeNetworkFormat& PendingPayload)
+		{
+			return PendingPayload.Handle == Payload.Handle;
+		});
+
+	PendingLifecyclePayloads.Add(Payload);
+}
+
 void UHordeNetworkSubsystem::SendPayloads()
 {
 	UWorld* World = GetWorld();
 	if (!World)
 	{
-		Payloads.Reset();
+		PendingLifecyclePayloads.Reset();
+		PendingSnapshotPayloads.Reset();
 		return;
 	}
 
 	if (World->GetNetMode() == NM_Client)
 	{
-		Payloads.Reset();
+		PendingLifecyclePayloads.Reset();
+		PendingSnapshotPayloads.Reset();
 		return;
 	}
 
@@ -77,7 +113,8 @@ void UHordeNetworkSubsystem::SendPayloads()
 		}
 	}
 
-	if (!Payloads.IsEmpty())
+	if (!PendingLifecyclePayloads.IsEmpty()
+		|| !PendingSnapshotPayloads.IsEmpty())
 	{
 		for (const TPair<TObjectPtr<APlayerController>,
 			     TObjectPtr<AHordeNetworkBridgeActor>>& Pair : Bridges)
@@ -86,12 +123,23 @@ void UHordeNetworkSubsystem::SendPayloads()
 
 			if (IsValid(Bridge))
 			{
-				Bridge->ClientReceivePayloads(Payloads);
+				if (!PendingLifecyclePayloads.IsEmpty())
+				{
+					Bridge->ClientReceiveLifecyclePayloads(
+						PendingLifecyclePayloads);
+				}
+
+				if (!PendingSnapshotPayloads.IsEmpty())
+				{
+					Bridge->ClientReceiveSnapshotPayloads(
+						PendingSnapshotPayloads);
+				}
 			}
 		}
 	}
 
-	Payloads.Reset();
+	PendingLifecyclePayloads.Reset();
+	PendingSnapshotPayloads.Reset();
 }
 
 void UHordeNetworkSubsystem::ReceivePayloads(const TArray<FHordeNetworkFormat>& InPayloads)

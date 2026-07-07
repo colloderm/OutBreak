@@ -20,13 +20,21 @@ void UHordeMovementSubsystem::InitializeStorage(int32 Capacity)
 	MovementStorage.Initialize(Capacity);
 }
 
-void UHordeMovementSubsystem::Register(const FTransform& Transform, float MoveSpeed)
+int32 UHordeMovementSubsystem::Register(const FTransform& Transform, float MoveSpeed)
 {
-	MovementStorage.Add(Transform, MoveSpeed);
+	check(IsInGameThread());
+
+	const int32 PackedIndex =
+		MovementStorage.Add(Transform, MoveSpeed);
+
+	check(MovementStorage.IsValid());
+
+	return PackedIndex;
 }
 
 void UHordeMovementSubsystem::Unregister(int32 Index)
 {
+	check(IsInGameThread());
 	MovementStorage.RemoveAtSwap(Index);
 }
 
@@ -112,12 +120,37 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 	}
 	
 	
+	const UFlowFieldSettings* FlowFieldSettings = GetDefault<UFlowFieldSettings>();
+
+	const float MaxSpeed = FlowFieldSettings->GetMaxVelocity();
+
+	TArray<FVector> MoveOffsets;
+	MoveOffsets.SetNumZeroed(AgentCount);
+
 	for (int32 i = 0 ; i < AgentCount; i++)
 	{
+		const float MaxTravelDistance =
+			FMath::Min(
+				MovementStorage.MoveSpeeds[i] * DeltaSeconds,
+				MaxSpeed);
+
+		FVector MoveOffset =
+			FVector::ZeroVector;
+
 		const bool bQuerySucceeded =
-			FlowFieldSubsystem->QueryDirection(
-			MovementStorage.Transforms[i].GetLocation(),
-			MovementStorage.CachedFlowDirections[i]);
+			FlowFieldSubsystem->QueryConstrainedMove(
+				MovementStorage.Transforms[i].GetLocation(),
+				MaxTravelDistance,
+				MoveOffset);
+
+		MoveOffset.Z = 0.0f;
+		MoveOffsets[i] =
+			bQuerySucceeded
+				? MoveOffset
+				: FVector::ZeroVector;
+
+		MovementStorage.CachedFlowDirections[i] =
+			MoveOffsets[i].GetSafeNormal2D();
 
 		if (bDiagnosticsEnabled && i == 0)
 		{
@@ -129,16 +162,9 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 		}
 	}
 	
-	
-	const UFlowFieldSettings* FlowFieldSettings = GetDefault<UFlowFieldSettings>();
-	
-	
-	const float MaxSpeed = FlowFieldSettings->GetMaxVelocity();
-	
 	FTransform* Transforms = MovementStorage.Transforms.GetData();
 	FVector* Velocities = MovementStorage.Velocities.GetData();
-	const FVector* CachedFlowDirections = MovementStorage.CachedFlowDirections.GetData();
-	const float* MoveSpeeds = MovementStorage.MoveSpeeds.GetData();
+	const FVector* MoveOffsetsData = MoveOffsets.GetData();
 	
 	ParallelFor(
 		TEXT("UHordeMovementSubsystem::Parallel"),
@@ -147,43 +173,28 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 			[
 				Transforms,
 				Velocities,
-				CachedFlowDirections,
-				MoveSpeeds,
-				MaxSpeed,
-				DeltaSeconds
+				MoveOffsetsData
 				](const int32 AgentIndex)
 			{
 				const FVector CurrentPosition = 
 					Transforms[AgentIndex].GetLocation();
 				
-				const FVector CurrentDirection = 
-					CachedFlowDirections[AgentIndex].GetSafeNormal();
-				
-				const FVector CurrentVelocity =
-					Velocities[AgentIndex];
-				
-				const float CurrentAcceleration = 
-					MoveSpeeds[AgentIndex] * DeltaSeconds;
-				
-				const FVector NewVelocity =
-				(
-					// CurrentVelocity + 
-					CurrentDirection * CurrentAcceleration
-				).GetClampedToMaxSize(MaxSpeed);
+				const FVector MoveOffset =
+					MoveOffsetsData[AgentIndex];
 				
 				const FVector NewPosition = 
-					CurrentPosition + (NewVelocity /* DeltaSeconds*/);
+					CurrentPosition + MoveOffset;
 				
 				Transforms[AgentIndex].SetLocation(NewPosition);
-				if (!NewVelocity.IsNearlyZero())
+				if (!MoveOffset.IsNearlyZero())
 				{
 					const FVector FacingDirection =
-						NewVelocity.GetSafeNormal2D();
+						MoveOffset.GetSafeNormal2D();
 
 					Transforms[AgentIndex].SetRotation(
 						FRotator(FacingDirection.Rotation()+FRotator(0,-90,0)).Quaternion());
 				}
-				Velocities[AgentIndex] = NewVelocity;
+				Velocities[AgentIndex] = MoveOffset;
 			});
 
 	if (bDiagnosticsEnabled)
@@ -204,7 +215,7 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 				Warning,
 				TEXT(
 					"[HordeMovement] World=%s WorldType=%d NetMode=%d "
-					"AgentCount=%d Function=%s QueryDirection=%d "
+					"AgentCount=%d Function=%s QueryConstrainedMove=%d "
 					"Before=%s Direction=%s MoveSpeed=%.3f After=%s Velocity=%s"),
 				*World->GetName(),
 				static_cast<int32>(World->WorldType),

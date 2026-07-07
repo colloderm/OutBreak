@@ -13,7 +13,27 @@ AHordeNetworkBridgeActor::AHordeNetworkBridgeActor()
 	SetReplicateMovement(false);
 }
 
-void AHordeNetworkBridgeActor::ClientReceivePayloads_Implementation(
+void AHordeNetworkBridgeActor::ClientReceiveLifecyclePayloads_Implementation(
+	const TArray<FHordeNetworkFormat>& InPayloads)
+{
+	if (!HordeNetworkSubsystem)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			HordeNetworkSubsystem =
+				World->GetSubsystem<UHordeNetworkSubsystem>();
+		}
+	}
+
+	if (!ensure(HordeNetworkSubsystem))
+	{
+		return;
+	}
+
+	HordeNetworkSubsystem->ReceivePayloads(InPayloads);
+}
+
+void AHordeNetworkBridgeActor::ClientReceiveSnapshotPayloads_Implementation(
 	const TArray<FHordeNetworkFormat>& InPayloads)
 {
 	if (!HordeNetworkSubsystem)

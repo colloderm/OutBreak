@@ -29,6 +29,13 @@ void AHordeProxyHost::RegisterInstances(
 
 int32 AHordeProxyHost::AddInstance(const FTransform& Transform)
 {
+	if (!ensureAlwaysMsgf(
+		IsValid(InstancedStaticMesh),
+		TEXT("HordeProxyHost has no valid InstancedStaticMesh component.")))
+	{
+		return INDEX_NONE;
+	}
+
 	return InstancedStaticMesh->AddInstance(Transform, true);
 }
 
@@ -38,7 +45,9 @@ void AHordeProxyHost::RemoveInstance(const int32 InstanceId) const
 	InstancedStaticMesh->RemoveInstance(InstanceId);
 }
 
-void AHordeProxyHost::UpdateInstances(const TArray<FTransform>& Transforms) const
+void AHordeProxyHost::UpdateInstances(
+	TArray<int32>& InstanceIds,
+	const TArray<FTransform>& Transforms) const
 {
 	if (!ensureAlwaysMsgf(
 		IsValid(InstancedStaticMesh),
@@ -47,10 +56,15 @@ void AHordeProxyHost::UpdateInstances(const TArray<FTransform>& Transforms) cons
 		return;
 	}
 	
-	if (Transforms.Num() != InstancedStaticMesh->GetInstanceCount())
+	if (Transforms.Num() != InstancedStaticMesh->GetInstanceCount()
+		|| InstanceIds.Num() != Transforms.Num())
 	{
 		InstancedStaticMesh->ClearInstances();
-		InstancedStaticMesh->AddInstances(Transforms, true, true);
+		InstanceIds =
+			InstancedStaticMesh->AddInstances(
+				Transforms,
+				true,
+				true);
 		return;
 	}
 	

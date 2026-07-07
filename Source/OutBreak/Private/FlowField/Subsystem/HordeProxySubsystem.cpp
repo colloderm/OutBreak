@@ -31,8 +31,21 @@ void UHordeProxySubsystem::InitializeStorage(int32 Capacity)
 
 ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 {
-	check(HordeProxy);
-	const int32 InstanceId = HordeProxy->AddInstance(Transform);
+	check(IsInGameThread());
+
+	ProxyRegisterResult Result;
+
+	if (!IsValid(HordeProxy))
+	{
+		CreateProxyHost();
+	}
+
+	if (!ensureAlwaysMsgf(
+		IsValid(HordeProxy),
+		TEXT("Horde proxy host is invalid.")))
+	{
+		return Result;
+	}
 	
 	UWorld* World = GetWorld();
 	
@@ -45,7 +58,7 @@ ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 		HordeProxyActorClass,
 		TEXT("Flow Field 설정에 HordeProxyActorClass가 지정되지 않았습니다.")))
 	{
-		return ProxyRegisterResult();
+		return Result;
 	}
 	
 	FActorSpawnParameters SpawnParameters;
@@ -59,18 +72,56 @@ ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 		FTransform::Identity,
 		SpawnParameters
 	);
+
+	if (!ensureAlwaysMsgf(
+		IsValid(SpawnActor),
+		TEXT("Failed to spawn Horde proxy actor.")))
+	{
+		return Result;
+	}
+
+	const int32 InstanceIndex =
+		HordeProxy->AddInstance(Transform);
+
+	if (!ensureAlwaysMsgf(
+		InstanceIndex != INDEX_NONE,
+		TEXT("Failed to add Horde proxy ISM instance.")))
+	{
+		DestroyProxyActor(SpawnActor);
+		return Result;
+	}
 	
 	// SpawnActor->Capsule->OnComponentBeginOverlap.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleBeginOverlap);
 	// SpawnActor->Capsule->OnComponentEndOverlap.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleEndOverlap);
 	// SpawnActor->Capsule->OnComponentHit.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleHit);
 	SpawnActor->OnTakeAnyDamage.AddUniqueDynamic(this, 
 		&UHordeProxySubsystem::ProxyOnTakeAnyDamage);
-	int32 Index = ProxyStorage.Add(SpawnActor, InstanceId);
-	return ProxyRegisterResult(SpawnActor, Index);
+
+	const int32 ProxyStorageIndex =
+		ProxyStorage.Add(SpawnActor, InstanceIndex);
+
+	Result.Actor = SpawnActor;
+	Result.ProxyStorageIndex = ProxyStorageIndex;
+	Result.InstanceIndex = InstanceIndex;
+	Result.bSucceeded =
+		ProxyStorageIndex != INDEX_NONE;
+
+	check(ProxyStorage.IsValid());
+
+	return Result;
 }
 
 void UHordeProxySubsystem::Unregister(int32 Index)
 {
+	check(IsInGameThread());
+	check(ProxyStorage.IsValid());
+	check(ProxyStorage.PawnProxies.IsValidIndex(Index));
+
+	AActor* ProxyActor =
+		ProxyStorage.PawnProxies[Index].Get();
+
+	DestroyProxyActor(ProxyActor);
+
 	ProxyStorage.RemoveAtSwap(Index);
 }
 
@@ -80,6 +131,14 @@ AActor* UHordeProxySubsystem::GetRegisteredActor(
 	return ProxyStorage.PawnProxies.IsValidIndex(PackedIndex)
 		? ProxyStorage.PawnProxies[PackedIndex].Get()
 		: nullptr;
+}
+
+int32 UHordeProxySubsystem::GetInstanceIndex(
+	const int32 PackedIndex) const
+{
+	return ProxyStorage.InstanceIds.IsValidIndex(PackedIndex)
+		? ProxyStorage.InstanceIds[PackedIndex]
+		: INDEX_NONE;
 }
 
 
@@ -172,7 +231,9 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 		}
 	}
 	
-	HordeProxy->UpdateInstances(Transforms);
+	HordeProxy->UpdateInstances(
+		ProxyStorage.InstanceIds,
+		Transforms);
 	ParallelProxy();
 
 	if (bDiagnosticsEnabled)
@@ -302,6 +363,36 @@ void UHordeProxySubsystem::ParallelProxy()
 			nullptr,
 			ETeleportType::TeleportPhysics);
 	}
+}
+
+void UHordeProxySubsystem::RefreshInstancesFromMovement()
+{
+	check(IsInGameThread());
+	check(MovementSubsystem);
+
+	if (!IsValid(HordeProxy))
+	{
+		return;
+	}
+
+	HordeProxy->UpdateInstances(
+		ProxyStorage.InstanceIds,
+		MovementSubsystem->MovementStorage.Transforms);
+}
+
+void UHordeProxySubsystem::DestroyProxyActor(AActor* Actor)
+{
+	if (!IsValid(Actor))
+	{
+		return;
+	}
+
+	Actor->OnTakeAnyDamage.RemoveDynamic(
+		this,
+		&UHordeProxySubsystem::ProxyOnTakeAnyDamage);
+	Actor->SetActorEnableCollision(false);
+	Actor->SetActorHiddenInGame(true);
+	Actor->Destroy();
 }
 
 void UHordeProxySubsystem::ProxyOnTakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,

@@ -23,10 +23,7 @@ class OUTBREAK_API UHordeNetworkSubsystem : public UBaseHordeWorldSubsystem
 public:
 	
 	
-	FORCEINLINE void AddPayload(const FHordeNetworkFormat& Payload)
-	{
-		Payloads.Add(Payload);
-	}
+	void AddPayload(const FHordeNetworkFormat& Payload);
 	
 	void SendPayloads();
 	
@@ -41,7 +38,8 @@ protected:
 private:
 	TMap<TObjectPtr<APlayerController>,
 		 TObjectPtr<AHordeNetworkBridgeActor>> Bridges;
-	TArray<FHordeNetworkFormat> Payloads;
+	TArray<FHordeNetworkFormat> PendingLifecyclePayloads;
+	TArray<FHordeNetworkFormat> PendingSnapshotPayloads;
 	
 	friend class UBudgetOverlordSubsystem;
 };

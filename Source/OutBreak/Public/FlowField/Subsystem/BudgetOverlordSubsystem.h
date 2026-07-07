@@ -12,6 +12,8 @@ class UHordeProxySubsystem;
 class UHordeStatusSubsystem;
 class UHordeNetworkSubsystem;
 
+DECLARE_LOG_CATEGORY_EXTERN(LogHordeLifecycle, Log, All);
+
 /**
  * 
  */
@@ -25,7 +27,16 @@ public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
-	int32 GetIndexByActor(const AActor* Actor) const;
+	bool TryGetHandleByActor(
+		const AActor* Actor,
+		FHordeAgentHandle& OutHandle) const;
+
+	bool TryResolvePackedIndex(
+		const FHordeAgentHandle& Handle,
+		int32& OutPackedIndex) const;
+
+	FHordeAgentHandle GetHandleByPackedIndex(
+		int32 PackedIndex) const;
 	
 	
 	FORCEINLINE UHordeMovementSubsystem* GetMovementSubsystem() { return MovementSubsystem; }
@@ -42,8 +53,11 @@ public:
 		float HealthPercent = 1.f
 	);
 	
-	bool UnregisterAgent(int32 PackedIndex);
-	void ReleaseAgentHandle(FHordeAgentHandle Handle);
+	bool UnregisterAgent(
+		const FHordeAgentHandle& Handle);
+
+	bool UnregisterAgent(
+		const AActor* Actor);
 
 protected:
 	
@@ -56,6 +70,23 @@ private:
 	void BuildPacket();
 	
 	FHordeAgentHandle AllocateAgentHandle();
+	void RollbackAgentHandleAllocation(
+		const FHordeAgentHandle& Handle);
+	void ReleaseAgentHandle(
+		const FHordeAgentHandle& Handle);
+	bool UnregisterAgentByPackedIndex(
+		int32 PackedIndex,
+		bool bQueueNetworkPayload = true);
+	bool RegisterAgentWithHandle(
+		const FHordeNetworkFormat& Payload);
+	void ApplyRegisterPayload(
+		const FHordeNetworkFormat& Payload);
+	void ApplyUpdatePayload(
+		const FHordeNetworkFormat& Payload);
+	void ApplyUnregisterPayload(
+		const FHordeNetworkFormat& Payload);
+	void ValidateAgentRegistry() const;
+	int32 GetIndexByActor(const AActor* Actor) const;
 	
 	// PackedIndex -> Stable Handle
 	UPROPERTY(Transient)

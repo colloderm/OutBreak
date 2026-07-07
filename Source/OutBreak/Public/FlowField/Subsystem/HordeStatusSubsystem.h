@@ -26,7 +26,7 @@ public:
 protected:
 	void InitializeStorage(int32 Capacity);
 	/* Percent는 현재 MaxHealth 기반 현재 체력*/
-	void Register(float MaxHealth, float Percent = 1.0);
+	int32 Register(float MaxHealth, float Percent = 1.0);
 	void Unregister(int32 Index);
 	
 	virtual void ProcessSystem(const float DeltaSeconds) override;

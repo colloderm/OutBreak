@@ -15,8 +15,13 @@ class OUTBREAK_API AHordeNetworkBridgeActor : public AActor
 public:
 	AHordeNetworkBridgeActor();
 	
+	UFUNCTION(Client, Reliable)
+	void ClientReceiveLifecyclePayloads(
+		const TArray<FHordeNetworkFormat>& InPayloads);
+
 	UFUNCTION(Client, Unreliable)
-	void ClientReceivePayloads(const TArray<FHordeNetworkFormat>& InPayloads);
+	void ClientReceiveSnapshotPayloads(
+		const TArray<FHordeNetworkFormat>& InPayloads);
 	
 
 protected:
