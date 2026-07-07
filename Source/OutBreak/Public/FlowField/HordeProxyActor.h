@@ -14,6 +14,10 @@ class OUTBREAK_API AHordeProxyActor : public AActor
 
 public:
 	// Sets default values for this actor's properties
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<class USceneComponent> SceneComponent;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TObjectPtr<class UCapsuleComponent> Capsule;
 	AHordeProxyActor();
 

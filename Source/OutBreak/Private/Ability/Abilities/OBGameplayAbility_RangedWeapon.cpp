@@ -14,6 +14,8 @@
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Player/Controller/OBPlayerController.h"
 
+#include "Kismet/GameplayStatics.h"
+
 UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
@@ -265,6 +267,18 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		Hit, TraceStart, TraceEnd, OB_TraceChannel_Weapon, QueryParams
 	);
 	
+	AActor* HitActor = Hit.GetActor();
+
+	if (IsValid(HitActor))
+	{
+		UGameplayStatics::ApplyDamage(
+			HitActor,
+			WeaponData->BaseDamage,
+			nullptr,
+			nullptr,
+			UDamageType::StaticClass());
+	}
+	
 #if ENABLE_DRAW_DEBUG
 	const FVector DebugEnd = bHit ? Hit.ImpactPoint : TraceEnd;
 	if (bDrawDebugTrace)
@@ -273,6 +287,9 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		Character->Multicast_DrawFireTrace(TraceStart, DebugEnd, bHit);
 	}
 #endif
+	
+	
+	
 	
 	// 소스 ASC를 먼저 확보(발사 큐는 명중 여부와 무관하게 발생).
 	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
@@ -316,7 +333,8 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	Context.AddHitResult(Hit);
 
 	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(WeaponData->DamageEffect, GetAbilityLevel(), Context);
-
+	
+	
 	if (SpecHandle.IsValid())
 	{
 		SpecHandle.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, WeaponData->BaseDamage);

@@ -12,6 +12,14 @@
 using HordeAgentID = int32;
 
 
+UENUM()
+enum class EHordeNetworkOperation : uint8
+{
+	Register,
+	Update,
+	Unregister
+};
+
 struct ProxyRegisterResult
 {
 	AActor* Actor = nullptr;
@@ -221,6 +229,9 @@ USTRUCT()
 struct FHordeNetworkFormat
 {
 	GENERATED_BODY()
+	
+	EHordeNetworkOperation Operation =
+		EHordeNetworkOperation::Update;
 	
 	/* Handle */
 	UPROPERTY()

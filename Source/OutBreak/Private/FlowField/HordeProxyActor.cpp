@@ -9,10 +9,17 @@
 // Sets default values
 AHordeProxyActor::AHordeProxyActor()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-	
-	Capsule = CreateDefaultSubobject<UCapsuleComponent>("Capsule");
+	PrimaryActorTick.bCanEverTick = false;
+
+	SceneComponent =
+		CreateDefaultSubobject<USceneComponent>(TEXT("RootComponent"));
+
+	SetRootComponent(SceneComponent);
+
+	Capsule =
+		CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
+
+	Capsule->SetupAttachment(SceneComponent);
 }
 
 // Called when the game starts or when spawned

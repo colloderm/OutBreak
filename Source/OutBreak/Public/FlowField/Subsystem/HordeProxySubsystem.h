@@ -26,6 +26,7 @@ public:
 protected:
 	ProxyRegisterResult Register(const FTransform& Transform);
 	void Unregister(int32 Index);
+	AActor* GetRegisteredActor(int32 PackedIndex) const;
 	virtual void ProcessSystem(const float DeltaSeconds) override;
 	void CreateProxyHost();
 	void ParallelProxy();
@@ -40,6 +41,15 @@ private:
 	TObjectPtr<class UHordeMovementSubsystem> MovementSubsystem;
 	
 private:
+	UFUNCTION()
+	void ProxyOnTakeAnyDamage(
+		AActor* DamagedActor,
+		float Damage,
+		const UDamageType* DamageType,
+		AController* InstigatedBy,
+		AActor* DamageCauser);
+	
+	
 	UFUNCTION()
 	void HandleCapsuleBeginOverlap(
 		UPrimitiveComponent* OverlappedComponent,

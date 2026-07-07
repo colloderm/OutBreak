@@ -135,6 +135,7 @@ FHordeAgentHandle UBudgetOverlordSubsystem::RegisterAgent(
 	 * 단, 클라이언트에서는 이 Handle로 로컬 Agent를 먼저 등록해야 한다.
 	 */
 	FHordeNetworkFormat Payload;
+	Payload.Operation = EHordeNetworkOperation::Register;
 	Payload.Handle = Handle;
 	Payload.Transforms = InTransform;
 	Payload.MoveSpeed = InMoveSpeed;
@@ -152,16 +153,245 @@ FHordeAgentHandle UBudgetOverlordSubsystem::RegisterAgent(
 	return Handle;
 }
 
-void UBudgetOverlordSubsystem::UnregisterAgent(int32 Index)
+bool UBudgetOverlordSubsystem::UnregisterAgent(
+	const int32 PackedIndex)
 {
-	MovementSubsystem->Unregister(Index);
-	ProxySubsystem->Unregister(Index);
-	StatusSubsystem->Unregister(Index);
-	
+	check(MovementSubsystem);
+	check(ProxySubsystem);
+	check(StatusSubsystem);
+	check(NetworkSubsystem);
+
+	const int32 AgentCount =
+		PackedIndexToHandle.Num();
+
+	if (!PackedIndexToHandle.IsValidIndex(PackedIndex))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT(
+				"%s::%s: Invalid PackedIndex. "
+				"PackedIndex=%d AgentCount=%d"),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			PackedIndex,
+			AgentCount);
+
+		return false;
+	}
+
+	check(MovementSubsystem->MovementStorage.Size()
+		== AgentCount);
+
 	/*
-	 * NetworkSubsystem->AgentUnegistered()
-	 * Agent가 등록 해제됨을 모든 Client에 전파
+	 * Status 및 Proxy Storage도 같은 AgentCount를 가지는지
+	 * 각 Storage의 Size()에 맞게 검증하는 것이 좋다.
 	 */
+	check(StatusSubsystem->StatusStorage.Size()
+		== AgentCount);
+
+	const int32 PreviousLastIndex =
+		AgentCount - 1;
+
+	const bool bMovesLastAgent =
+		PackedIndex != PreviousLastIndex;
+
+	/*
+	 * RemoveAtSwap 전에 삭제될 Agent와 이동될 Agent 정보를
+	 * 반드시 저장한다.
+	 */
+	const FHordeAgentHandle RemovedHandle =
+		PackedIndexToHandle[PackedIndex];
+
+	FHordeAgentHandle MovedHandle;
+
+	if (bMovesLastAgent)
+	{
+		MovedHandle =
+			PackedIndexToHandle[PreviousLastIndex];
+	}
+
+	AActor* RemovedActor =
+		ProxySubsystem->GetRegisteredActor(
+			PackedIndex);
+
+	AActor* MovedActor = nullptr;
+
+	if (bMovesLastAgent)
+	{
+		MovedActor =
+			ProxySubsystem->GetRegisteredActor(
+				PreviousLastIndex);
+	}
+
+	/*
+	 * 클라이언트에는 삭제되는 시점의 기존 Generation을 가진
+	 * Handle을 전송해야 한다.
+	 */
+	FHordeNetworkFormat Payload;
+	Payload.Operation =
+		EHordeNetworkOperation::Unregister;
+	Payload.Handle =
+		RemovedHandle;
+
+	NetworkSubsystem->AddPayload(Payload);
+
+	/*
+	 * 모든 Storage는 반드시 같은 PackedIndex를
+	 * RemoveAtSwap 해야 한다.
+	 *
+	 * 각 Unregister 내부에서도
+	 * EAllowShrinking::No를 사용해야 한다.
+	 */
+	MovementSubsystem->Unregister(
+		PackedIndex);
+
+	ProxySubsystem->Unregister(
+		PackedIndex);
+
+	StatusSubsystem->Unregister(
+		PackedIndex);
+
+	/*
+	 * PackedIndexToHandle 역시 동일한 Swap Remove를 수행한다.
+	 *
+	 * Num은 감소하지만 Max는 유지되므로 메모리는 축소되지 않는다.
+	 */
+	PackedIndexToHandle.RemoveAtSwap(
+		PackedIndex,
+		1,
+		EAllowShrinking::No);
+
+	/*
+	 * 삭제된 Handle은 더 이상 PackedIndex를 가지지 않는다.
+	 */
+	check(AgentIDToPackedIndex.IsValidIndex(
+		static_cast<int32>(RemovedHandle.AgentID)));
+
+	AgentIDToPackedIndex[RemovedHandle.AgentID] =
+		INDEX_NONE;
+
+	/*
+	 * 마지막 Agent가 삭제 자리로 이동했다면
+	 * Handle → PackedIndex 역참조를 수정한다.
+	 */
+	if (bMovesLastAgent)
+	{
+		check(AgentIDToPackedIndex.IsValidIndex(
+			static_cast<int32>(MovedHandle.AgentID)));
+
+		AgentIDToPackedIndex[MovedHandle.AgentID] =
+			PackedIndex;
+
+		check(
+			PackedIndexToHandle.IsValidIndex(
+				PackedIndex));
+
+		check(
+			PackedIndexToHandle[PackedIndex]
+			== MovedHandle);
+	}
+
+	/*
+	 * 삭제된 Actor의 매핑을 제거한다.
+	 */
+	if (IsValid(RemovedActor))
+	{
+		IndexByActor.Remove(RemovedActor);
+	}
+
+	/*
+	 * 마지막 Actor가 삭제 위치로 이동한 경우
+	 * Actor → PackedIndex를 수정한다.
+	 */
+	if (bMovesLastAgent
+		&& IsValid(MovedActor))
+	{
+		IndexByActor.FindOrAdd(MovedActor) =
+			PackedIndex;
+	}
+
+	/*
+	 * ID를 Free List에 반환하고 Generation을 증가시킨다.
+	 *
+	 * 오래된 네트워크 패킷이 이후 같은 AgentID를 재사용한
+	 * 새 Agent에 적용되는 것을 Generation으로 방지한다.
+	 */
+	ReleaseAgentHandle(RemovedHandle);
+
+	/*
+	 * 모든 Storage와 매핑의 논리 크기가 같은지 검증한다.
+	 */
+	check(
+		MovementSubsystem->MovementStorage.Size()
+		== PackedIndexToHandle.Num());
+
+	check(
+		StatusSubsystem->StatusStorage.Size()
+		== PackedIndexToHandle.Num());
+
+	return true;
+}
+
+void UBudgetOverlordSubsystem::ReleaseAgentHandle(
+	const FHordeAgentHandle Handle)
+{
+	const int32 AgentID =
+		static_cast<int32>(Handle.AgentID);
+
+	if (!AgentGenerations.IsValidIndex(AgentID)
+		|| !AgentIDToPackedIndex.IsValidIndex(AgentID))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT(
+				"%s::%s: Invalid AgentID. "
+				"AgentID=%u Generation=%u"),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			Handle.AgentID,
+			Handle.Generation);
+
+		return;
+	}
+
+	/*
+	 * 현재 활성 Handle과 Generation이 같은 경우만 반환한다.
+	 */
+	if (AgentGenerations[AgentID]
+		!= Handle.Generation)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT(
+				"%s::%s: Generation mismatch. "
+				"AgentID=%u HandleGeneration=%u "
+				"CurrentGeneration=%u"),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			Handle.AgentID,
+			Handle.Generation,
+			AgentGenerations[AgentID]);
+
+		return;
+	}
+
+	AgentIDToPackedIndex[AgentID] =
+		INDEX_NONE;
+
+	/*
+	 * 이전 Handle을 무효화한다.
+	 */
+	++AgentGenerations[AgentID];
+
+	/*
+	 * 동일한 AgentID를 다음 등록에서 재사용할 수 있도록
+	 * Free List에 반환한다.
+	 */
+	FreeAgentIDs.Add(
+		Handle.AgentID);
 }
 
 void UBudgetOverlordSubsystem::DispatchPayload(const FHordeNetworkFormat& Payload)
@@ -258,6 +488,9 @@ void UBudgetOverlordSubsystem::BuildPacket()
 		}
 
 		FHordeNetworkFormat Payload;
+		Payload.Operation =
+			EHordeNetworkOperation::Update;
+		
 		Payload.Handle =
 			PackedIndexToHandle[PackedIndex];
 

@@ -12,6 +12,8 @@
 #include "FlowField/Settings/FlowFieldSettings.h"
 #include "FlowField/HordeProxyHost.h"
 #include "FlowField/HordeProxyActor.h"
+#include "FlowField/Subsystem/BudgetOverlordSubsystem.h"
+#include "Flowfield/Subsystem/HordeStatusSubsystem.h"
 
 void UHordeProxySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -61,6 +63,8 @@ ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 	// SpawnActor->Capsule->OnComponentBeginOverlap.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleBeginOverlap);
 	// SpawnActor->Capsule->OnComponentEndOverlap.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleEndOverlap);
 	// SpawnActor->Capsule->OnComponentHit.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleHit);
+	SpawnActor->OnTakeAnyDamage.AddUniqueDynamic(this, 
+		&UHordeProxySubsystem::ProxyOnTakeAnyDamage);
 	int32 Index = ProxyStorage.Add(SpawnActor, InstanceId);
 	return ProxyRegisterResult(SpawnActor, Index);
 }
@@ -68,6 +72,14 @@ ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 void UHordeProxySubsystem::Unregister(int32 Index)
 {
 	ProxyStorage.RemoveAtSwap(Index);
+}
+
+AActor* UHordeProxySubsystem::GetRegisteredActor(
+	const int32 PackedIndex) const
+{
+	return ProxyStorage.PawnProxies.IsValidIndex(PackedIndex)
+		? ProxyStorage.PawnProxies[PackedIndex].Get()
+		: nullptr;
 }
 
 
@@ -292,8 +304,14 @@ void UHordeProxySubsystem::ParallelProxy()
 	}
 }
 
+void UHordeProxySubsystem::ProxyOnTakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,
+	AController* InstigatedBy, AActor* DamageCauser)
+{
+	BudgetOverlord->GetStatusSubsystem()->AddDamageEvent(DamagedActor, Damage);
+}
+
 void UHordeProxySubsystem::HandleCapsuleBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-	UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+                                                     UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
 	
 }

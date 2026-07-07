@@ -46,9 +46,11 @@ private:
 	int32 MaxFlowQueriesPerFrame = 64;
 	
 	/** 네트워크 상태 갱신의 최소 간격 */
-	UPROPERTY(Config, EditAnywhere, Category = "Network Budget", meta = (ClampMin = "0.001", UIMin = "0.001", Units = "s")
-	)
+	UPROPERTY(Config, EditAnywhere, Category = "Network Budget", meta = (ClampMin = "0.001", UIMin = "0.001", Units = "s"))
 	float NetworkUpdateInterval = 0.1f;
+	
+	UPROPERTY(Config, EditAnywhere, Category = "Network Budget", meta = (ClampMin = "1", UIMin = "1"))
+	int HordeUpdateBudget = 8;
 
 	/** 뷰포트 밖 Agent에 적용하는 갱신 주기 배율 */
 	UPROPERTY(Config, EditAnywhere, Category = "Significance", meta = (ClampMin = "1.0", UIMin = "1.0"))

@@ -7,6 +7,11 @@
 #include "FlowField/Struct/HordeSystemType.h"
 #include "BudgetOverlordSubsystem.generated.h"
 
+class UHordeMovementSubsystem;
+class UHordeProxySubsystem;
+class UHordeStatusSubsystem;
+class UHordeNetworkSubsystem;
+
 /**
  * 
  */
@@ -23,6 +28,12 @@ public:
 	int32 GetIndexByActor(const AActor* Actor) const;
 	
 	
+	FORCEINLINE UHordeMovementSubsystem* GetMovementSubsystem() { return MovementSubsystem; }
+	FORCEINLINE UHordeProxySubsystem* GetProxySubsystem() { return ProxySubsystem; }
+	FORCEINLINE UHordeStatusSubsystem* GetStatusSubsystem() { return StatusSubsystem; };
+	FORCEINLINE UHordeNetworkSubsystem* GetNetworkSubsystem() { return NetworkSubsystem; }
+	
+	
 	UFUNCTION(BlueprintCallable)
 	FHordeAgentHandle RegisterAgent(
 		const FTransform& inTransform,
@@ -31,8 +42,9 @@ public:
 		float HealthPercent = 1.f
 	);
 	
-	void UnregisterAgent(int32 Index);
-	
+	bool UnregisterAgent(int32 PackedIndex);
+	void ReleaseAgentHandle(FHordeAgentHandle Handle);
+
 protected:
 	
 	void DispatchPayload(const FHordeNetworkFormat& Payload);
@@ -65,16 +77,16 @@ private:
 	TMap<TWeakObjectPtr<AActor>, int32> IndexByActor;
 	
 	UPROPERTY(Transient)
-	TObjectPtr<class UHordeMovementSubsystem> MovementSubsystem;
+	TObjectPtr<UHordeMovementSubsystem> MovementSubsystem;
 	
 	UPROPERTY(Transient)
-	TObjectPtr<class UHordeProxySubsystem> ProxySubsystem;
+	TObjectPtr<UHordeProxySubsystem> ProxySubsystem;
 	
 	UPROPERTY(Transient)
-	TObjectPtr<class UHordeStatusSubsystem> StatusSubsystem;
+	TObjectPtr<UHordeStatusSubsystem> StatusSubsystem;
 	
 	UPROPERTY(Transient)
-	TObjectPtr<class UHordeNetworkSubsystem> NetworkSubsystem;
+	TObjectPtr<UHordeNetworkSubsystem> NetworkSubsystem;
 	
 	void InitializeViceroy(int32 Capacity);
 };
