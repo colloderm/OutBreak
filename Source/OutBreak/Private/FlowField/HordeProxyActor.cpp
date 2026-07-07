@@ -18,8 +18,11 @@ AHordeProxyActor::AHordeProxyActor()
 
 	Capsule =
 		CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
-
+	
+	Capsule->SetCapsuleHalfHeight(90.f);
+	Capsule->SetCapsuleRadius(34.f);
 	Capsule->SetupAttachment(SceneComponent);
+	Capsule->SetRelativeLocation(FVector(0.0f, 0.0f, 90.0f));
 }
 
 // Called when the game starts or when spawned

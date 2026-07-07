@@ -7,6 +7,13 @@
 #include "FlowField/Subsystem/FlowFieldSubsystem.h"
 #include "FlowField/Settings/FlowFieldSettings.h"
 
+namespace
+{
+	constexpr float FlowDirectionSmoothingAlpha = 0.35f;
+	constexpr float FailedQueryFallbackScale = 0.25f;
+	constexpr uint8 MaxConsecutiveFallbackFrames = 6;
+}
+
 
 void UHordeMovementSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -144,13 +151,64 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 				MoveOffset);
 
 		MoveOffset.Z = 0.0f;
-		MoveOffsets[i] =
-			bQuerySucceeded
-				? MoveOffset
-				: FVector::ZeroVector;
 
-		MovementStorage.CachedFlowDirections[i] =
-			MoveOffsets[i].GetSafeNormal2D();
+		const bool bHasValidMoveOffset =
+			bQuerySucceeded
+			&& !MoveOffset.IsNearlyZero();
+
+		const FVector PreviousDirection =
+			MovementStorage.CachedFlowDirections[i]
+			.GetSafeNormal2D();
+
+		if (bHasValidMoveOffset)
+		{
+			const FVector QueryDirection =
+				MoveOffset.GetSafeNormal2D();
+
+			const FVector SmoothedDirection =
+				PreviousDirection.IsNearlyZero()
+					? QueryDirection
+					: FMath::Lerp(
+						PreviousDirection,
+						QueryDirection,
+						FlowDirectionSmoothingAlpha)
+						.GetSafeNormal2D();
+
+			MovementStorage.CachedFlowDirections[i] =
+				SmoothedDirection.IsNearlyZero()
+					? QueryDirection
+					: SmoothedDirection;
+
+			MovementStorage.FlowQueryFailureCounts[i] =
+				0;
+
+			MoveOffsets[i] =
+				MoveOffset;
+		}
+		else if (!PreviousDirection.IsNearlyZero()
+			&& MovementStorage.FlowQueryFailureCounts[i]
+				< MaxConsecutiveFallbackFrames)
+		{
+			++MovementStorage.FlowQueryFailureCounts[i];
+
+			MoveOffsets[i] =
+				PreviousDirection
+				* MaxTravelDistance
+				* FailedQueryFallbackScale;
+		}
+		else
+		{
+			const uint8 FailureCount =
+				MovementStorage.FlowQueryFailureCounts[i];
+
+			MovementStorage.FlowQueryFailureCounts[i] =
+				FailureCount < MaxConsecutiveFallbackFrames
+					? FailureCount + 1
+					: MaxConsecutiveFallbackFrames;
+
+			MoveOffsets[i] =
+				FVector::ZeroVector;
+		}
 
 		if (bDiagnosticsEnabled && i == 0)
 		{

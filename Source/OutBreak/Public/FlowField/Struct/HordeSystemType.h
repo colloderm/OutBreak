@@ -91,6 +91,7 @@ struct HordeMovementStorage
 
 	TArray<FVector>					Velocities;
 	TArray<FVector>					CachedFlowDirections;
+	TArray<uint8>					FlowQueryFailureCounts;
 	TArray<uint8>					MovementStates;
 	TArray<uint8>					TraversalStates;
 	TArray<uint8>					PriorityTiers;
@@ -105,6 +106,7 @@ struct HordeMovementStorage
 		Transforms.Reserve(Capacity);
 		Velocities.Reserve(Capacity);
 		CachedFlowDirections.Reserve(Capacity);
+		FlowQueryFailureCounts.Reserve(Capacity);
 		MoveSpeeds.Reserve(Capacity);
 		MovementStates.Reserve(Capacity);
 		TraversalStates.Reserve(Capacity);
@@ -118,6 +120,7 @@ struct HordeMovementStorage
 		return Velocities.Num() == AgentCount
 			&& MoveSpeeds.Num() == AgentCount
 			&& CachedFlowDirections.Num() == AgentCount
+			&& FlowQueryFailureCounts.Num() == AgentCount
 			&& MovementStates.Num() == AgentCount
 			&& TraversalStates.Num() == AgentCount
 			&& PriorityTiers.Num() == AgentCount;
@@ -128,6 +131,7 @@ struct HordeMovementStorage
 		Transforms.Add(inTransform);
 		Velocities.Add(FVector::ZeroVector);
 		CachedFlowDirections.Add(FVector::ZeroVector);
+		FlowQueryFailureCounts.Add(0);
 		MoveSpeeds.Add(MoveSpeed);
 		MovementStates.Add(0);
 		TraversalStates.Add(0);
@@ -142,6 +146,7 @@ struct HordeMovementStorage
 		Transforms.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		Velocities.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		CachedFlowDirections.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		FlowQueryFailureCounts.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		MoveSpeeds.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		MovementStates.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		TraversalStates.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
