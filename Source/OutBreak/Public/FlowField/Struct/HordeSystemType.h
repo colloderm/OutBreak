@@ -11,6 +11,21 @@
 
 using HordeAgentID = uint32;
 
+struct FHordeSeparationGridEntry
+{
+	int32 CellX = 0;
+	int32 CellY = 0;
+	int32 AgentIndex = INDEX_NONE;
+};
+
+struct FHordeSeparationCellRange
+{
+	int32 CellX = 0;
+	int32 CellY = 0;
+	int32 StartIndex = 0;
+	int32 Count = 0;
+};
+
 
 UENUM()
 enum class EHordeNetworkOperation : uint8
@@ -91,10 +106,17 @@ struct HordeMovementStorage
 
 	TArray<FVector>					Velocities;
 	TArray<FVector>					CachedFlowDirections;
+	TArray<FVector>					SeparationDirections;
 	TArray<uint8>					FlowQueryFailureCounts;
 	TArray<uint8>					MovementStates;
 	TArray<uint8>					TraversalStates;
 	TArray<uint8>					PriorityTiers;
+
+	TArray<FVector>					PositionSnapshot;
+	TArray<FVector>					MoveOffsetScratch;
+	TArray<FVector>					FinalMoveOffsetScratch;
+	TArray<FHordeSeparationGridEntry> SeparationGridEntries;
+	TArray<FHordeSeparationCellRange> SeparationCellRanges;
 
 	int32 Size() const
 	{
@@ -106,11 +128,17 @@ struct HordeMovementStorage
 		Transforms.Reserve(Capacity);
 		Velocities.Reserve(Capacity);
 		CachedFlowDirections.Reserve(Capacity);
+		SeparationDirections.Reserve(Capacity);
 		FlowQueryFailureCounts.Reserve(Capacity);
 		MoveSpeeds.Reserve(Capacity);
 		MovementStates.Reserve(Capacity);
 		TraversalStates.Reserve(Capacity);
 		PriorityTiers.Reserve(Capacity);
+		PositionSnapshot.Reserve(Capacity);
+		MoveOffsetScratch.Reserve(Capacity);
+		FinalMoveOffsetScratch.Reserve(Capacity);
+		SeparationGridEntries.Reserve(Capacity);
+		SeparationCellRanges.Reserve(Capacity);
 	}
 	
 	bool IsValid() const
@@ -120,6 +148,7 @@ struct HordeMovementStorage
 		return Velocities.Num() == AgentCount
 			&& MoveSpeeds.Num() == AgentCount
 			&& CachedFlowDirections.Num() == AgentCount
+			&& SeparationDirections.Num() == AgentCount
 			&& FlowQueryFailureCounts.Num() == AgentCount
 			&& MovementStates.Num() == AgentCount
 			&& TraversalStates.Num() == AgentCount
@@ -131,6 +160,7 @@ struct HordeMovementStorage
 		Transforms.Add(inTransform);
 		Velocities.Add(FVector::ZeroVector);
 		CachedFlowDirections.Add(FVector::ZeroVector);
+		SeparationDirections.Add(FVector::ZeroVector);
 		FlowQueryFailureCounts.Add(0);
 		MoveSpeeds.Add(MoveSpeed);
 		MovementStates.Add(0);
@@ -146,6 +176,7 @@ struct HordeMovementStorage
 		Transforms.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		Velocities.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		CachedFlowDirections.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		SeparationDirections.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		FlowQueryFailureCounts.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		MoveSpeeds.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		MovementStates.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);

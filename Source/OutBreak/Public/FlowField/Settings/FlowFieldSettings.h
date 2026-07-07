@@ -30,6 +30,16 @@ public:
 	{
 		return MaxVelocity;
 	}
+
+	float GetSeparationRadius() const
+	{
+		return SeparationRadius;
+	}
+
+	float GetSeparationSteeringWeight() const
+	{
+		return SeparationSteeringWeight;
+	}
 	
 	TSubclassOf<AHordeProxyHost> GetHordeProxyHostClass() const
 	{
@@ -65,6 +75,12 @@ private:
 	
 	UPROPERTY(Config, EditAnywhere, Category = "General|Movement")
 	float MaxVelocity = 500.f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Horde Movement|Separation", meta = (ClampMin = "0.0"))
+	float SeparationRadius = 90.0f;
+
+	UPROPERTY(Config, EditAnywhere, Category = "Horde Movement|Separation", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float SeparationSteeringWeight = 0.35f;
 	
 	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Class")
 	TSubclassOf<AHordeProxyHost> HordeProxyHostClass;
