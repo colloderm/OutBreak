@@ -12,7 +12,6 @@ void UHordeMovementSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	Super::Initialize(Collection);
 	
 	FlowFieldSubsystem = Collection.InitializeDependency<UFlowFieldSubsystem>();
-	
 }
 
 void UHordeMovementSubsystem::InitializeStorage(int32 Capacity)

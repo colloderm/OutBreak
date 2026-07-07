@@ -41,6 +41,7 @@ void UBudgetOverlordSubsystem::Tick(float DeltaTime)
 	
 	/* 유사 Rendering 단계. */
 	ProxySubsystem->ProcessSystem(DeltaTime);
+	
 }
 
 TStatId UBudgetOverlordSubsystem::GetStatId() const

@@ -17,10 +17,11 @@ class OUTBREAK_API UBaseHordeWorldSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 	
 public:
+	
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	
-	
 protected:
+	virtual void BeginSystem() {};
 	virtual void ProcessSystem(const float DeltaSeconds) {};
 	UPROPERTY()
 	TObjectPtr<class UFlowFieldSettings> Settings;
