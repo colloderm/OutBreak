@@ -20,9 +20,36 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemInspector.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemInspector.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/KeyBindableBtn.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopCategory.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopCategoryElement.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemList.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopWindow.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopkeeperPortrait.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/UserCurrency.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopCategory.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopCategoryElement.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemList.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopWindow.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopkeeperPortrait.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/UserCurrency.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Blueprint/Character/BP_PlayerCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Blueprint/Character/BP_PlayerCharacter.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ItemInspector.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ItemInspector.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopCategory.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopCategory.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopItemList.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopItemList.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopWindow.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopWindow.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopkeeperPortrait.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopkeeperPortrait.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_UserCurrency.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_UserCurrency.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemInspector.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemInspector.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemInspector.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemInspector.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,7 +78,16 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeNetworkSubsystem.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeProxySubsystem.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeStatusSubsystem.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/KeyBindableBtn.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopCategory.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopCategoryElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemInspector.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemList.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopWindow.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopkeeperPortrait.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/UserCurrency.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/FlowFieldGoalActor.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/HordeNetworkBridgeActor.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/HordeProxyActor.h" root0="FORCE_HIGHLIGHTING" />
@@ -64,7 +100,16 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeNetworkSubsystem.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeProxySubsystem.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeStatusSubsystem.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopCategory.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopCategoryElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemInspector.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemList.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopWindow.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopkeeperPortrait.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/UserCurrency.h" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
@@ -230,6 +275,10 @@
       <workItem from="1783381111389" duration="5830000" />
       <workItem from="1783436220930" duration="2044000" />
       <workItem from="1783469674211" duration="693000" />
+      <workItem from="1783474962500" duration="2921000" />
+      <workItem from="1783484334279" duration="974000" />
+      <workItem from="1783493801075" duration="7167000" />
+      <workItem from="1783510684591" duration="1287000" />
     </task>
     <servers />
   </component>
