@@ -20,13 +20,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config/DefaultGame.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultGame.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/DevB/Level_DefenseMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/DevB/Level_DefenseMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeMovementSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeMovementSubsystem.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Settings/FlowFieldSettings.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Settings/FlowFieldSettings.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Struct/HordeSystemType.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Struct/HordeSystemType.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemInspector.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemInspector.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopWindow.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopWindow.uasset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,6 +51,7 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeNetworkSubsystem.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeProxySubsystem.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeStatusSubsystem.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemInspector.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/FlowFieldGoalActor.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/HordeNetworkBridgeActor.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/HordeProxyActor.h" root0="FORCE_HIGHLIGHTING" />
@@ -67,6 +64,7 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeNetworkSubsystem.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeProxySubsystem.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeStatusSubsystem.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemInspector.h" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
@@ -231,6 +229,7 @@
       <workItem from="1783071063709" duration="1773000" />
       <workItem from="1783381111389" duration="5830000" />
       <workItem from="1783436220930" duration="2044000" />
+      <workItem from="1783469674211" duration="693000" />
     </task>
     <servers />
   </component>
