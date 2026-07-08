@@ -4,57 +4,78 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/Shop/ShopWidgetTypes.h"
 #include "ShopItemInspector.generated.h"
 
-class UTextBlock;
 class UBorder;
-class UVerticalBox;
+class UItemStatElement;
 class UKeyBindableBtn;
+class UTextBlock;
+class UVerticalBox;
 
-/**
- * 
- */
 UCLASS()
 class OUTBREAK_API UShopItemInspector : public UUserWidget
 {
 	GENERATED_BODY()
-	
+
 public:
-	/* 아이템 이름 */
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void SetItemData(const FShopItemViewData& InData);
+
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void ClearItemData();
+
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void RefreshActionStates(const TArray<FShopActionViewData>& InActions);
+
+	UPROPERTY(BlueprintAssignable, Category = "Shop")
+	FShopActionTriggeredSignature OnActionTriggered;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_InspectorTitle;
-	
-	/* 이 아이템에 대한 인벤토리 보유 개수 */
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_InspectorQty;
 
-	/* 아이템 메타 정보 ex) Advanced  •  Consumable */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_InspectorMeta;
-	
-	/* 아이템 이미지 (현재는 Border)*/
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UBorder> IMG_InspectorPreview_Placeholder;
-	
-	/* 아이템 설명 */
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_InspectorDescription;
-	
-	/* 아이템 스텟 정보 리스트 */
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UVerticalBox> VBX_ItemStatList;
-	
-	/* 아이템 가격 */
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_InspectorPriceValue;
-	
-	/* 배치된 버튼 0 */
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UKeyBindableBtn> BTN_0;
-	
-	/* 배치된 버튼 1 */
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UKeyBindableBtn> BTN_1;
-	
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+	TSubclassOf<UItemStatElement> ItemStatElementClass;
+
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
+
+protected:
+	UFUNCTION()
+	void HandleActionTriggered(FName ActionId);
+
+	void ResolveItemStatElementClass();
+	void ClearStatElements();
+	void RebuildStats(const TArray<FShopItemStatViewData>& InStats);
+	TArray<UKeyBindableBtn*> GetActionButtons() const;
+
+	UPROPERTY(Transient)
+	FShopItemViewData ItemData;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UItemStatElement>> StatElements;
 };

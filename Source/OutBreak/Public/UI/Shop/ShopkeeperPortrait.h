@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/Shop/ShopWidgetTypes.h"
 #include "ShopkeeperPortrait.generated.h"
 
 
@@ -20,6 +21,12 @@ class OUTBREAK_API UShopkeeperPortrait : public UUserWidget
 	GENERATED_BODY()
 	
 public:
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void SetShopkeeperData(const FShopkeeperViewData& InData);
+
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void ClearShopkeeperData();
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_Role;
 	

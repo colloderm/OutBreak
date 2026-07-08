@@ -4,29 +4,57 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/Shop/ShopWidgetTypes.h"
 #include "KeyBindableBtn.generated.h"
 
-
+class UButton;
 class UTextBlock;
 
-/**
- * 
- */
 UCLASS()
 class OUTBREAK_API UKeyBindableBtn : public UUserWidget
 {
 	GENERATED_BODY()
-	
-	
+
 public:
-	/* 바인딩 시킨 키를 표시 해주는 텍스트 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void SetActionData(const FShopActionViewData& InData);
+
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void SetActionEnabled(bool bEnabled);
+
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void ClearActionData();
+
+	UFUNCTION(BlueprintPure, Category = "Shop")
+	FName GetActionId() const;
+
+	UPROPERTY(BlueprintAssignable, Category = "Shop")
+	FShopActionTriggeredSignature OnActionTriggered;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TXT_BindedKey;
-	
-	/* 이 버튼이 동작한 액션 정보 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> TXT_Action;
-	
-	
+
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+protected:
+	UFUNCTION()
+	void HandleClicked();
+
+	void BroadcastAction();
+	bool CanTrigger() const;
+	UButton* GetClickButton() const;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button;
+
+	UPROPERTY(Transient)
+	FShopActionViewData ActionData;
+
+	bool bActionEnabled = false;
 };

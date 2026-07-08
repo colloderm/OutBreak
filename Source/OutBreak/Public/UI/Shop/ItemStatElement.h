@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "UI/Shop/ShopWidgetTypes.h"
 #include "ItemStatElement.generated.h"
 
 
@@ -20,6 +21,12 @@ class OUTBREAK_API UItemStatElement : public UUserWidget
 
 	
 public:
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void SetStatData(const FShopItemStatViewData& InData);
+
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	void ClearStatData();
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_StatLabel;
 
