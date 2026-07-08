@@ -6,8 +6,6 @@
 #include "GameFramework/Actor.h"
 #include "OBExpeditionSpawnZone.generated.h"
 
-class UBillboardComponent;
-
 /**
  * 파티 스폰 지점(존). 레벨에 여러 개 배치하고 서로 멀리 떨어뜨린다(3~5분 도보).
  * - 세션 시작 시 GameMode가 파티별로 랜덤 배정.
@@ -32,9 +30,4 @@ protected:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<USceneComponent> Root;
 	
-#if WITH_EDITORONLY_DATA
-	// 에디터 뷰포트에서 존 위치를 눈으로 식별하기 위한 아이콘(런타임 영향 없음)
-	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UBillboardComponent> Billboard;
-#endif
 };

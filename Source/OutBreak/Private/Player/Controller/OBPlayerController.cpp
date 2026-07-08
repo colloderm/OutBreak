@@ -32,6 +32,12 @@ void AOBPlayerController::BeginPlay()
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, InputMappingPriority);
 		}
+		
+		if (IsLocalController() && ExtractionProgressWidgetClass)
+		{
+			UUserWidget* W = CreateWidget<UUserWidget>(this, ExtractionProgressWidgetClass);
+			if (W) { W->AddToViewport(10); } // 상시 존재, Visibility 바인딩이 알아서 숨김
+		}
 	}
 	
 	// GameInstance에 저장된 Loadout을 서버로 push(비seamless travel이라 PS가 새로 생성되므로 필요).
@@ -44,12 +50,22 @@ void AOBPlayerController::BeginPlay()
 			{
 				Server_ApplyLoadout(Classes);
 			}
-			
 		}
 		
 		if (UOBPartySubsystem* Party = GI->GetSubsystem<UOBPartySubsystem>())
+		{
 			Server_SetPartyLeader(Party->IsLocalLeader());
+		}
 	}
+	
+	BindToExpeditionStatus();
+}
+
+void AOBPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	BindToExpeditionStatus();
 }
 
 void AOBPlayerController::ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale)
@@ -265,6 +281,84 @@ void AOBPlayerController::Input_Interact()
 {
 	if (AOBInteractableActor* Target = CurrentInteractable.Get())
 		Target->Interact(this);
+}
+
+void AOBPlayerController::BindToExpeditionStatus()
+{
+	if (bExpeditionStatusBound) return;
+	
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	if (!PS) return; // 아직 PS 없음 → OnRep_PlayerState에서 재시도됨
+	
+	// 비다이나믹 멀티캐스트 → AddUObject 바인딩.
+	PS->OnExpeditionStatusChanged.AddUObject(this, &AOBPlayerController::HandleExpeditionStatusChanged);
+	bExpeditionStatusBound = true;
+	
+	HandleExpeditionStatusChanged(); // 바인딩 시점 현재 상태 1회 동기화
+}
+
+void AOBPlayerController::HandleExpeditionStatusChanged()
+{
+	if (!IsLocalController()) return; // 화면 연출은 소유 클라에서만
+	
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	if (!PS) return;
+
+	switch (PS->GetExpeditionStatus())
+	{
+	case EOBPlayerExpeditionStatus::Dead:
+		ShowDeathScreen();
+		break;
+	case EOBPlayerExpeditionStatus::Extracted:
+		ShowExtractScreen();   // 사망화면과 동일 패턴, 위젯만 다름
+		break;
+	default:
+		HideDeathScreen(); // 현재는 리스폰 없음(Alive 복귀 시 대비)
+		break;
+	}
+}
+
+void AOBPlayerController::ShowDeathScreen()
+{
+	if (ActiveDeathWidget) return; // 이미 표시 중
+	
+	DisableInput(this); // 로컬 이동/사격 에측 차단(서버는 이미 차단)
+	
+	if (DeathScreenWidgetClass)
+	{
+		ActiveDeathWidget = CreateWidget<UUserWidget>(this, DeathScreenWidgetClass);
+		if (ActiveDeathWidget)
+		{
+			ActiveDeathWidget->AddToViewport(50); // HUD 위에
+		}
+	}
+}
+
+void AOBPlayerController::ShowExtractScreen()
+{
+	if (ActiveDeathWidget) return;
+	
+	DisableInput(this);
+	
+	if (ExtractScreenWidgetClass)
+	{
+		ActiveDeathWidget = CreateWidget<UUserWidget>(this, ExtractScreenWidgetClass);
+		if (ActiveDeathWidget)
+		{
+			ActiveDeathWidget->AddToViewport(50);
+		}
+	}
+}
+
+void AOBPlayerController::HideDeathScreen()
+{
+	if (ActiveDeathWidget)
+	{
+		ActiveDeathWidget->RemoveFromParent();
+		ActiveDeathWidget = nullptr;
+	}
+	
+	EnableInput(this);
 }
 
 void AOBPlayerController::SetCurrentInteractable(AOBInteractableActor* Interactable)

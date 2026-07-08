@@ -42,6 +42,11 @@ public:
 	void SetExpeditionStatus(EOBPlayerExpeditionStatus NewStatus);
 	void SetTeamId(uint8 NewTeamId);
 	
+	float GetExtractionProgress() const { return ExtractionProgress; }
+	bool IsExtracting() const { return bIsExtracting; }
+	// 서버: 탈출 진행도 갱신(ExtractionZone이 매 틱 호출).
+	void SetExtractionProgress(float InProgress01, bool bInExtracting);
+	
 	bool IsPartyLeader() const { return bIsPartyLeader; }
 	void SetPartyLeader(bool bInLeader);
 	
@@ -57,6 +62,10 @@ public:
 	DECLARE_MULTICAST_DELEGATE(FOBOnExpeditionStatusChanged);
 	FOBOnExpeditionStatusChanged OnExpeditionStatusChanged;
 	
+	// HUD 탈출 진행바 갱신.
+	DECLARE_MULTICAST_DELEGATE(FOBOnExtractionProgressChanged);
+	FOBOnExtractionProgressChanged OnExtractionProgressChanged;
+	
 protected:
 	UFUNCTION() 
 	void OnRep_SelectedWeapons();
@@ -66,6 +75,9 @@ protected:
 	
 	UFUNCTION() 
 	void OnRep_ExpeditionStatus();
+	
+	UFUNCTION()
+	void OnRep_ExtractionProgress();
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ability", Meta = (AllowPrivateAccess = "true"))
@@ -86,6 +98,14 @@ protected:
 	// 솔로=고유값 / 파티=공유값. GameMode가 진입 시 부여.
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
 	uint8 TeamId = 0;
+	
+	// 탈출 진행도(0~1). 소유 클라에만 복제(HUD용).
+	UPROPERTY(ReplicatedUsing = OnRep_ExtractionProgress, BlueprintReadOnly, Category = "Expedition")
+	float ExtractionProgress = 0.f;
+
+	// 현재 탈출 홀드 중인지(HUD 표시 토글). 소유 클라에만 복제.
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	bool bIsExtracting = false;
 	
 	// 솔로=true(자기 자신이 리더). 파티 시 팀장만 true → "탐사 시작" 버튼 게이팅.
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Party")

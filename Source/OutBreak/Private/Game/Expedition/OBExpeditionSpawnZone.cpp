@@ -4,7 +4,6 @@
 #include "Game/Expedition/OBExpeditionSpawnZone.h"
 
 #include "NavigationSystem.h"
-#include "Components/BillboardComponent.h"
 
 
 AOBExpeditionSpawnZone::AOBExpeditionSpawnZone()
@@ -13,11 +12,6 @@ AOBExpeditionSpawnZone::AOBExpeditionSpawnZone()
 	
 	Root = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	SetRootComponent(Root);
-	
-#if WITH_EDITORONLY_DATA
-	Billboard = CreateDefaultSubobject<UBillboardComponent>(TEXT("Billboard"));
-	Billboard->SetupAttachment(Root);
-#endif
 }
 
 FTransform AOBExpeditionSpawnZone::GetScatteredSpawnTransform() const

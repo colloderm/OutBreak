@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "GameplayTagContainer.h"
 #include "OBGrenadeProjectile.generated.h"
 
 class USphereComponent;
@@ -33,7 +32,7 @@ protected:
 	void Explode();
 
 	// 폭발 연출(모든 머신). BP에서 VFX/SFX 구현.
-	UFUNCTION(NetMulticast, Unreliable)
+	UFUNCTION(NetMulticast, Reliable)
 	void Multicast_OnExploded(FVector Location);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Grenade")

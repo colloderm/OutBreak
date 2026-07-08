@@ -33,6 +33,8 @@ void AOBPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AOBPlayerStateBase, ExpeditionStatus);
 	DOREPLIFETIME(AOBPlayerStateBase, TeamId);
 	DOREPLIFETIME(AOBPlayerStateBase, bIsPartyLeader);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, ExtractionProgress, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, bIsExtracting,      COND_OwnerOnly);
 }
 
 void AOBPlayerStateBase::SetWeaponForSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
@@ -78,6 +80,15 @@ void AOBPlayerStateBase::SetTeamId(uint8 NewTeamId)
 	TeamId = NewTeamId;
 }
 
+void AOBPlayerStateBase::SetExtractionProgress(float InProgress01, bool bInExtracting)
+{
+	if (!HasAuthority()) return;
+
+	ExtractionProgress = InProgress01;
+	bIsExtracting = bInExtracting;
+	OnExtractionProgressChanged.Broadcast(); // 리슨 호스트 로컬 즉시 갱신
+}
+
 void AOBPlayerStateBase::SetPartyLeader(bool bInLeader)
 {
 	if (!HasAuthority()) return;
@@ -107,6 +118,11 @@ void AOBPlayerStateBase::OnRep_Ready()
 void AOBPlayerStateBase::OnRep_ExpeditionStatus()
 {
 	OnExpeditionStatusChanged.Broadcast();
+}
+
+void AOBPlayerStateBase::OnRep_ExtractionProgress()
+{
+	OnExtractionProgressChanged.Broadcast(); // 클라 HUD 갱신
 }
 
 void AOBPlayerStateBase::CopyProperties(APlayerState* NewPlayerState)

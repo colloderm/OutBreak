@@ -31,6 +31,9 @@ public:
 	// - 실제 "사망 상태 마킹(Dead) + 종료판정"은 Step 4에서 이 안에 채운다.
 	virtual void RequestRespawn(AController* Controller, APawn* DeadPawn) override;
 	
+	// 탈출 성공 처리(ExtractionZone이 호출). 상태=Extracted + 폰 정리 + 종료판정.
+	void NotifyPlayerExtracted(AController* Controller);
+	
 	// 팀별 존 배정에 따라 시작지점을 고른다.
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	// 존이면 반경 내 랜덤 위치로 스폰(파티원 산개).

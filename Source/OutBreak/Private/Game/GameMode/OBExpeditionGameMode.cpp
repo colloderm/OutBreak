@@ -8,6 +8,7 @@
 #include "Game/Expedition/OBExpeditionSpawnZone.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "GameFramework/GameSession.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "Kismet/GameplayStatics.h"
@@ -279,5 +280,33 @@ void AOBExpeditionGameMode::RequestRespawn(AController* Controller, APawn* DeadP
 	// (관전/시체 정리는 Step 6/8에서 결정 — 여기선 그대로 둔다)
 
 	// 살아있는(또는 다운) 플레이어가 남았는지 재평가 → 없으면 세션 종료.
+	CheckEndConditions();
+}
+
+void AOBExpeditionGameMode::NotifyPlayerExtracted(AController* Controller)
+{
+	if (!Controller) return;
+
+	AOBPlayerStateBase* PS = Controller->GetPlayerState<AOBPlayerStateBase>();
+	// 살아있는 플레이어만 탈출 가능(중복/사망자 무효 처리).
+	if (!PS || PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive) return;
+
+	PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Extracted);
+	PS->SetExtractionProgress(0.f, false);
+
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] Player extracted: %s"), *PS->GetPlayerName());
+
+	// 탈출한 폰은 월드에서 제거(관전/결과는 Step 8). 충돌·표시·이동 정리.
+	if (APawn* Pawn = Controller->GetPawn())
+	{
+		Pawn->SetActorHiddenInGame(true);
+		Pawn->SetActorEnableCollision(false);
+		if (UPawnMovementComponent* Move = Pawn->GetMovementComponent())
+		{
+			Move->StopMovementImmediately();
+		}
+	}
+
+	// 남은 인원 재평가 → 전원 Extracted/Dead면 세션 종료.
 	CheckEndConditions();
 }

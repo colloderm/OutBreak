@@ -54,6 +54,9 @@ protected:
 	virtual void BeginPlay() override;
 	//~ End interface
 	
+	// 클라: PlayerState가 복제되어 들어온 시점 → 사망상태 구독.
+	virtual void OnRep_PlayerState() override;
+	
 	void Input_Move(const FInputActionValue& Value);
 	void Input_Look(const FInputActionValue& Value);
 	void Input_JumpStarted();
@@ -71,6 +74,13 @@ protected:
 	virtual void AcknowledgePossession(APawn* P) override;
 	
 	void Input_Interact();
+	
+	//~ Expedition 사망 피드백 ---------------------------------
+	void BindToExpeditionStatus();          // 로컬 PS 상태변경 구독(중복가드)
+	void HandleExpeditionStatusChanged();   // 상태 → 화면 처리
+	void ShowDeathScreen();
+	void ShowExtractScreen();
+	void HideDeathScreen();
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -100,6 +110,23 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> InteractAction;
+	
+	// 사망 시 띄울 위젯(WBP_DeathScreen). 미지정이면 입력잠금만 수행.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	TSubclassOf<UUserWidget> DeathScreenWidgetClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	TSubclassOf<UUserWidget> ExtractScreenWidgetClass;
+	
+	UPROPERTY(EditDefaultsOnly, Category="Expedition") 
+	TSubclassOf<UUserWidget> ExtractionProgressWidgetClass;
+
+	// 현재 떠 있는 사망 위젯(중복 방지/제거).
+	UPROPERTY()
+	TObjectPtr<UUserWidget> ActiveDeathWidget;
+
+	// PS 델리게이트 중복 바인딩 방지 플래그.
+	bool bExpeditionStatusBound = false;
 	
 public:
 	UFUNCTION(Server, Reliable) 
