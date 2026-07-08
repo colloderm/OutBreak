@@ -6,6 +6,7 @@
 #include "OBGameModeBase.h"
 #include "OBExpeditionGameMode.generated.h"
 
+class AOBExtractionZone;
 class UOBExpeditionMapCatalog;
 class AOBExpeditionSpawnZone;
 class UOBExpeditionMapData;
@@ -17,6 +18,16 @@ enum class EOBExpeditionEndReason : uint8
 {
 	TimedOut,     // 제한시간 초과
 	AllResolved   // 살아있는 플레이어가 없음(전원 탈출 or 전멸)
+};
+
+// 개인 탈출구 배열 래퍼(UHT는 TMap 값에 TArray를 직접 못 씀 → struct로 감쌈).
+USTRUCT()
+struct FOBPersonalZoneList
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<TObjectPtr<AOBExtractionZone>> Zones;
 };
 
 UCLASS()
@@ -77,6 +88,11 @@ protected:
 
 	// 현재 맵에 해당하는 MapData(StartPlay에서 1회 결정).
 	UOBExpeditionMapData* ResolveMapData();
+	
+	//~ 개인 탈출구(스폰 기준 원거리 + 주변 좌우, 팀 분산, 세션 랜덤) ----------
+	void CollectPersonalExtractPoints();                                   // 태그 마커 수집
+	void AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin); // 스폰 확정 후 배정
+	TArray<AActor*> SelectPersonalMarkers(const FVector& SpawnOrigin, uint8 TeamId); // 선정 알고리즘
 
 protected:
 	// 이 맵의 세션 설정(정원/시간). 맵별 GameMode BP에서 해당 맵의 MapData 에셋을 지정.
@@ -97,13 +113,41 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
 	bool bUseSharedTeam = true;
 	
+	// 단일 GameMode로 여러 맵을 쓰기 위한 카탈로그. 현재 레벨과 매칭해 MapData 결정.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	TObjectPtr<UOBExpeditionMapCatalog> MapCatalog;
+	
 	// 존 간 최소 이격(cm). 미달 시 경고 로그. ~1000m(도보 약 3분).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Spawn")
 	float MinZoneSeparation = 100000.f;
 	
-	// 단일 GameMode로 여러 맵을 쓰기 위한 카탈로그. 현재 레벨과 매칭해 MapData 결정.
-	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
-	TObjectPtr<UOBExpeditionMapCatalog> MapCatalog;
+	// 개인 탈출구로 스폰할 클래스(BP_ExtractionZone_Personal 지정).
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction")
+	TSubclassOf<AOBExtractionZone> PersonalExtractClass;
+	
+	// 스폰에서 이 거리(cm) 이상 떨어진 마커만 '먼 후보'로 취급.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction", meta = (ClampMin = "0"))
+	float MinSpawnDistance = 60000.f;
+
+	// 먼 후보 상위 N개 중 랜덤으로 중심 선정(세션 다양성).
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction", meta = (ClampMin = "1"))
+	int32 FarPoolSize = 4;
+
+	// 중심 주변 좌/우 탐색 반경(cm).
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction", meta = (ClampMin = "0"))
+	float NeighborRadius = 20000.f;
+
+	// 좌/우 인정 최소 측면 오프셋(cm). 이보다 옆으로 벗어나야 좌/우로 분류.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction", meta = (ClampMin = "0"))
+	float SideMinOffset = 500.f;
+
+	// 좌우 탈출구 생성 여부.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction")
+	bool bAssignSideExtracts = true;
+
+	// 디버그: 스폰→개인탈출 라인/구체 그리기(서버).
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction")
+	bool bDrawDebugPersonalExtract = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UOBExpeditionMapData> ActiveMapData;
@@ -122,4 +166,18 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AOBExpeditionSpawnZone>> AvailableZones; // 아직 배정 안 된 존
 	TMap<uint8, TObjectPtr<AOBExpeditionSpawnZone>> TeamZones; // 팀ID → 배정된 존
+	
+	bool bPersonalPointsCollected = false;
+
+	// 레벨의 개인 탈출 후보 마커 전체(소비 안 함 — 플레이어별 독립 선정).
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AActor>> PersonalExtractPoints;
+
+	// 컨트롤러 → 그 플레이어의 개인 탈출구들(정리용).
+	UPROPERTY(Transient)
+	TMap<TObjectPtr<AController>, FOBPersonalZoneList> PersonalZones;
+
+	// 팀ID → 이미 소비한 '중심' 마커(팀원끼리 다른 지역 강제).
+	// (중첩 컨테이너라 UPROPERTY 불가. 마커는 레벨 액터라 GC 안전)
+	TMap<uint8, TSet<TObjectPtr<AActor>>> TeamUsedCenters;
 };

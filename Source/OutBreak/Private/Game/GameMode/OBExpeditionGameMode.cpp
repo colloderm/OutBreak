@@ -3,14 +3,18 @@
 #include "Game/GameMode/OBExpeditionGameMode.h"
 
 #include "EngineUtils.h"
+#include "NavigationSystem.h"
+#include "Engine/TargetPoint.h"
 #include "Game/Expedition/OBExpeditionMapCatalog.h"
 #include "Game/Expedition/OBExpeditionMapData.h"
 #include "Game/Expedition/OBExpeditionSpawnZone.h"
+#include "Game/Expedition/OBExtractionZone.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "GameFramework/GameSession.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "GameFramework/PlayerState.h"
+#include "DrawDebugHelpers.h"
 #include "Kismet/GameplayStatics.h"
 
 AOBExpeditionGameMode::AOBExpeditionGameMode()
@@ -114,6 +118,12 @@ AActor* AOBExpeditionGameMode::ChoosePlayerStart_Implementation(AController* Pla
 
 void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, AActor* StartSpot)
 {
+	// [개인 탈출] 스폰 지점(존)이 확정된 지금 시점에 스폰기준 배정.
+	if (NewPlayer && StartSpot)
+	{
+		AssignPersonalExtractsFor(NewPlayer, StartSpot->GetActorLocation());
+	}
+
 	// 시작지점이 존이면 반경 내 랜덤(네비 투영) 트랜스폼으로 스폰 -> 파티원 산개
 	if (AOBExpeditionSpawnZone* Zone = Cast<AOBExpeditionSpawnZone>(StartSpot))
 	{
@@ -130,6 +140,15 @@ void AOBExpeditionGameMode::Logout(AController* Exiting)
 	
 	// 남은 인원 기준으로 종료 여부 재평가.
 	CheckEndConditions();
+	
+	if (FOBPersonalZoneList* Zones = PersonalZones.Find(Exiting))
+	{
+		for (const TObjectPtr<AOBExtractionZone>& Z : Zones->Zones)
+		{
+			if (Z) Z->Destroy();
+		}
+		PersonalZones.Remove(Exiting);
+	}
 }
 
 void AOBExpeditionGameMode::ValidateZoneSeparation() const
@@ -260,6 +279,177 @@ UOBExpeditionMapData* AOBExpeditionGameMode::ResolveMapData()
 	}
 	
 	return nullptr;
+}
+
+void AOBExpeditionGameMode::CollectPersonalExtractPoints()
+{
+	PersonalExtractPoints.Reset();
+	
+	// 레벨에 배치된 TargetPoint 중 Actor Tag "PersonalExtract" 인 것만 수집
+	for (TActorIterator<ATargetPoint> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("PersonalExtract")))
+		{
+			PersonalExtractPoints.Add(*It);
+		}
+	}
+	
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] PersonalExtractPoints = %d"), PersonalExtractPoints.Num());
+}
+
+TArray<AActor*> AOBExpeditionGameMode::SelectPersonalMarkers(const FVector& SpawnOrigin, uint8 TeamId)
+{
+	TArray<AActor*> Result;
+	if (PersonalExtractPoints.Num() == 0) return Result; // 탈출구 없으면 반환
+	
+	// 1. 먼거리 필터(직선 XY) 없으면 완화(전체)
+	TArray<AActor*> Candidates;
+	for (const TObjectPtr<AActor>& M : PersonalExtractPoints)
+	{
+		// 스폰 위치에서 충분히 먼 탈출구만 후보로 선택 (기준 거리 이상인 경우 탈출구 후보에 포함)
+		if (M && FVector::Dist2D(SpawnOrigin, M->GetActorLocation()) >= MinSpawnDistance)
+		{
+			Candidates.Add(M);
+		}
+	}
+	// 조건에 만족하는 후보가 없으면 전체를 후보로 사용
+	if (Candidates.Num() == 0)
+	{
+		for (const TObjectPtr<AActor>& M : PersonalExtractPoints)
+		{
+			if (M)
+			{
+				Candidates.Add(M);
+			}
+		}
+	}
+	if (Candidates.Num() == 0) return Result;
+	
+	// 2. 먼 순 정렬.
+	Candidates.Sort([&SpawnOrigin](const AActor& L, const AActor& R)
+	{
+		return FVector::Dist2D(SpawnOrigin, L.GetActorLocation()) > FVector::Dist2D(SpawnOrigin, R.GetActorLocation());
+	});
+	
+	// 3. 상위 FarPool 중, 팀이 아직 안 쓴 중심을 랜덤 선정
+	const int32 PoolN = FMath::Clamp(FarPoolSize, 1, Candidates.Num());
+	TArray<AActor*> FarPool(Candidates.GetData(), PoolN);
+	
+	// 같은 팀이 이전에 사용한 중심 탈출구 제외
+	TSet<TObjectPtr<AActor>>& Used = TeamUsedCenters.FindOrAdd(TeamId);
+	TArray<AActor*> Fresh;
+	for (AActor* M : FarPool)
+	{
+		if (!Used.Contains(M))
+		{
+			Fresh.Add(M);
+		}
+	}
+	
+	TArray<AActor*>& CenterPool = (Fresh.Num() > 0) ? Fresh : FarPool; // 새로운 탈출구 후보가 고갈 시 선택
+	if (Fresh.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Expedition] Team %d 개인탈출 중심풀 고갈 → 중복 허용 폴백"), TeamId);		
+	}
+	
+	AActor* Center = CenterPool[FMath::RandRange(0, CenterPool.Num() - 1)];
+	Used.Add(Center);
+	Result.Add(Center);
+	
+	// 4~5 중심 주변 좌/우 각각 랜덤 1개.
+	if (bAssignSideExtracts)
+	{
+		const FVector Dir = (Center->GetActorLocation() - SpawnOrigin).GetSafeNormal2D();
+		const FVector Right = FVector::CrossProduct(FVector::UpVector, Dir).GetSafeNormal(); // Up*Fwd = Right (외적)
+		
+		TArray<AActor*> LeftCands, RightCands;
+		for (AActor* M : Candidates)
+		{
+			if (M == Center) continue;
+			const FVector Off = M->GetActorLocation() - Center->GetActorLocation();
+			if (Off.Size2D() > NeighborRadius) continue; // 중심 '주변'만
+			
+			const float Side = FVector::DotProduct(Off, Right); // + 우 / - 좌 (내적)
+			if (Side > SideMinOffset)
+				RightCands.Add(M);
+			else if (Side < -SideMinOffset)
+				LeftCands.Add(M);
+		}
+		
+		if (LeftCands.Num() > 0)
+			Result.Add(LeftCands[FMath::RandRange(0, LeftCands.Num() - 1)]);
+		if (RightCands.Num() > 0)
+			Result.Add(RightCands[FMath::RandRange(0, RightCands.Num() - 1)]);
+	}
+	
+	return Result;
+}
+
+void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin)
+{
+	if (!C || !PersonalExtractClass) return;
+	if (PersonalZones.Contains(C)) return; // 1회만
+	
+	if (!bPersonalPointsCollected)
+	{
+		CollectPersonalExtractPoints();
+		bPersonalPointsCollected = true;
+	}
+	if (PersonalExtractPoints.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Expedition] 개인 탈출 마커 없음 → %s 미배정"), *C->GetName());
+		return;
+	}
+	
+	const AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>();
+	const uint8 TeamId = PS ? PS->GetTeamId() : 0;
+	
+	TArray<AActor*> Markers = SelectPersonalMarkers(SpawnOrigin, TeamId);
+	
+	// 맵별 활성창(없으면 폴백 0~600)
+	const int32 StartSec = ActiveMapData ? ActiveMapData->PersonalActiveStartSec : 0;
+	const int32 EndSec = ActiveMapData ? ActiveMapData->PersonalActiveEndSec : 600;
+	
+	TArray<TObjectPtr<AOBExtractionZone>>& Zones = PersonalZones.FindOrAdd(C).Zones;
+	UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
+	
+	for (AActor* M : Markers)
+	{
+		if (!M) continue;
+		
+		// 네비 위로 스냅(도달 가능 위치 보장)
+		FVector Loc = M->GetActorLocation();
+		if (Nav)
+		{
+			FNavLocation Projected;
+			if (Nav->ProjectPointToNavigation(Loc, Projected, FVector(500.f)))
+			{
+				Loc = Projected.Location;
+			}
+		}
+		const FTransform T(M->GetActorRotation(), Loc);
+		
+		// 지연 스폰 -> owner-only + 활성창 설정 후 FinishSpawning.
+		AOBExtractionZone* Zone = GetWorld()->SpawnActorDeferred<AOBExtractionZone>(
+			PersonalExtractClass, T, /*Owner*/nullptr, /*Instigator*/nullptr,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+		if (!Zone) continue;
+		
+		Zone->ConfigureAsPersonal(C);				// 소유 클라에만 복제(본인만 보임)
+		Zone->SetActiveWindow(StartSec, EndSec);	// 맵 별 활성창
+		UGameplayStatics::FinishSpawningActor(Zone, T);
+		
+		Zones.Add(Zone);
+#if ENABLE_DRAW_DEBUG
+		if (bDrawDebugPersonalExtract)
+		{
+			DrawDebugLine(GetWorld(), SpawnOrigin, Loc, FColor::Cyan, false, 30.f, 0, 20.f);
+			DrawDebugSphere(GetWorld(), Loc, 200.f, 12, FColor::Cyan, false, 30.f, 0, 10.f);
+		}
+#endif
+	}
+	
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] %s(Team %d) 개인탈출 %d개 배정"), *C->GetName(), TeamId, Zones.Num());
 }
 
 void AOBExpeditionGameMode::RequestRespawn(AController* Controller, APawn* DeadPawn)

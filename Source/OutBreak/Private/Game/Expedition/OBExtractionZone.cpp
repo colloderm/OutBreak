@@ -26,6 +26,20 @@ AOBExtractionZone::AOBExtractionZone()
 	bReplicates = false; // 판정은 서버 전용, 결과는 PlayerState로 복제
 }
 
+void AOBExtractionZone::ConfigureAsPersonal(AController* InOwner)
+{
+	// 소유 클라에만 복제 → 본인만 위치/메시가 보임(팀원도 안 보임).
+	SetReplicates(true);
+	bOnlyRelevantToOwner = true;
+	SetOwner(InOwner);
+}
+
+void AOBExtractionZone::SetActiveWindow(int32 InStartSec, int32 InEndSec)
+{
+	ActiveStartSec = InStartSec;
+	ActiveEndSec = InEndSec;
+}
+
 // Called when the game starts or when spawned
 void AOBExtractionZone::BeginPlay()
 {

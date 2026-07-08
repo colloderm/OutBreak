@@ -48,5 +48,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session|Test")
 	FString TestServerAddress;
 
-	// (이후 확장) 개인 탈출구 마감시간, 필요아이템 태그 등도 여기로 모을 예정.
+	// [개인 탈출] 맵별 개인 탈출구 활성 시작 경과초.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session|Extraction", meta = (ClampMin = "0"))
+	int32 PersonalActiveStartSec = 0;
+
+	// [개인 탈출] 활성 종료 경과초(0=끝까지). 먼 거리 맵일수록 늘려 도달 여유 확보.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session|Extraction", meta = (ClampMin = "0"))
+	int32 PersonalActiveEndSec = 600;
 };
