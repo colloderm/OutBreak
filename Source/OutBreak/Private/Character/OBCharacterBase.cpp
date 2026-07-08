@@ -369,23 +369,29 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 		DefaultAbilitySet->GiveToAbilitySystem(AbilitySystemComponent, nullptr, this);
 	}
 	
-	// 4) 시작 로드아웃 일괄 지급
-	if (PawnData && InventoryComponent)
+	// 4) 로드아웃: 로비 선택 무기 우선, 없으면 PawnData 기본.
+	TArray<TSubclassOf<AOBWeaponBase>> Loadout;
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
 	{
-		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : PawnData->DefaultWeapons)
-		{
-			if (WeaponClass)
-			{
-				InventoryComponent->AddWeapon(WeaponClass);
-			}
-		}
+		Loadout = PS->GetSelectedWeapons();
+	}
+	if (Loadout.Num() == 0 && PawnData)
+	{
+		Loadout = PawnData->DefaultWeapons;
+	}
 
-		for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
+	if (InventoryComponent)
+	{
+		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Loadout)
 		{
-			InventoryComponent->AddItem(Item.Key, Item.Value);
+			if (WeaponClass) InventoryComponent->AddWeapon(WeaponClass);
 		}
-
-		InventoryComponent->EquipDefaultSlot();   // 주무기 우선 장착
+		if (PawnData)
+		{
+			for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
+				InventoryComponent->AddItem(Item.Key, Item.Value);
+		}
+		InventoryComponent->EquipDefaultSlot();
 	}
 }
 

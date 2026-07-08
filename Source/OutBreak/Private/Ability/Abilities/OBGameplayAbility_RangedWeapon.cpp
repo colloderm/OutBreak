@@ -305,9 +305,9 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	}
 	
 	// 발사 반동 몽타주(모든 클라에 복제). 명중 여부와 무관.
-	if (WeaponData->FireMontage)
+	if (WeaponData->AttackMontage)
 	{
-		Character->Multicast_PlayFireMontage(WeaponData->FireMontage);
+		Character->Multicast_PlayFireMontage(WeaponData->AttackMontage);
 	}
 
 	if (!bHit || !Hit.GetActor()) return; // 빗나감: 발사 큐만 재생하고 종료.

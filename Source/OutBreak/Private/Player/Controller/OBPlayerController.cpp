@@ -9,9 +9,15 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
+#include "Blueprint/UserWidget.h"
 #include "LyraInspired/Input/OBInputConfig.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Inventory/Components/OBInventoryComponent.h"
+#include "Player/State/OBPlayerStateBase.h"
+#include "Game/GameMode/OBLobbyGameMode.h"
+#include "Interaction/OBInteractableActor.h"
+#include "LoadOut/OBLoadoutSubsystem.h"
+#include "Party/OBPartySubsystem.h"
 #include "Weapon/Data/OBWeaponData.h"
 
 void AOBPlayerController::BeginPlay()
@@ -26,7 +32,40 @@ void AOBPlayerController::BeginPlay()
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, InputMappingPriority);
 		}
+		
+		if (IsLocalController() && ExtractionProgressWidgetClass)
+		{
+			UUserWidget* W = CreateWidget<UUserWidget>(this, ExtractionProgressWidgetClass);
+			if (W) { W->AddToViewport(10); } // 상시 존재, Visibility 바인딩이 알아서 숨김
+		}
 	}
+	
+	// GameInstance에 저장된 Loadout을 서버로 push(비seamless travel이라 PS가 새로 생성되므로 필요).
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			const TArray<TSubclassOf<AOBWeaponBase>> Classes = Loadout->GetSelectedClasses();
+			if (Classes.Num() > 0)
+			{
+				Server_ApplyLoadout(Classes);
+			}
+		}
+		
+		if (UOBPartySubsystem* Party = GI->GetSubsystem<UOBPartySubsystem>())
+		{
+			Server_SetPartyLeader(Party->IsLocalLeader());
+		}
+	}
+	
+	BindToExpeditionStatus();
+}
+
+void AOBPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	BindToExpeditionStatus();
 }
 
 void AOBPlayerController::ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale)
@@ -130,7 +169,7 @@ void AOBPlayerController::SetupInputComponent()
 	
 	if (SlotPrimaryAction)
 	{
-		EIC->BindAction(SlotPrimaryAction,   ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Primary);
+		EIC->BindAction(SlotPrimaryAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Primary);
 	}
 	
 	if (SlotSecondaryAction)
@@ -140,7 +179,12 @@ void AOBPlayerController::SetupInputComponent()
 	
 	if (SlotMeleeAction)
 	{
-		EIC->BindAction(SlotMeleeAction,     ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Melee);
+		EIC->BindAction(SlotMeleeAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Melee);
+	}
+	
+	if (InteractAction)
+	{
+		EIC->BindAction(InteractAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_Interact);
 	}
 }
 
@@ -219,4 +263,178 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 			Inv->Server_EquipSlot(Slot);  // 클라 → 서버 요청
 		}
 	}
+}
+
+void AOBPlayerController::AcknowledgePossession(APawn* P)
+{
+	Super::AcknowledgePossession(P);
+	
+	if (IsLocalController())
+	{
+		FInputModeGameOnly Mode;
+		SetInputMode(Mode);
+		SetShowMouseCursor(false);
+	}
+}
+
+void AOBPlayerController::Input_Interact()
+{
+	if (AOBInteractableActor* Target = CurrentInteractable.Get())
+		Target->Interact(this);
+}
+
+void AOBPlayerController::BindToExpeditionStatus()
+{
+	if (bExpeditionStatusBound) return;
+	
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	if (!PS) return; // 아직 PS 없음 → OnRep_PlayerState에서 재시도됨
+	
+	// 비다이나믹 멀티캐스트 → AddUObject 바인딩.
+	PS->OnExpeditionStatusChanged.AddUObject(this, &AOBPlayerController::HandleExpeditionStatusChanged);
+	bExpeditionStatusBound = true;
+	
+	HandleExpeditionStatusChanged(); // 바인딩 시점 현재 상태 1회 동기화
+}
+
+void AOBPlayerController::HandleExpeditionStatusChanged()
+{
+	if (!IsLocalController()) return; // 화면 연출은 소유 클라에서만
+	
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	if (!PS) return;
+
+	switch (PS->GetExpeditionStatus())
+	{
+	case EOBPlayerExpeditionStatus::Dead:
+		ShowDeathScreen();
+		break;
+	case EOBPlayerExpeditionStatus::Extracted:
+		ShowExtractScreen();   // 사망화면과 동일 패턴, 위젯만 다름
+		break;
+	default:
+		HideDeathScreen(); // 현재는 리스폰 없음(Alive 복귀 시 대비)
+		break;
+	}
+}
+
+void AOBPlayerController::ShowDeathScreen()
+{
+	if (ActiveDeathWidget) return; // 이미 표시 중
+	
+	DisableInput(this); // 로컬 이동/사격 에측 차단(서버는 이미 차단)
+	
+	if (DeathScreenWidgetClass)
+	{
+		ActiveDeathWidget = CreateWidget<UUserWidget>(this, DeathScreenWidgetClass);
+		if (ActiveDeathWidget)
+		{
+			ActiveDeathWidget->AddToViewport(50); // HUD 위에
+		}
+	}
+}
+
+void AOBPlayerController::ShowExtractScreen()
+{
+	if (ActiveDeathWidget) return;
+	
+	DisableInput(this);
+	
+	if (ExtractScreenWidgetClass)
+	{
+		ActiveDeathWidget = CreateWidget<UUserWidget>(this, ExtractScreenWidgetClass);
+		if (ActiveDeathWidget)
+		{
+			ActiveDeathWidget->AddToViewport(50);
+		}
+	}
+}
+
+void AOBPlayerController::HideDeathScreen()
+{
+	if (ActiveDeathWidget)
+	{
+		ActiveDeathWidget->RemoveFromParent();
+		ActiveDeathWidget = nullptr;
+	}
+	
+	EnableInput(this);
+}
+
+void AOBPlayerController::SetCurrentInteractable(AOBInteractableActor* Interactable)
+{
+	CurrentInteractable = Interactable;
+	// (선택) 여기서 "E 눌러 상호작용" 프롬프트 위젯 토글 가능 — 지금은 생략.
+}
+
+AOBInteractableActor* AOBPlayerController::GetCurrentInteractable() const
+{
+	return CurrentInteractable.Get();
+}
+
+void AOBPlayerController::OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass)
+{
+	if (!IsLocalController() || !WidgetClass || ActiveInteractionWidget) return;
+
+	ActiveInteractionWidget = CreateWidget<UUserWidget>(this, WidgetClass);
+	if (!ActiveInteractionWidget) return;
+	
+	ActiveInteractionWidget->SetIsFocusable(true);
+	ActiveInteractionWidget->AddToViewport();
+
+	FInputModeUIOnly Mode;
+	Mode.SetWidgetToFocus(ActiveInteractionWidget->TakeWidget());
+	SetInputMode(Mode);
+	SetShowMouseCursor(true);
+
+	// 이동/시점 잠금(UI 연 플레이어만 영향).
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
+}
+
+void AOBPlayerController::CloseInteractionWidget()
+{
+	if (ActiveInteractionWidget)
+	{
+		ActiveInteractionWidget->RemoveFromParent();
+		ActiveInteractionWidget = nullptr;
+	}
+
+	FInputModeGameOnly Mode;
+	SetInputMode(Mode);
+	SetShowMouseCursor(false);
+
+	// 잠금 해제(Open의 true와 1:1 균형).
+	SetIgnoreMoveInput(false);
+	SetIgnoreLookInput(false);
+}
+
+void AOBPlayerController::Server_SetPartyLeader_Implementation(bool bLeader)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetPartyLeader(bLeader);
+}
+
+void AOBPlayerController::Server_ApplyLoadout_Implementation(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetSelectedWeaponsBulk(Weapons);
+}
+
+void AOBPlayerController::Server_SetWeaponSlot_Implementation(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetWeaponForSlot(Slot, WeaponClass);
+}
+
+void AOBPlayerController::Server_SetReady_Implementation(bool bReady)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetReady(bReady);
+}
+
+void AOBPlayerController::Server_StartGame_Implementation()
+{
+	if (AOBLobbyGameMode* GM = GetWorld()->GetAuthGameMode<AOBLobbyGameMode>())
+		GM->TryStartGame(this);
 }

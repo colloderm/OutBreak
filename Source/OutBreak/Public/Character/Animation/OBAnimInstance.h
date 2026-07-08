@@ -48,6 +48,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "State", Meta = (AllowPrivateAccess = "true"))
 	bool bIsAiming = false;
 	
+	UPROPERTY(BlueprintReadOnly, Category = "State", Meta = (AllowPrivateAccess = "true"))
+	bool bWeaponReady = false;
+	
 private:
 	// 방향 계산 헬퍼(외부 모듈 의존 회피).
 	float CalculateDirectionAngle(const FVector& Velocity, const FRotator& BaseRotation) const;

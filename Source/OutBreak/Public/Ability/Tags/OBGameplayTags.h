@@ -32,10 +32,13 @@ namespace OBGameplayTags
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Aiming);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Weapon_Switching);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_UsingConsumable);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Melee_Attacking);
 	
 	// 연출(발사 - 총구 화염/사격음, 피격 - 탄착 이펙트/사운드 등).
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Fire);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Impact);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Melee_Swing);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Melee_Impact);
 	
 	// 탄약 타입(인벤토리 탄약 풀의 키). 무기마다 자기 타입을 지정.
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ammo_AssaultRifle);

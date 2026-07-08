@@ -16,24 +16,42 @@ public class OutBreak : ModuleRules
 			"InputCore", 
 			"EnhancedInput",
 			"UMG",
+			"Niagara",
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks",
 			"NavigationSystem",
 			"DeveloperSettings",
-			"AnimationDataController",
-			"AnimationData",
 			"AnimationBudgetAllocator",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
+			
+			"Slate",
+			"SlateCore",
 			"ModelViewViewModel",
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
 			"AIModule",
 			"Navmesh"
 		});
+		
+		if (Target.Type == TargetType.Editor)
+		{
+			PrivateDependencyModuleNames.AddRange(
+				new string[]
+				{
+					"AnimationData",
+					"AnimationDataController"
+				});
+
+			PrivateDefinitions.Add("WITH_OUTBREAK_EDITOR=1");
+		}
+		else
+		{
+			PrivateDefinitions.Add("WITH_OUTBREAK_EDITOR=0");
+		}
 
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });

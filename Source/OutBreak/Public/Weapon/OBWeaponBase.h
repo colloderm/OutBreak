@@ -26,6 +26,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UOBWeaponData* GetWeaponData() const { return WeaponData; }
 	
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
+	
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION(BlueprintPure, Category = "Weapon|Ammo")
