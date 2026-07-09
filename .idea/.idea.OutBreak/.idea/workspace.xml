@@ -21,28 +21,20 @@
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/DefaultGame.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultGame.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_HordeProxyActor.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/DevB/BP_HordeProxyActor.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/DevB/Level_DefenseMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/DevB/Level_DefenseMap.umap" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Home/WBP_HomeHub.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Home/WBP_HomeHub.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ItemListElement.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ItemListElement.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_KeyBindableBtn.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_KeyBindableBtn.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopCategoryElement.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopCategoryElement.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopItemList.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopItemList.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopWindow.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Shop/WBP_ShopWindow.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/KeyBindableBtn.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/KeyBindableBtn.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopCategory.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopCategory.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopCategoryElement.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopCategoryElement.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemInspector.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemInspector.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemList.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopItemList.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopWindow.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopWindow.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopkeeperPortrait.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ShopkeeperPortrait.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/UserCurrency.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/UserCurrency.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopCategory.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopCategory.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopCategoryElement.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopCategoryElement.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemInspector.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemInspector.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemList.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopItemList.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopWindow.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopWindow.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopkeeperPortrait.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ShopkeeperPortrait.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/UserCurrency.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/UserCurrency.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -272,6 +264,7 @@
       <workItem from="1783484334279" duration="974000" />
       <workItem from="1783493801075" duration="7167000" />
       <workItem from="1783510684591" duration="5094000" />
+      <workItem from="1783557022952" duration="4423000" />
     </task>
     <servers />
   </component>

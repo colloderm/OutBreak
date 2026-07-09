@@ -63,9 +63,9 @@ void UShopCategoryElement::SetSelected(bool bInSelected)
 {
 	bSelected = bInSelected;
 
-	if (BG_Category_All_Selected)
+	if (BG_Category_Selected)
 	{
-		BG_Category_All_Selected->SetVisibility(bSelected ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+		BG_Category_Selected->SetVisibility(bSelected ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
 }
 
@@ -101,9 +101,9 @@ void UShopCategoryElement::BroadcastSelected()
 
 UButton* UShopCategoryElement::GetClickButton() const
 {
-	if (BTN_Category_All)
+	if (BTN_Category)
 	{
-		return BTN_Category_All.Get();
+		return BTN_Category.Get();
 	}
 
 	UButton* FoundButton = nullptr;

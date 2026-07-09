@@ -50,10 +50,10 @@ protected:
 	UButton* GetClickButton() const;
 
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UButton> BTN_Category_All;
+	TObjectPtr<UButton> BTN_Category;
 
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UWidget> BG_Category_All_Selected;
+	TObjectPtr<UWidget> BG_Category_Selected;
 
 	UPROPERTY(Transient)
 	FShopCategoryViewData CategoryData;

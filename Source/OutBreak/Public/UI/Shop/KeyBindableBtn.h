@@ -31,10 +31,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Shop")
 	FShopActionTriggeredSignature OnActionTriggered;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidgetOptional))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_BindedKey;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidgetOptional))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (BindWidget))
 	TObjectPtr<UTextBlock> TXT_Action;
 
 	virtual void NativeConstruct() override;
