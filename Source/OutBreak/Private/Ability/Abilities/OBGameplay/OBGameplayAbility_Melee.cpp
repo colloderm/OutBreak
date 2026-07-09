@@ -12,6 +12,7 @@
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "Engine/OverlapResult.h"
+#include "Player/State/OBPlayerStateBase.h"
 
 UOBGameplayAbility_Melee::UOBGameplayAbility_Melee(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -119,8 +120,8 @@ void UOBGameplayAbility_Melee::PerformMeleeTrace()
 		if (!TargetASC || AlreadyHit.Contains(TargetASC)) continue;
 		AlreadyHit.Add(TargetASC);
 
-		// 데미지
-		if (Data->DamageEffect)
+		// 데미지 (같은 팀이면 스킵 → 팀킬 OFF, 임팩트 연출은 아래에서 유지)
+		if (Data->DamageEffect && !AOBPlayerStateBase::AreSameTeam(Char, HitActor))
 		{
 			FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
 			Ctx.AddInstigator(Char, Weapon);

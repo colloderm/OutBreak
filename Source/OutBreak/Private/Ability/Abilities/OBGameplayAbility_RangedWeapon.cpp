@@ -13,6 +13,7 @@
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Player/Controller/OBPlayerController.h"
+#include "Player/State/OBPlayerStateBase.h"
 
 UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -304,6 +305,9 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		ImpactCueParams.PhysicalMaterial = Hit.PhysMaterial;
 		SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Impact, ImpactCueParams);
 	}
+	
+	// 같은 팀이면 무기 피해 무시(탄착 이펙트는 이미 재생됨).
+	if (AOBPlayerStateBase::AreSameTeam(Character, Hit.GetActor())) return;
 
 	// --- 데미지 적용 ---
 	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Hit.GetActor());

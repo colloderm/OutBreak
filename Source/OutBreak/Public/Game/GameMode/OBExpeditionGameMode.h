@@ -143,6 +143,10 @@ protected:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UOBExpeditionMapData> ActiveMapData;
+	
+	// 진입 URL 옵션(?party=<코드>) 파싱을 위해 오버라이드.
+	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId,
+		const FString& Options, const FString& Portal) override;
 
 private:	
 	FTimerHandle SessionTimerHandle;
@@ -172,4 +176,10 @@ private:
 	// 팀ID → 이미 소비한 '중심' 마커(팀원끼리 다른 지역 강제).
 	// (중첩 컨테이너라 UPROPERTY 불가. 마커는 레벨 액터라 GC 안전)
 	TMap<uint8, TSet<TObjectPtr<AActor>>> TeamUsedCenters;
+	
+	// 컨트롤러 → 진입 시 파싱한 파티 코드(?party=).
+	TMap<TObjectPtr<AController>, FString> PartyCodeByController;
+	
+	// 코드(파티/솔로) → 배정된 TeamId. 같은 코드=같은 팀, 새 코드=중복없는 고유 발급.
+	TMap<FString, uint8> PartyTeams;
 };

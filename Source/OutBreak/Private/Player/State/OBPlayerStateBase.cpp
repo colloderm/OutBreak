@@ -105,6 +105,25 @@ void AOBPlayerStateBase::SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeap
 	OnLobbyStateChanged.Broadcast();
 }
 
+bool AOBPlayerStateBase::AreSameTeam(const AActor* A, const AActor* B)
+{
+	auto GetTeam = [](const AActor* Actor, uint8& OutTeam) -> bool 
+	{
+		const APawn* Pawn = Cast<APawn>(Actor);
+		if (!Pawn) return false;
+		if (const AOBPlayerStateBase* PS = Pawn->GetPlayerState<AOBPlayerStateBase>())
+		{
+			OutTeam = PS->GetTeamId();
+			return true;
+		}
+		return false; // 컨트롤러/PS 없음(AI 등) -> 팀 없음
+	};
+	
+	uint8 TA = 0, TB = 0;
+	if (!GetTeam(A,TA) || !GetTeam(B,TB)) return false; // 한쪽이라도 플레이어 아님
+	return TA != 0 && TA == TB; // 0 미배정 제외, 같은 팀만 true
+}
+
 void AOBPlayerStateBase::OnRep_SelectedWeapons()
 {
 	OnLobbyStateChanged.Broadcast();

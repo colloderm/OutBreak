@@ -36,7 +36,12 @@ public:
 
 	EOBMatchmakingState GetState() const { return State; }
 	int32 GetRemainingSeconds() const { return FMath::Max(0, SearchMaxSeconds - ElapsedSeconds); }
+	
+	// 파티 코드 설정(같은 코드끼리 서버에서 같은 팀). 알파=수동/임시, M8=Steam 초대가 지정.
+	UFUNCTION(BlueprintCallable, Category = "Matchmaking")
+	void SetPartyCode(const FString& InCode) { PartyCode = InCode; }
 
+public:
 	FOBMatchStateChanged OnStateChanged;
 	FOBMatchTick OnTick;
 
@@ -61,4 +66,7 @@ private:
 	
 	// 알파 기본 접속 주소(MapData.TestServerAddress가 비었을 때).
 	FString DefaultServerAddress = TEXT("127.0.0.1:7777");
+	
+	// 세션 진입 URL에 실을 파티 코드(?party=). 비어있으면 솔로.
+	FString PartyCode;
 };

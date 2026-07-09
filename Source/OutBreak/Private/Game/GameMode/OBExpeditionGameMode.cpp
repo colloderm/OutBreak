@@ -45,8 +45,34 @@ void AOBExpeditionGameMode::GenericPlayerInitialization(AController* C)
 	// 진입 플레이어의 세션 초기화
 	if (AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>())
 	{
-		// TeamID 부여: 협동이면 전원 1, 개인전이면 고유값
-		const uint8 AssignedTeam = bUseSharedTeam ? 1 : NextTeamId++;
+		// [팀 배정] ?party=<코드> 기반. 같은 코드=같은 팀, 새 코드/솔로=중복없는 고유 팀 발급.
+		const FString* CodePtr = PartyCodeByController.Find(C);
+		FString EffectiveCode = CodePtr ? *CodePtr : FString();
+		
+		// 코드 없음 + 협동모드 = 코드없는 전원을 한 팀으로(레거시 폴백)
+		if (EffectiveCode.IsEmpty() && bUseSharedTeam)
+		{
+			EffectiveCode = TEXT("__SHARED__");
+		}
+		
+		uint8 AssignedTeam;
+		if (!EffectiveCode.IsEmpty())
+		{
+			if (uint8* Existing = PartyTeams.Find(EffectiveCode))
+			{
+				AssignedTeam = *Existing;		// 같은 코드 -> 같은 팀
+			}
+			else
+			{
+				AssignedTeam = NextTeamId++;	// 새 코드 -> 중복없는 고유 팀
+				PartyTeams.Add(EffectiveCode, AssignedTeam);
+			}
+		}
+		else
+		{
+			AssignedTeam = NextTeamId++;		// 솔로(협동 아님) -> 고유 팀
+		}
+		
 		PS->SetTeamId(AssignedTeam);
 		
 		// 세션 시작 시점엔 모두 Alive. (로비에서 넘어온 상태가 남아있을 수 있어 명시적 리셋)
@@ -148,6 +174,7 @@ void AOBExpeditionGameMode::Logout(AController* Exiting)
 			if (Z) Z->Destroy();
 		}
 		PersonalZones.Remove(Exiting);
+		PartyCodeByController.Remove(Exiting);
 	}
 }
 
@@ -406,6 +433,21 @@ TArray<AActor*> AOBExpeditionGameMode::SelectPersonalMarkers(const FVector& Spaw
 	}
 	
 	return Result; // 최대 2개
+}
+
+FString AOBExpeditionGameMode::InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId,
+	const FString& Options, const FString& Portal)
+{
+	const FString Result = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
+	
+	// URL ?party=<코드> 파싱 → 팀 배정(GenericPlayerInitialization)에서 사용.
+	const FString PartyCode = UGameplayStatics::ParseOption(Options, TEXT("party"));
+	if (NewPlayerController)
+	{
+		PartyCodeByController.Add(NewPlayerController, PartyCode);
+	}
+	
+	return Result;
 }
 
 void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin)

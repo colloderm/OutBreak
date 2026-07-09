@@ -53,6 +53,10 @@ public:
 	// 클라가 GameInstance Loadout을 한 번에 밀어넣을 때 사용(세션 진입 시).
 	void SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeaponBase>>& InWeapons);
 	
+	// 프렌들리 파이어 판정: 두 액터가 모두 플레이어이고 같은 팀(TeamId>0)이면 true.
+	// - AI/적(플레이어 아님)은 항상 false → 정상 피해.
+	static bool AreSameTeam(const AActor* A, const AActor* B);
+	
 public:
 	// 로비 UI 갱신.
 	DECLARE_MULTICAST_DELEGATE(FOBOnLobbyStateChanged);
