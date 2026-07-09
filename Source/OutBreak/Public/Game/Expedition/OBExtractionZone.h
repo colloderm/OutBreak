@@ -27,6 +27,10 @@ public:
 	
 	// 활성 시간창 설정. GameMode가 개인 존 스폰 시 맵(MapData)별 값으로 덮어씀.
 	void SetActiveWindow(int32 InStartSec, int32 InEndSec);
+	
+	// 탈출구 활성/비활성 전환 시 호출. BP에서 비콘 이펙트 표시/숨김 구현.
+	UFUNCTION(BlueprintImplementableEvent, Category = "Extraction")
+	void OnExtractionActiveChanged(bool bActive);
 
 protected:
 	virtual void BeginPlay() override;
@@ -47,6 +51,8 @@ protected:
 	bool CanPlayerExtract(AController* C) const;
 
 	AOBExpeditionGameState* GetExpeditionGameState() const;
+	
+	void CheckActiveState(); // 활성창 경계에서 이펙트 토글
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Extraction")
@@ -76,4 +82,7 @@ private:
 	// 서버 전용: 구역 안 컨트롤러 → 누적 홀드(초).
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<AController>, float> HoldProgress;
+	
+	FTimerHandle ActiveCheckTimer;
+	bool bLastActiveState = false;
 };

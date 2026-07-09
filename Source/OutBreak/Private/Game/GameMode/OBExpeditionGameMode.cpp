@@ -212,6 +212,22 @@ void AOBExpeditionGameMode::EndExpedition(EOBExpeditionEndReason Reason)
 
 	if (AOBExpeditionGameState* GS = GetExpeditionGameState())
 	{
+		// 종료 시점에 아직 탈출 못 한 인원(Alive/Downed)은 실패(Dead)로 확정
+		if (GameState)
+		{
+			for (APlayerState* PS : GameState->PlayerArray)
+			{
+				if (AOBPlayerStateBase* OBPS = Cast<AOBPlayerStateBase>(PS))
+				{
+					const EOBPlayerExpeditionStatus S = OBPS->GetExpeditionStatus();
+					if (S == EOBPlayerExpeditionStatus::Alive || S == EOBPlayerExpeditionStatus::Downed)
+					{
+						OBPS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Dead);
+					}
+				}
+			}
+		}
+		
 		GS->SetPhase(EOBExpeditionPhase::Ended);
 	}
 
@@ -325,64 +341,71 @@ TArray<AActor*> AOBExpeditionGameMode::SelectPersonalMarkers(const FVector& Spaw
 	}
 	if (Candidates.Num() == 0) return Result;
 	
-	// 2. 먼 순 정렬.
+	// 2. 먼 순 정렬 → 상위 FarPool(변동 여지).
 	Candidates.Sort([&SpawnOrigin](const AActor& L, const AActor& R)
 	{
 		return FVector::Dist2D(SpawnOrigin, L.GetActorLocation()) > FVector::Dist2D(SpawnOrigin, R.GetActorLocation());
 	});
-	
-	// 3. 상위 FarPool 중, 팀이 아직 안 쓴 중심을 랜덤 선정
 	const int32 PoolN = FMath::Clamp(FarPoolSize, 1, Candidates.Num());
 	TArray<AActor*> FarPool(Candidates.GetData(), PoolN);
 	
 	// 같은 팀이 이전에 사용한 중심 탈출구 제외
 	TSet<TObjectPtr<AActor>>& Used = TeamUsedCenters.FindOrAdd(TeamId);
-	TArray<AActor*> Fresh;
-	for (AActor* M : FarPool)
+	
+	// FarPool 중 팀 미사용 후보(소진 시 중복 허용 완화).
+	auto BuildAvailable = [&](TArray<AActor*>& Out)
 	{
-		if (!Used.Contains(M))
+		Out.Reset();
+		for (AActor* M : FarPool)
+			if (M && !Used.Contains(M)) Out.Add(M);
+		if (Out.Num() == 0)
+			for (AActor* M : FarPool) if (M) Out.Add(M);
+	};
+
+	// --- 1번 탈출구: 팀 미사용 후보 중 랜덤(세션 변동성) ---
+	TArray<AActor*> Avail;
+	BuildAvailable(Avail);
+	if (Avail.Num() == 0) return Result;
+
+	AActor* First = Avail[FMath::RandRange(0, Avail.Num() - 1)];
+	Used.Add(First);
+	Result.Add(First);
+	
+	// --- 2번 탈출구: 1번과 방향각이 충분히 벌어진 후보 중 랜덤 ---
+	const FVector Dir1 = (First->GetActorLocation() - SpawnOrigin).GetSafeNormal2D();
+	const float CosThreshold = FMath::Cos(FMath::DegreesToRadians(MinDirectionAngleDeg));
+	
+	BuildAvailable(Avail); // First가 Used에 반영된 상태로 다시 구성
+	
+	TArray<AActor*> Divergent;
+	for (AActor* M : Avail)
+	{
+		if (M == First) continue;
+		const FVector Dir2 = (M->GetActorLocation() - SpawnOrigin).GetSafeNormal2D();
+		// dot <= cos(임계) ⟺ 두 방향의 각도 >= 임계
+		if (FVector::DotProduct(Dir1, Dir2) <= CosThreshold)
+			Divergent.Add(M);
+	}
+
+	// 방향 조건 만족이 없으면 방향 무시하고 남은 것 중 랜덤(완화)
+	TArray<AActor*>& Pool2 = (Divergent.Num() > 0) ? Divergent : Avail;
+	TArray<AActor*> SecondCands;
+	for (AActor* M : Pool2)
+	{
+		if (M && M != First)
 		{
-			Fresh.Add(M);
+			SecondCands.Add(M);
 		}
 	}
 	
-	TArray<AActor*>& CenterPool = (Fresh.Num() > 0) ? Fresh : FarPool; // 새로운 탈출구 후보가 고갈 시 선택
-	if (Fresh.Num() == 0)
+	if (SecondCands.Num() > 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Expedition] Team %d 개인탈출 중심풀 고갈 → 중복 허용 폴백"), TeamId);		
+		AActor* Second = SecondCands[FMath::RandRange(0, SecondCands.Num() - 1)];
+		Used.Add(Second);
+		Result.Add(Second);
 	}
 	
-	AActor* Center = CenterPool[FMath::RandRange(0, CenterPool.Num() - 1)];
-	Used.Add(Center);
-	Result.Add(Center);
-	
-	// 4~5 중심 주변 좌/우 각각 랜덤 1개.
-	if (bAssignSideExtracts)
-	{
-		const FVector Dir = (Center->GetActorLocation() - SpawnOrigin).GetSafeNormal2D();
-		const FVector Right = FVector::CrossProduct(FVector::UpVector, Dir).GetSafeNormal(); // Up*Fwd = Right (외적)
-		
-		TArray<AActor*> LeftCands, RightCands;
-		for (AActor* M : Candidates)
-		{
-			if (M == Center) continue;
-			const FVector Off = M->GetActorLocation() - Center->GetActorLocation();
-			if (Off.Size2D() > NeighborRadius) continue; // 중심 '주변'만
-			
-			const float Side = FVector::DotProduct(Off, Right); // + 우 / - 좌 (내적)
-			if (Side > SideMinOffset)
-				RightCands.Add(M);
-			else if (Side < -SideMinOffset)
-				LeftCands.Add(M);
-		}
-		
-		if (LeftCands.Num() > 0)
-			Result.Add(LeftCands[FMath::RandRange(0, LeftCands.Num() - 1)]);
-		if (RightCands.Num() > 0)
-			Result.Add(RightCands[FMath::RandRange(0, RightCands.Num() - 1)]);
-	}
-	
-	return Result;
+	return Result; // 최대 2개
 }
 
 void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin)

@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Game/Expedition/OBExpeditionTypes.h"
 #include "OBPlayerController.generated.h"
 
+class UWorld;
 class AOBInteractableActor;
 class UUserWidget;
 class AOBWeaponBase;
@@ -82,6 +84,12 @@ protected:
 	void ShowExtractScreen();
 	void HideDeathScreen();
 	
+	//~ Expedition 세션 종료(결과 → Home 복귀) --------------------
+	void BindToGameStatePhase();   // GameState 준비 대기 후 페이즈 구독
+	UFUNCTION()
+	void HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase);
+	void ShowResultScreen();
+	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
@@ -118,8 +126,28 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
 	TSubclassOf<UUserWidget> ExtractScreenWidgetClass;
 	
-	UPROPERTY(EditDefaultsOnly, Category="Expedition") 
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition") 
 	TSubclassOf<UUserWidget> ExtractionProgressWidgetClass;
+	
+	// 세션 종료 결과 위젯(WBP_ExpeditionResult).
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	TSubclassOf<UUserWidget> ResultWidgetClass;
+
+	// 복귀할 Home 레벨(L_HomeMap).
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	TSoftObjectPtr<UWorld> HomeLevel;
+
+	// 결과창 후 자동 Home 복귀까지 대기(초). 0이면 버튼으로만.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	float AutoReturnSeconds = 10.f;
+
+	// 현재 결과 위젯(중복 방지).
+	UPROPERTY()
+	TObjectPtr<UUserWidget> ActiveResultWidget;
+
+	bool bPhaseBound = false;              // 페이즈 중복 바인딩 방지
+	FTimerHandle PhaseBindRetryTimer;      // GameState 대기 재시도
+	FTimerHandle AutoReturnTimer;          // 자동 복귀
 
 	// 현재 떠 있는 사망 위젯(중복 방지/제거).
 	UPROPERTY()
@@ -153,4 +181,12 @@ public:
 	// 범위 내 상호작용 대상 등록(액터가 호출).
 	void SetCurrentInteractable(AOBInteractableActor* Interactable);
 	AOBInteractableActor* GetCurrentInteractable() const;
+	
+	// 결과창 버튼/자동타이머가 호출 → 데디 종료 후 로컬 Home 로드.
+	UFUNCTION(BlueprintCallable, Category = "Expedition")
+	void ReturnToHome();
+	
+	// 자동 복귀까지 남은 초(올림). 결과창 버튼 텍스트 "복귀하기 (N)"용.
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	int32 GetReturnCountdown() const;
 };

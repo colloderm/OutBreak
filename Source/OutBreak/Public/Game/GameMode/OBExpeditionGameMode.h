@@ -132,18 +132,10 @@ protected:
 	// 먼 후보 상위 N개 중 랜덤으로 중심 선정(세션 다양성).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction", meta = (ClampMin = "1"))
 	int32 FarPoolSize = 4;
-
-	// 중심 주변 좌/우 탐색 반경(cm).
-	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction", meta = (ClampMin = "0"))
-	float NeighborRadius = 20000.f;
-
-	// 좌/우 인정 최소 측면 오프셋(cm). 이보다 옆으로 벗어나야 좌/우로 분류.
-	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction", meta = (ClampMin = "0"))
-	float SideMinOffset = 500.f;
-
-	// 좌우 탈출구 생성 여부.
-	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction")
-	bool bAssignSideExtracts = true;
+	
+	// 두 탈출구 사이 최소 방향각(도, 스폰 기준). 서로 다른 방향으로 벌려 '진짜 루트 선택' 유도.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction", meta = (ClampMin = "0", ClampMax = "180"))
+	float MinDirectionAngleDeg = 60.f;
 
 	// 디버그: 스폰→개인탈출 라인/구체 그리기(서버).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction")

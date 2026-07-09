@@ -15,10 +15,13 @@
 #include "Inventory/Components/OBInventoryComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Game/GameMode/OBLobbyGameMode.h"
+#include "Game/GameState/OBExpeditionGameState.h"
 #include "Interaction/OBInteractableActor.h"
+#include "Kismet/GameplayStatics.h"
 #include "LoadOut/OBLoadoutSubsystem.h"
 #include "Party/OBPartySubsystem.h"
 #include "Weapon/Data/OBWeaponData.h"
+#include "TimerManager.h"
 
 void AOBPlayerController::BeginPlay()
 {
@@ -36,7 +39,13 @@ void AOBPlayerController::BeginPlay()
 		if (IsLocalController() && ExtractionProgressWidgetClass)
 		{
 			UUserWidget* W = CreateWidget<UUserWidget>(this, ExtractionProgressWidgetClass);
-			if (W) { W->AddToViewport(10); } // 상시 존재, Visibility 바인딩이 알아서 숨김
+			// 상시 존재, Visibility 바인딩이 알아서 숨김
+			if (W)
+			{
+				W->AddToViewport(10);
+			}
+			
+			BindToGameStatePhase(); // 세션 종료(결과창)
 		}
 	}
 	
@@ -359,6 +368,85 @@ void AOBPlayerController::HideDeathScreen()
 	}
 	
 	EnableInput(this);
+}
+
+void AOBPlayerController::BindToGameStatePhase()
+{
+	if (bPhaseBound) return;
+	
+	AOBExpeditionGameState* GS = GetWorld() ? GetWorld()->GetGameState<AOBExpeditionGameState>() : nullptr;
+	if (!GS)
+	{
+		// GameState 아직 복제 전 -> 잠시 후 재시도
+		GetWorldTimerManager().SetTimer(PhaseBindRetryTimer, this, &AOBPlayerController::BindToGameStatePhase, 0.25f, false);
+		return;
+	}
+	
+	GS->OnPhaseChanged.AddDynamic(this, &AOBPlayerController::HandleExpeditionPhaseChanged);
+	bPhaseBound = true;
+	
+	// 늦게 붙어 이미 Ended면 즉시 반영
+	if (GS->GetPhase() == EOBExpeditionPhase::Ended)
+	{
+		HandleExpeditionPhaseChanged(EOBExpeditionPhase::Ended);
+	}
+}
+
+void AOBPlayerController::HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase)
+{
+	if (!IsLocalController()) return;
+	if (NewPhase == EOBExpeditionPhase::Ended)
+	{
+		ShowResultScreen();
+	}
+}
+
+void AOBPlayerController::ShowResultScreen()
+{
+	if (ActiveResultWidget) return;
+	
+	HideDeathScreen(); // 사망/탈출 화면 있으면 결과창으로 대체
+	
+	// 입력 잠금 + UI 모드 + 커서
+	DisableInput(this);
+	SetShowMouseCursor(true);
+	SetInputMode(FInputModeUIOnly());
+	
+	if (ResultWidgetClass)
+	{
+		ActiveResultWidget = CreateWidget<UUserWidget>(this, ResultWidgetClass);
+		if (ActiveResultWidget)
+		{
+			ActiveResultWidget->AddToViewport(100); // 최상단
+		}
+	}
+	
+	// 자동 복귀(버튼 안 눌러도)
+	if (AutoReturnSeconds > 0.f)
+	{
+		GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AOBPlayerController::ReturnToHome, AutoReturnSeconds, false);
+	}
+}
+
+void AOBPlayerController::ReturnToHome()
+{
+	GetWorldTimerManager().ClearTimer(AutoReturnTimer);
+	
+	if (HomeLevel.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Expedition] HomeLevel 미지정 → 복귀 불가"));
+		return;
+	}
+	
+	// 데디 접속 종료 후 각 클라가 로컬 Home 로드(개별 복귀).
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, HomeLevel);
+}
+
+int32 AOBPlayerController::GetReturnCountdown() const
+{
+	// 자동복귀 타이머의 남은 시간(비활성이면 -1) → 0 이상 올림값.
+	const float Remaining = GetWorldTimerManager().GetTimerRemaining(AutoReturnTimer);
+	return Remaining > 0.f ? FMath::CeilToInt(Remaining) : 0;
 }
 
 void AOBPlayerController::SetCurrentInteractable(AOBInteractableActor* Interactable)
