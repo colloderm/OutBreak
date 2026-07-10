@@ -5,20 +5,21 @@
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
+#include "OnlineSubsystemNames.h"
 #include "Interfaces/OnlinePresenceInterface.h"
 
 static const FName PARTY_SESSION_NAME(TEXT("OBParty"));
 static const int32 PARTY_MAX = 3;
 
-// 월드 우선, 없으면 기본(Steam) 서브시스템.
-static IOnlineSubsystem* GetOSS(UWorld* World)
+// 소셜(친구/파티/세션)은 항상 Steam 서브시스템을 명시적으로 사용.
+// (기본 서브시스템은 게임 전송용 NULL이므로 Online::GetSubsystem 쓰면 안 됨)
+static IOnlineSubsystem* GetSocialOSS()
 {
-	IOnlineSubsystem* OSS = World ? Online::GetSubsystem(World) : nullptr;
-	return OSS ? OSS : IOnlineSubsystem::Get();
+	return IOnlineSubsystem::Get(STEAM_SUBSYSTEM);
 }
-static IOnlineSessionPtr GetSession(UWorld* World)
+static IOnlineSessionPtr GetSocialSession()
 {
-	IOnlineSubsystem* OSS = GetOSS(World);
+	IOnlineSubsystem* OSS = GetSocialOSS();
 	return OSS ? OSS->GetSessionInterface() : nullptr;
 }
 
@@ -26,7 +27,7 @@ void UOBOnlinePartySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	
-	if (IOnlineSubsystem* OSS = Online::GetSubsystem(GetWorld()))
+	if (IOnlineSubsystem* OSS = GetSocialOSS())
 	{
 		UE_LOG(LogTemp, Log, TEXT("[Online] Subsystem = %s"), *OSS->GetSubsystemName().ToString());
 	}
@@ -35,7 +36,7 @@ void UOBOnlinePartySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 		UE_LOG(LogTemp, Warning, TEXT("[Online] OnlineSubsystem 없음(Steam 미초기화?)"));
 	}
 	
-	if (IOnlineSessionPtr Session = GetSession(GetWorld()))
+	if (IOnlineSessionPtr Session = GetSocialSession())
 	{
 		InviteAcceptedHandle = Session->AddOnSessionUserInviteAcceptedDelegate_Handle(
 			FOnSessionUserInviteAcceptedDelegate::CreateUObject(this, &UOBOnlinePartySubsystem::HandleInviteAccepted));
@@ -44,7 +45,7 @@ void UOBOnlinePartySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 FString UOBOnlinePartySubsystem::GetLocalPlayerName() const
 {
-	if (IOnlineSubsystem* OSS = Online::GetSubsystem(GetWorld()))
+	if (IOnlineSubsystem* OSS = GetSocialOSS())
 	{
 		if (IOnlineIdentityPtr Identity = OSS->GetIdentityInterface())
 		{
@@ -57,7 +58,7 @@ FString UOBOnlinePartySubsystem::GetLocalPlayerName() const
 
 void UOBOnlinePartySubsystem::ReadFriends()
 {
-	IOnlineSubsystem* OSS = Online::GetSubsystem(GetWorld());
+	IOnlineSubsystem* OSS = GetSocialOSS();
 	if (!OSS) return;
 	
 	IOnlineFriendsPtr Friends = OSS->GetFriendsInterface();
@@ -71,7 +72,7 @@ void UOBOnlinePartySubsystem::ReadFriends()
 
 void UOBOnlinePartySubsystem::Deinitialize()
 {
-	if (IOnlineSessionPtr Session = GetSession(GetWorld()))
+	if (IOnlineSessionPtr Session = GetSocialSession())
 	{
 		Session->ClearOnSessionUserInviteAcceptedDelegate_Handle(InviteAcceptedHandle);
 	}
@@ -81,7 +82,7 @@ void UOBOnlinePartySubsystem::Deinitialize()
 
 void UOBOnlinePartySubsystem::CreateParty()
 {
-	IOnlineSessionPtr Session = GetSession(GetWorld());
+	IOnlineSessionPtr Session = GetSocialSession();
 	if (!Session.IsValid()) return;
 
 	if (Session->GetNamedSession(PARTY_SESSION_NAME)) return; // 이미 있음
@@ -105,7 +106,7 @@ void UOBOnlinePartySubsystem::CreateParty()
 
 void UOBOnlinePartySubsystem::HandleCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
-	if (IOnlineSessionPtr Session = GetSession(GetWorld()))
+	if (IOnlineSessionPtr Session = GetSocialSession())
 		Session->ClearOnCreateSessionCompleteDelegate_Handle(CreateHandle);
 
 	if (bWasSuccessful)
@@ -131,7 +132,7 @@ void UOBOnlinePartySubsystem::HandleCreateSessionComplete(FName SessionName, boo
 
 void UOBOnlinePartySubsystem::InviteFriend(const FString& UserId)
 {
-	IOnlineSessionPtr Session = GetSession(GetWorld());
+	IOnlineSessionPtr Session = GetSocialSession();
 	if (!Session.IsValid()) return;
 
 	// 파티 없으면 먼저 생성하고, 생성 완료 후 이 초대를 전송.
@@ -142,7 +143,7 @@ void UOBOnlinePartySubsystem::InviteFriend(const FString& UserId)
 		return;
 	}
 
-	IOnlineIdentityPtr Identity = GetOSS(GetWorld())->GetIdentityInterface();
+	IOnlineIdentityPtr Identity = GetSocialOSS()->GetIdentityInterface();
 	TSharedPtr<const FUniqueNetId> FriendId = Identity.IsValid() ? Identity->CreateUniquePlayerId(UserId) : nullptr;
 	if (!FriendId.IsValid()) return;
 
@@ -155,7 +156,7 @@ void UOBOnlinePartySubsystem::HandleInviteAccepted(bool bWasSuccessful, int32 Lo
 {
 	if (!bWasSuccessful || !InviteResult.IsValid()) return;
 
-	IOnlineSessionPtr Session = GetSession(GetWorld());
+	IOnlineSessionPtr Session = GetSocialSession();
 	if (!Session.IsValid()) return;
 
 	JoinHandle = Session->AddOnJoinSessionCompleteDelegate_Handle(
@@ -166,7 +167,7 @@ void UOBOnlinePartySubsystem::HandleInviteAccepted(bool bWasSuccessful, int32 Lo
 
 void UOBOnlinePartySubsystem::HandleJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
 {
-	if (IOnlineSessionPtr Session = GetSession(GetWorld()))
+	if (IOnlineSessionPtr Session = GetSocialSession())
 		Session->ClearOnJoinSessionCompleteDelegate_Handle(JoinHandle);
 
 	if (Result == EOnJoinSessionCompleteResult::Success)
@@ -185,7 +186,7 @@ void UOBOnlinePartySubsystem::HandleJoinSessionComplete(FName SessionName, EOnJo
 
 void UOBOnlinePartySubsystem::LeaveParty()
 {
-	IOnlineSessionPtr Session = GetSession(GetWorld());
+	IOnlineSessionPtr Session = GetSocialSession();
 	if (!Session.IsValid() || !Session->GetNamedSession(PARTY_SESSION_NAME)) return;
 
 	DestroyHandle = Session->AddOnDestroySessionCompleteDelegate_Handle(
@@ -196,7 +197,7 @@ void UOBOnlinePartySubsystem::LeaveParty()
 
 void UOBOnlinePartySubsystem::HandleDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
-	if (IOnlineSessionPtr Session = GetSession(GetWorld()))
+	if (IOnlineSessionPtr Session = GetSocialSession())
 		Session->ClearOnDestroySessionCompleteDelegate_Handle(DestroyHandle);
 
 	bInParty = false;
@@ -207,7 +208,7 @@ void UOBOnlinePartySubsystem::HandleDestroySessionComplete(FName SessionName, bo
 
 int32 UOBOnlinePartySubsystem::GetPartyMemberCount() const
 {
-	if (IOnlineSessionPtr Session = GetSession(GetWorld()))
+	if (IOnlineSessionPtr Session = GetSocialSession())
 	{
 		if (FNamedOnlineSession* Named = Session->GetNamedSession(PARTY_SESSION_NAME))
 		{
@@ -225,7 +226,7 @@ void UOBOnlinePartySubsystem::HandleReadFriendsComplete(int32 LocalUserNum, bool
 	
 	if (bWasSuccessful)
 	{
-		if (IOnlineSubsystem* OSS = Online::GetSubsystem(GetWorld()))
+		if (IOnlineSubsystem* OSS = GetSocialOSS())
 		{
 			IOnlineFriendsPtr Friends = OSS->GetFriendsInterface();
 			if (Friends.IsValid())
