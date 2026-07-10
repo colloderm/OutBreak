@@ -58,6 +58,10 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 	// 서버는 OnRep이 호출되지 않으므로 여기서 직접 부착(리슨 서버 포함).
 	AttachWeaponToOwner();
 	
+	// [수정] 장착 즉시 탄약 초기화(WeaponData 기준) → CurrentAmmo 세팅 + OnRep_Ammo 복제.
+	//        이게 없으면 첫 장전이 한 박자 밀림(속성 미세팅/복제 타이밍).
+	NewWeapon->InitializeAmmo();
+	
 	// 레이어 링크 + draw 몽타주(서버 로컬)
 	ApplyCosmeticEquip();
 	
@@ -74,12 +78,6 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 			}
 		}
 	}
-	
-
-	// [확장] 장착 시 발사 Ability 부여:
-	// UOBAbilitySet이 Ability 부여를 지원하면 여기서 PlayerState ASC에 적용한다.
-	// (현재 미지원 → AbilitySet 확장 단계에서 활성화)
-	// if (UOBAbilitySet* Set = WeaponData->GetAbilitySet()) { Set->GiveToAbilitySystem(ASC, NewWeapon); }
 }
 
 void UOBEquipmentComponent::UnequipWeapon()
