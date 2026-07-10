@@ -65,6 +65,9 @@ public:
 	// 발사 방향 보기
 	void NotifyFired();
 	
+	// 탈출 시 서버 정리: 진행 중 능력(발사 등) 취소 + 무기 해제(재발사/이펙트 중단).
+	void HandleExtracted();
+	
 public:
 	/*
 	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).

@@ -63,6 +63,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	TArray<AOBPlayerStateBase*> GetExpeditionPlayers() const;
 	
+	// HUD용 "mm:ss" 문자열.
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	FText GetTimeRemainingText() const;
+	
 public:
 	//~ HUD 구독용 델리게이트 인스턴스 ----------------------------------------
 

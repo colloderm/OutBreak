@@ -266,6 +266,23 @@ void AOBCharacterBase::NotifyFired()
 	);
 }
 
+void AOBCharacterBase::HandleExtracted()
+{
+	if (!HasAuthority()) return;
+
+	// 진행 중 능력 즉시 취소 → 발사 트레이스/데미지/큐 중단.
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->CancelAbilities();
+	}
+	// 무기 해제(부여된 발사 능력 회수 → 재발사 불가).
+	if (EquipmentComponent)
+	{
+		EquipmentComponent->UnequipWeapon();
+	}
+	// (폰 숨김/충돌·이동 정지는 GameMode가 처리)
+}
+
 void AOBCharacterBase::ApplyCombatFocusPostProcess()
 {
 	if (!FollowCamera) return;

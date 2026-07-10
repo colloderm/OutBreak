@@ -15,6 +15,7 @@
 #include "Player/State/OBPlayerStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "DrawDebugHelpers.h"
+#include "Character/OBCharacterBase.h"
 #include "Kismet/GameplayStatics.h"
 
 AOBExpeditionGameMode::AOBExpeditionGameMode()
@@ -44,37 +45,7 @@ void AOBExpeditionGameMode::GenericPlayerInitialization(AController* C)
 	
 	// 진입 플레이어의 세션 초기화
 	if (AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>())
-	{
-		// [팀 배정] ?party=<코드> 기반. 같은 코드=같은 팀, 새 코드/솔로=중복없는 고유 팀 발급.
-		const FString* CodePtr = PartyCodeByController.Find(C);
-		FString EffectiveCode = CodePtr ? *CodePtr : FString();
-		
-		// 코드 없음 + 협동모드 = 코드없는 전원을 한 팀으로(레거시 폴백)
-		if (EffectiveCode.IsEmpty() && bUseSharedTeam)
-		{
-			EffectiveCode = TEXT("__SHARED__");
-		}
-		
-		uint8 AssignedTeam;
-		if (!EffectiveCode.IsEmpty())
-		{
-			if (uint8* Existing = PartyTeams.Find(EffectiveCode))
-			{
-				AssignedTeam = *Existing;		// 같은 코드 -> 같은 팀
-			}
-			else
-			{
-				AssignedTeam = NextTeamId++;	// 새 코드 -> 중복없는 고유 팀
-				PartyTeams.Add(EffectiveCode, AssignedTeam);
-			}
-		}
-		else
-		{
-			AssignedTeam = NextTeamId++;		// 솔로(협동 아님) -> 고유 팀
-		}
-		
-		PS->SetTeamId(AssignedTeam);
-		
+	{		
 		// 세션 시작 시점엔 모두 Alive. (로비에서 넘어온 상태가 남아있을 수 있어 명시적 리셋)
 		PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Alive);
 	}
@@ -445,9 +416,32 @@ FString AOBExpeditionGameMode::InitNewPlayer(APlayerController* NewPlayerControl
 	if (NewPlayerController)
 	{
 		PartyCodeByController.Add(NewPlayerController, PartyCode);
+		
+		// [중요] 팀 배정을 스폰(ChoosePlayerStart) 이전인 여기서 수행.
+		if (AOBPlayerStateBase* PS = NewPlayerController->GetPlayerState<AOBPlayerStateBase>())
+		{
+			PS->SetTeamId(ResolveTeamForCode(PartyCode));
+		}
 	}
 	
 	return Result;
+}
+
+uint8 AOBExpeditionGameMode::ResolveTeamForCode(const FString& PartyCode)
+{
+	FString EffectiveCode = PartyCode;
+	if (EffectiveCode.IsEmpty() && bUseSharedTeam)
+		EffectiveCode = TEXT("__SHARED__");
+
+	if (!EffectiveCode.IsEmpty())
+	{
+		if (uint8* Existing = PartyTeams.Find(EffectiveCode))
+			return *Existing;                       // 같은 코드 → 같은 팀
+		const uint8 NewTeam = NextTeamId++;
+		PartyTeams.Add(EffectiveCode, NewTeam);
+		return NewTeam;                             // 새 코드 → 고유 팀
+	}
+	return NextTeamId++;                            // 솔로(협동 아님) → 고유 팀
 }
 
 void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin)
@@ -554,6 +548,10 @@ void AOBExpeditionGameMode::NotifyPlayerExtracted(AController* Controller)
 	// 탈출한 폰은 월드에서 제거(관전/결과는 Step 8). 충돌·표시·이동 정리.
 	if (APawn* Pawn = Controller->GetPawn())
 	{
+		if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(Pawn))
+		{
+			Char->HandleExtracted(); // ★ 능력 취소 + 무기 해제
+		}
 		Pawn->SetActorHiddenInGame(true);
 		Pawn->SetActorEnableCollision(false);
 		if (UPawnMovementComponent* Move = Pawn->GetMovementComponent())

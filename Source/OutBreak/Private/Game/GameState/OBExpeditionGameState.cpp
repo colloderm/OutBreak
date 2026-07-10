@@ -72,6 +72,12 @@ TArray<AOBPlayerStateBase*> AOBExpeditionGameState::GetExpeditionPlayers() const
 	return Out;
 }
 
+FText AOBExpeditionGameState::GetTimeRemainingText() const
+{
+	const int32 T = FMath::Max(0, TimeRemaining);
+	return FText::FromString(FString::Printf(TEXT("%02d:%02d"), T / 60, T % 60));
+}
+
 void AOBExpeditionGameState::OnRep_Phase()
 {
 	// 클라가 서버로부터 Phase 값을 새로 받았을 때 호출됨 -> HUD에 알림

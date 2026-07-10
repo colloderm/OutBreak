@@ -79,6 +79,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Online") 
 	int32 GetPartyMemberCount() const;
 	
+	// 파티 코드 = 세션/로비 고유 ID(서버 팀 그룹핑용).
+	UFUNCTION(BlueprintPure, Category = "Online")
+	FString GetPartyCode() const;
+
+	// 리더: 팀원에게 출발 신호 브로드캐스트 + 자신 이동. (솔로/파티 공통 진입점)
+	UFUNCTION(BlueprintCallable, Category = "Online")
+	void LeaderStartExpedition(const FString& ServerAddress);
+	
 public:
 	// 친구 읽기 완료 알림(UI가 목록 갱신).
 	UPROPERTY(BlueprintAssignable, Category = "Online")
@@ -98,8 +106,16 @@ private:
 	
 	void HandleInviteAccepted(bool bWasSuccessful, int32 LocalUserNum, TSharedPtr<const FUniqueNetId> UserId,
 		
-		const FOnlineSessionSearchResult& InviteResult);
+	const FOnlineSessionSearchResult& InviteResult);
 	void HandleDestroySessionComplete(FName SessionName, bool bWasSuccessful);
+	
+	void TravelToServer(const FString& ServerAddress);
+	
+	// 멤버: 출발 신호 폴링 시작
+	void StartFollowPoll();
+	
+	// 1초마다 세션 설정 확인
+	void PollLeaderStart();
 
 private:
 	UPROPERTY()
@@ -110,4 +126,7 @@ private:
 	FString PendingInviteUserId; // 파티 없을 때 초대 → 생성 완료 후 전송
 
 	FDelegateHandle CreateHandle, JoinHandle, DestroyHandle, InviteAcceptedHandle;
+	
+	bool bTraveled = false;
+	FTimerHandle FollowTimer;
 };

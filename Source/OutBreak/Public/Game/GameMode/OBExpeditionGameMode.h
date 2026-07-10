@@ -147,6 +147,8 @@ protected:
 	// 진입 URL 옵션(?party=<코드>) 파싱을 위해 오버라이드.
 	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId,
 		const FString& Options, const FString& Portal) override;
+	
+	uint8 ResolveTeamForCode(const FString& PartyCode); // 코드→TeamId(같은 코드=같은 팀, 없으면 고유)
 
 private:	
 	FTimerHandle SessionTimerHandle;

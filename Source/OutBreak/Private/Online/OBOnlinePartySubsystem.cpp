@@ -174,9 +174,10 @@ void UOBOnlinePartySubsystem::HandleJoinSessionComplete(FName SessionName, EOnJo
 	{
 		bInParty = true;
 		bIsLeader = false;
-		// [주의] 파티 '로비' 합류이므로 여기서 게임 서버로 트래블하지 않음(M8-3에서 처리).
-		UE_LOG(LogTemp, Log, TEXT("[Online] 파티 합류 완료"));
+		StartFollowPoll(); // 멤버는 리더 출발 신호를 대기
+		
 		OnPartyChanged.Broadcast();
+		
 	}
 	else
 	{
@@ -204,6 +205,84 @@ void UOBOnlinePartySubsystem::HandleDestroySessionComplete(FName SessionName, bo
 	bIsLeader = false;
 	UE_LOG(LogTemp, Log, TEXT("[Online] 파티 나감"));
 	OnPartyChanged.Broadcast();
+}
+
+FString UOBOnlinePartySubsystem::GetPartyCode() const
+{
+	if (IOnlineSessionPtr Session = GetSocialSession())
+	{
+		if (FNamedOnlineSession* Named = Session->GetNamedSession(PARTY_SESSION_NAME))
+		{
+			return Named->GetSessionIdStr();
+		}
+	}
+	
+	return FString();
+}
+
+void UOBOnlinePartySubsystem::TravelToServer(const FString& ServerAddress)
+{
+	const FString Code = GetPartyCode();
+	FString URL = ServerAddress;
+	if (!Code.IsEmpty())
+	{
+		URL += FString::Printf(TEXT("?party=%s"), *Code);
+	}
+	
+	UGameInstance* GI = GetGameInstance();
+	if (GI)
+	{
+		if (APlayerController* PC = GI->GetFirstLocalPlayerController())
+		{
+			PC->ClientTravel(URL, TRAVEL_Absolute);
+		}
+	}
+}
+
+void UOBOnlinePartySubsystem::LeaderStartExpedition(const FString& ServerAddress)
+{
+	IOnlineSessionPtr Session = GetSocialSession();
+	FNamedOnlineSession* Named = Session.IsValid() ? Session->GetNamedSession(PARTY_SESSION_NAME) : nullptr;
+	
+	// 파티가 있고 내가 리더면 -> 팀원에게 출발 신호(서버주소) 브로드캐스트.
+	if (Named && bIsLeader)
+	{
+		FOnlineSessionSettings Updated = Named->SessionSettings;
+		Updated.Set(FName("TRAVEL"), ServerAddress, EOnlineDataAdvertisementType::ViaOnlineService);
+		Session->UpdateSession(PARTY_SESSION_NAME, Updated, true);
+	}
+	
+	bTraveled = true;
+	TravelToServer(ServerAddress); // 리더(또는 솔로) 이동
+}
+
+void UOBOnlinePartySubsystem::StartFollowPoll()
+{
+	bTraveled = false;
+	if (UWorld* W = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr)
+	{
+		W->GetTimerManager().SetTimer(FollowTimer, this, &UOBOnlinePartySubsystem::PollLeaderStart, 1.f, true);
+	}
+}
+
+void UOBOnlinePartySubsystem::PollLeaderStart()
+{
+	if (bTraveled || bIsLeader) return;
+	
+	IOnlineSessionPtr Session = GetSocialSession();
+	FNamedOnlineSession* Named = Session.IsValid() ? Session->GetNamedSession(PARTY_SESSION_NAME) : nullptr;
+	if (!Named) return;
+	
+	FString Addr;
+	if (Named->SessionSettings.Get(FName("TRABEL"), Addr) && !Addr.IsEmpty())
+	{
+		bTraveled = true;
+		if (UWorld* W = GetGameInstance()->GetWorld())
+		{
+			W->GetTimerManager().ClearTimer(FollowTimer);
+			TravelToServer(Addr); // 멤버: 리더가 준 주소 + 내 로비ID로 이동
+		}
+	}
 }
 
 int32 UOBOnlinePartySubsystem::GetPartyMemberCount() const
