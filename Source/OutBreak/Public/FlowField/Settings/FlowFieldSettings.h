@@ -9,6 +9,7 @@
 
 class AHordeProxyHost;
 class AHordeProxyActor;
+class UAnimToTextureDataAsset;
 /**
  * 
  */
@@ -21,33 +22,48 @@ class OUTBREAK_API UFlowFieldSettings : public UDeveloperSettings
 	
 	
 public:
-	int32 GetMaxAgentCount() const
+	FORCEINLINE int32 GetMaxAgentCount() const
 	{
 		return MaxAgentCount;
 	}
 	
-	float GetMaxVelocity() const
+	FORCEINLINE float GetMaxVelocity() const
 	{
 		return MaxVelocity;
 	}
 
-	float GetSeparationRadius() const
+	FORCEINLINE float GetSeparationRadius() const
 	{
 		return SeparationRadius;
 	}
 
-	float GetSeparationSteeringWeight() const
+	FORCEINLINE float GetSeparationSteeringWeight() const
 	{
 		return SeparationSteeringWeight;
 	}
 	
-	TSubclassOf<AHordeProxyHost> GetHordeProxyHostClass() const
+	FORCEINLINE TSubclassOf<AHordeProxyHost> GetHordeProxyHostClass() const
 	{
 		return HordeProxyHostClass;
 	}
-	TSubclassOf<AHordeProxyActor> GetHordeProxyActorClass() const
+	FORCEINLINE TSubclassOf<AHordeProxyActor> GetHordeProxyActorClass() const
 	{
 		return HordeProxyActorClass;
+	}
+	
+	FORCEINLINE float GetFlowDirectionSmoothingAlpha() const
+	{
+		return FlowDirectionSmoothingAlpha;
+	}
+	
+	FORCEINLINE TSoftObjectPtr<UAnimToTextureDataAsset> GetHordeVATDataAsset() const
+	{
+		return HordeVATDataAsset;
+	}
+	
+	FORCEINLINE int GetAnimToTextureAutoPlayDataCount() const
+	{
+		return AnimToTextureAutoPlayDataCount;
 	}
 	
 private:
@@ -75,6 +91,9 @@ private:
 	
 	UPROPERTY(Config, EditAnywhere, Category = "General|Movement")
 	float MaxVelocity = 500.f;
+	
+	UPROPERTY(Config, EditAnywhere, Category = "General|Movement", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float FlowDirectionSmoothingAlpha = 0.35f;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Horde Movement|Separation", meta = (ClampMin = "0.0"))
 	float SeparationRadius = 90.0f;
@@ -87,5 +106,11 @@ private:
 	
 	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Class")
 	TSubclassOf<AHordeProxyActor> HordeProxyActorClass;
+	
+	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Animation")
+	TSoftObjectPtr<UAnimToTextureDataAsset> HordeVATDataAsset;
+	
+	UPROPERTY(Config, EditAnywhere, Category = "HordeProxy|Animation")
+	int AnimToTextureAutoPlayDataCount = 4;
 	
 };

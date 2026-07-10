@@ -7,10 +7,12 @@
 #include "FlowField/Struct/HordeSystemType.h"
 #include "BudgetOverlordSubsystem.generated.h"
 
+class UAnimToTextureDataAsset;
 class UHordeMovementSubsystem;
 class UHordeProxySubsystem;
 class UHordeStatusSubsystem;
 class UHordeNetworkSubsystem;
+class UFlowFieldSettings;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogHordeLifecycle, Log, All);
 
@@ -37,6 +39,11 @@ public:
 
 	FHordeAgentHandle GetHandleByPackedIndex(
 		int32 PackedIndex) const;
+	
+	TObjectPtr<UAnimToTextureDataAsset> GetHordeVATDataAsset() const
+	{
+		return HordeVATDataAsset;
+	}
 	
 	
 	FORCEINLINE UHordeMovementSubsystem* GetMovementSubsystem() { return MovementSubsystem; }
@@ -104,11 +111,18 @@ private:
 	UPROPERTY(Transient)
 	TArray<uint32> FreeAgentIDs;
 	
+	UPROPERTY(Transient)
+	TObjectPtr<UAnimToTextureDataAsset> HordeVATDataAsset = nullptr;
+	
 	/* Status System에서 Damage 적용 병렬 처리를 위한 Index By Actor Cache */
 	TMap<TWeakObjectPtr<AActor>, int32> IndexByActor;
 	
 	UPROPERTY(Transient)
+	TObjectPtr<UFlowFieldSettings> Settings;
+	
+	UPROPERTY(Transient)
 	TObjectPtr<UHordeMovementSubsystem> MovementSubsystem;
+	
 	
 	UPROPERTY(Transient)
 	TObjectPtr<UHordeProxySubsystem> ProxySubsystem;

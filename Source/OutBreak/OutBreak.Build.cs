@@ -34,7 +34,8 @@ public class OutBreak : ModuleRules
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
 			"AIModule",
-			"Navmesh"
+			"Navmesh",
+			"AnimToTexture"
 		});
 		
 		if (Target.Type == TargetType.Editor)

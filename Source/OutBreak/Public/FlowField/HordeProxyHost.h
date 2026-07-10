@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AnimToTextureInstancePlaybackHelpers.h"
 #include "GameFramework/Actor.h"
 #include "HordeProxyHost.generated.h"
 
@@ -30,6 +31,9 @@ public:
 	void UpdateInstances(
 		TArray<int32>& InstanceIds,
 		const TArray<FTransform>& Transforms) const;
+	
+	void PlayHordeAgentMontage(int32 InstanceID, FAnimToTextureAutoPlayData PlaybackData);
+	void PlayHordeAgentsMontage(int32 InstanceID, FAnimToTextureAutoPlayData PlaybackData);
 
 protected:
 	// Called when the game starts or when spawned

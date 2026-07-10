@@ -15,7 +15,6 @@
 
 namespace
 {
-	constexpr float FlowDirectionSmoothingAlpha = 0.35f;
 	constexpr float FailedQueryFallbackScale = 0.25f;
 	constexpr uint8 MaxConsecutiveFallbackFrames = 6;
 
@@ -742,7 +741,7 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 					: FMath::Lerp(
 						PreviousDirection,
 						QueryDirection,
-						FlowDirectionSmoothingAlpha)
+						Settings->GetFlowDirectionSmoothingAlpha())
 						.GetSafeNormal2D();
 
 			MovementStorage.CachedFlowDirections[i] =

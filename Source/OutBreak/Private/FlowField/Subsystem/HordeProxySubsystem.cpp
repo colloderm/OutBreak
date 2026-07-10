@@ -3,6 +3,7 @@
 
 #include "FlowField/Subsystem/HordeProxySubsystem.h"
 
+#include "AnimToTextureDataAsset.h"
 #include "GeometryTypes.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -15,10 +16,14 @@
 #include "FlowField/Subsystem/BudgetOverlordSubsystem.h"
 #include "Flowfield/Subsystem/HordeStatusSubsystem.h"
 
+#include "AnimToTextureInstancePlaybackHelpers.h"
+
+
+
+
 void UHordeProxySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-	
 	
 	MovementSubsystem = Collection.InitializeDependency<UHordeMovementSubsystem>();
 	
@@ -107,6 +112,7 @@ ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 		ProxyStorageIndex != INDEX_NONE;
 
 	check(ProxyStorage.IsValid());
+	PlayHordeAgentMontage(InstanceIndex, EHordeAnimationDataIndex::Run);
 
 	return Result;
 }
@@ -395,8 +401,38 @@ void UHordeProxySubsystem::DestroyProxyActor(AActor* Actor)
 	Actor->Destroy();
 }
 
+void UHordeProxySubsystem::PlayHordeAgentMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex)
+{
+	int32 Index = static_cast<int32>(AnimationIndex);
+	
+	FAnimToTextureAutoPlayData PlaybackData;
+	const float CurrentTime = GetWorld()->GetTimeSeconds();
+	
+	const bool bFoundAnimation = UAnimToTextureInstancePlaybackLibrary::GetAutoPlayDataFromDataAsset
+		(
+			BudgetOverlord->GetHordeVATDataAsset(),
+			Index,
+			PlaybackData,
+			1.0f
+		);
+	
+	if (!bFoundAnimation)
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Can't Found VAT Index By Animation."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	int32 InstanceID = GetInstanceIndex(PackedIndex);
+	
+	HordeProxy->PlayHordeAgentMontage(InstanceID, PlaybackData);
+}
+
+void UHordeProxySubsystem::PlayHordeAgentsMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex)
+{
+}
+
 void UHordeProxySubsystem::ProxyOnTakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,
-	AController* InstigatedBy, AActor* DamageCauser)
+                                                AController* InstigatedBy, AActor* DamageCauser)
 {
 	BudgetOverlord->GetStatusSubsystem()->AddDamageEvent(DamagedActor, Damage);
 }

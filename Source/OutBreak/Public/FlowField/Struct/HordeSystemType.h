@@ -11,6 +11,13 @@
 
 using HordeAgentID = uint32;
 
+enum class EHordeAnimationDataIndex : uint8
+{
+	Run,
+	Hit_RightShoulder,
+	Hit_LeftShoulder,
+};
+
 struct FHordeSeparationGridEntry
 {
 	int32 CellX = 0;
@@ -112,6 +119,7 @@ struct HordeMovementStorage
 	TArray<uint8>					TraversalStates;
 	TArray<uint8>					PriorityTiers;
 
+	/* 겹침이 많아 질수록 Spreation 연산이 폭증 함.*/
 	TArray<FVector>					PositionSnapshot;
 	TArray<FVector>					MoveOffsetScratch;
 	TArray<FVector>					FinalMoveOffsetScratch;

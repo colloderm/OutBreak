@@ -4,6 +4,7 @@
 #include "FlowField/Subsystem/HordeStatusSubsystem.h"
 
 #include "FlowField/Subsystem/BudgetOverlordSubsystem.h"
+#include "FlowField/Subsystem/HordeProxySubsystem.h"
 
 namespace
 {
@@ -162,6 +163,7 @@ void UHordeStatusSubsystem::Parallel()
 			continue;
 		}
 
+		BudgetOverlord->GetProxySubsystem()->PlayHordeAgentMontage(PackedIndex, EHordeAnimationDataIndex::Hit_RightShoulder);
 		ResolvedEvents.Add(
 			FResolvedHordeDamageEvent
 			{

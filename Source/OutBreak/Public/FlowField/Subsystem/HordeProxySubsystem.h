@@ -14,14 +14,14 @@ UCLASS()
 class OUTBREAK_API UHordeProxySubsystem : public UBaseHordeWorldSubsystem
 {
 	GENERATED_BODY()
-	
-	
-	
+
 public:
 	virtual auto Initialize(FSubsystemCollectionBase& Collection) -> void override;
-
-
+	
 	void InitializeStorage(int32 Capacity);
+	
+	void PlayHordeAgentMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex);
+	void PlayHordeAgentsMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex);
 	
 protected:
 	ProxyRegisterResult Register(const FTransform& Transform);
@@ -43,6 +43,9 @@ private:
 	
 	UPROPERTY(Transient)
 	TObjectPtr<class UHordeMovementSubsystem> MovementSubsystem;
+	
+	
+
 	
 private:
 	UFUNCTION()

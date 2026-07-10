@@ -12,6 +12,8 @@
 #include "FlowField/Subsystem/HordeStatusSubsystem.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
+#include "AnimToTextureInstancePlaybackHelpers.h"
+#include "AnimToTextureDataAsset.h"
 
 DEFINE_LOG_CATEGORY(LogHordeLifecycle);
 
@@ -25,8 +27,10 @@ void UBudgetOverlordSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	StatusSubsystem = Collection.InitializeDependency<UHordeStatusSubsystem>();
 	NetworkSubsystem = Collection.InitializeDependency<UHordeNetworkSubsystem>();
 	
-	const UFlowFieldSettings* Settings = GetDefault<UFlowFieldSettings>();
+	Settings = const_cast<UFlowFieldSettings*>(GetDefault<UFlowFieldSettings>());
 	InitializeViceroy(Settings->GetMaxAgentCount());
+	
+	
 }
 
 void UBudgetOverlordSubsystem::OnWorldBeginPlay(UWorld& InWorld)
@@ -47,6 +51,44 @@ void UBudgetOverlordSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			NetworkSubsystem->RegisterConnection(PlayerController);
 		}
 	}
+	
+	const TSoftObjectPtr<UAnimToTextureDataAsset>& SoftDataAsset =
+		Settings->GetHordeVATDataAsset();
+	
+	if (!ensureAlwaysMsgf(
+		!SoftDataAsset.IsNull(),
+		TEXT(
+			"%s::%s: HordeVATDataAsset is not configured."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
+	{
+		return;
+	}
+	
+	HordeVATDataAsset =
+		SoftDataAsset.LoadSynchronous();
+
+	// check(HordeVATDataAsset);
+	if (!ensureAlwaysMsgf(
+		IsValid(HordeVATDataAsset),
+		TEXT(
+			"%s::%s: Failed to load Horde VAT DataAsset. "
+			"AssetPath=%s"),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__),
+		*SoftDataAsset.ToSoftObjectPath().ToString()))
+	{
+		return;
+	}
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT(
+			"%s::%s: Horde VAT DataAsset loaded. Asset=%s"),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__),
+		*HordeVATDataAsset->GetName());
 }
 
 void UBudgetOverlordSubsystem::Tick(float DeltaTime)

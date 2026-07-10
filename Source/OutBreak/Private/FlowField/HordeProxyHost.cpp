@@ -8,6 +8,9 @@
 #define UE_EXPERIMENTAL(Version, Message)
 
 #include "Components/InstancedStaticMeshComponent.h"
+#include "AnimToTextureInstancePlaybackHelpers.h"
+
+#include "FlowField/Settings/FlowFieldSettings.h"
 
 #pragma pop_macro("UE_EXPERIMENTAL")
 
@@ -16,7 +19,15 @@ AHordeProxyHost::AHordeProxyHost()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	
+	
 	InstancedStaticMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(FName("StaticMeshComponent"));
+	check(InstancedStaticMesh);
+	
+	const UFlowFieldSettings* Settings = GetDefault<UFlowFieldSettings>();
+	const int DataCount = Settings->GetAnimToTextureAutoPlayDataCount();
+	
+	InstancedStaticMesh->SetNumCustomDataFloats(DataCount);
+
 	RootComponent = InstancedStaticMesh;
 }
 
@@ -70,6 +81,29 @@ void AHordeProxyHost::UpdateInstances(
 	
 	InstancedStaticMesh->BatchUpdateInstancesTransforms(
 		0, Transforms, true);
+}
+
+void AHordeProxyHost::PlayHordeAgentMontage(int32 InstanceID, FAnimToTextureAutoPlayData PlaybackData)
+{
+	UAnimToTextureInstancePlaybackLibrary::UpdateInstanceAutoPlayData
+	(
+		InstancedStaticMesh,
+		InstanceID,
+		PlaybackData,
+		true
+	);
+}
+
+void AHordeProxyHost::PlayHordeAgentsMontage(int32 InstanceID, FAnimToTextureAutoPlayData PlaybackData)
+{
+	// UAnimToTextureInstancePlaybackLibrary::BatchUpdateInstancesAutoPlayData
+	// (
+	// 	InstancedStaticMesh,
+	// 	InstanceID,
+	// 	PlaybackData,
+	// 	true
+	// );
+	UE_LOG(LogTemp, Display, TEXT("%s::%s: Success."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 }
 
 
