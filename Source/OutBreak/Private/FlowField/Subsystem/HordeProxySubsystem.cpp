@@ -37,6 +37,7 @@ void UHordeProxySubsystem::InitializeStorage(int32 Capacity)
 ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 {
 	check(IsInGameThread());
+	check(ProxyStorage.IsValid());
 
 	ProxyRegisterResult Result;
 
@@ -99,20 +100,35 @@ ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 	// SpawnActor->Capsule->OnComponentBeginOverlap.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleBeginOverlap);
 	// SpawnActor->Capsule->OnComponentEndOverlap.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleEndOverlap);
 	// SpawnActor->Capsule->OnComponentHit.AddDynamic(this, &UHordeProxySubsystem::HandleCapsuleHit);
+	
 	SpawnActor->OnTakeAnyDamage.AddUniqueDynamic(this, 
 		&UHordeProxySubsystem::ProxyOnTakeAnyDamage);
+	
+	FAnimToTextureAutoPlayData PlaybackData;
+	
+	const bool bFoundAnimation = UAnimToTextureInstancePlaybackLibrary::GetAutoPlayDataFromDataAsset
+		(
+			BudgetOverlord->GetHordeVATDataAsset(),
+			FMath::RandRange(0,1),
+			PlaybackData,
+			1.0f
+		);
+	
+	if (!bFoundAnimation)
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Can't Found VAT Index By Animation."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return Result;
+	}
 
 	const int32 ProxyStorageIndex =
-		ProxyStorage.Add(SpawnActor, InstanceIndex);
+		ProxyStorage.Add(SpawnActor, InstanceIndex, PlaybackData);
 
 	Result.Actor = SpawnActor;
 	Result.ProxyStorageIndex = ProxyStorageIndex;
 	Result.InstanceIndex = InstanceIndex;
 	Result.bSucceeded =
 		ProxyStorageIndex != INDEX_NONE;
-
-	check(ProxyStorage.IsValid());
-	PlayHordeAgentMontage(InstanceIndex, EHordeAnimationDataIndex::Run);
+	Result.AnimToTextureAutoPlayData = PlaybackData;
 
 	return Result;
 }
@@ -239,7 +255,7 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 	
 	HordeProxy->UpdateInstances(
 		ProxyStorage.InstanceIds,
-		Transforms);
+		Transforms, ProxyStorage.VAT_Data);
 	ParallelProxy();
 
 	if (bDiagnosticsEnabled)
@@ -383,7 +399,7 @@ void UHordeProxySubsystem::RefreshInstancesFromMovement()
 
 	HordeProxy->UpdateInstances(
 		ProxyStorage.InstanceIds,
-		MovementSubsystem->MovementStorage.Transforms);
+		MovementSubsystem->MovementStorage.Transforms, ProxyStorage.VAT_Data);
 }
 
 void UHordeProxySubsystem::DestroyProxyActor(AActor* Actor)
@@ -406,7 +422,6 @@ void UHordeProxySubsystem::PlayHordeAgentMontage(int32 PackedIndex, EHordeAnimat
 	int32 Index = static_cast<int32>(AnimationIndex);
 	
 	FAnimToTextureAutoPlayData PlaybackData;
-	const float CurrentTime = GetWorld()->GetTimeSeconds();
 	
 	const bool bFoundAnimation = UAnimToTextureInstancePlaybackLibrary::GetAutoPlayDataFromDataAsset
 		(
@@ -422,13 +437,7 @@ void UHordeProxySubsystem::PlayHordeAgentMontage(int32 PackedIndex, EHordeAnimat
 		return;
 	}
 	
-	int32 InstanceID = GetInstanceIndex(PackedIndex);
-	
-	HordeProxy->PlayHordeAgentMontage(InstanceID, PlaybackData);
-}
-
-void UHordeProxySubsystem::PlayHordeAgentsMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex)
-{
+	ProxyStorage.VAT_Data[PackedIndex] = PlaybackData;
 }
 
 void UHordeProxySubsystem::ProxyOnTakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,

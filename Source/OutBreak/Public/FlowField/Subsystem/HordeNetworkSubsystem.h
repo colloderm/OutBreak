@@ -23,7 +23,7 @@ class OUTBREAK_API UHordeNetworkSubsystem : public UBaseHordeWorldSubsystem
 public:
 	
 	
-	void AddPayload(const FHordeNetworkFormat& Payload);
+	void HordeAddPayload(const FHordeNetworkFormat& Payload);
 	
 	void SendPayloads();
 	

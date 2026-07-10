@@ -21,7 +21,6 @@ public:
 	void InitializeStorage(int32 Capacity);
 	
 	void PlayHordeAgentMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex);
-	void PlayHordeAgentsMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex);
 	
 protected:
 	ProxyRegisterResult Register(const FTransform& Transform);

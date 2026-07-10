@@ -333,11 +333,12 @@ FHordeAgentHandle UBudgetOverlordSubsystem::RegisterAgent(
 	Payload.TraversalStates = 0;
 	Payload.PriorityTiers = 0;
 	Payload.PoseIndex = FIntVector2(0,0);
+	Payload.AnimToTextureAutoPlayData = ProxyResult.AnimToTextureAutoPlayData;
 
 	if (UWorld* World = GetWorld();
 		World && World->GetNetMode() != NM_Client)
 	{
-		NetworkSubsystem->AddPayload(Payload);
+		NetworkSubsystem->HordeAddPayload(Payload);
 	}
 
 #if DO_CHECK
@@ -440,7 +441,7 @@ bool UBudgetOverlordSubsystem::UnregisterAgentByPackedIndex(
 		Payload.Handle =
 			RemoveResult.RemovedHandle;
 
-		NetworkSubsystem->AddPayload(Payload);
+		NetworkSubsystem->HordeAddPayload(Payload);
 	}
 
 	IndexByActor.Remove(RemoveResult.RemovedActor);
@@ -1010,8 +1011,8 @@ void UBudgetOverlordSubsystem::BuildPacket()
 
 		Payload.PriorityTiers =
 			Storage.PriorityTiers[PackedIndex];
-
-		NetworkSubsystem->AddPayload(Payload);
+		
+		NetworkSubsystem->HordeAddPayload(Payload);
 
 		CacheTestIndex =
 			(CacheTestIndex + 1) % AgentCount;

@@ -30,10 +30,10 @@ public:
 	
 	void UpdateInstances(
 		TArray<int32>& InstanceIds,
-		const TArray<FTransform>& Transforms) const;
+		const TArray<FTransform>& Transforms, const TArray<FAnimToTextureAutoPlayData>& AnimToTextureAutoPlayDatas) const;
 	
 	void PlayHordeAgentMontage(int32 InstanceID, FAnimToTextureAutoPlayData PlaybackData);
-	void PlayHordeAgentsMontage(int32 InstanceID, FAnimToTextureAutoPlayData PlaybackData);
+	void BatchHordeAnimAndTransform(const TArray<FTransform>& Transforms,const TArray<FAnimToTextureAutoPlayData>& PlaybackData) const;
 
 protected:
 	// Called when the game starts or when spawned

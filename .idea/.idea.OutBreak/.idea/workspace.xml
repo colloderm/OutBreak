@@ -20,26 +20,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Components/HordeAnimationComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Components/HordeComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/Loadout.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/LoadoutCardElement.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/LoadoutSelectionList.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/LoadoutSelectionView.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponElement.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatElement.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Components/HordeAnimationComponent.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Components/HordeComponent.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/Loadout.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/LoadoutCardElement.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/LoadoutSelectionList.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/LoadoutSelectionView.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/WeaponElement.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/WeaponStatElement.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Config/DefaultGame.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultGame.ini" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Characters/DA_MannequinBoneAnimation.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/DA_MannequinBoneAnimation.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Characters/MI_Manny_01_VAT.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/MI_Manny_01_VAT.uasset" afterDir="false" />
@@ -48,22 +29,16 @@
       <change beforePath="$PROJECT_DIR$/Content/Characters/TX_BonePosition.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/TX_BonePosition.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Characters/TX_BoneRotation.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/TX_BoneRotation.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Characters/TX_BoneWeight.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/TX_BoneWeight.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_HordeProxyHost.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/DevB/BP_HordeProxyHost.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/DevB/Level_DefenseMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/DevB/Level_DefenseMap.umap" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/UI/Home/WBP_HomeHub.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Home/WBP_HomeHub.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/UI/Lobby/Loadout/WBP_Loadout.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/OutBreak.uproject" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.uproject" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/OutBreak.Build.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/OutBreak.Build.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/HordeProxyHost.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/HordeProxyHost.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/BudgetOverlordSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/BudgetOverlordSubsystem.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeMovementSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeMovementSubsystem.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeNetworkSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeNetworkSubsystem.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeProxySubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeProxySubsystem.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeStatusSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeStatusSubsystem.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/HordeProxyHost.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/HordeProxyHost.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Settings/FlowFieldSettings.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Settings/FlowFieldSettings.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Struct/HordeSystemType.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Struct/HordeSystemType.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/BudgetOverlordSubsystem.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/BudgetOverlordSubsystem.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeNetworkSubsystem.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeNetworkSubsystem.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeProxySubsystem.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeProxySubsystem.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -321,7 +296,7 @@
       <workItem from="1783510684591" duration="5094000" />
       <workItem from="1783557022952" duration="17081000" />
       <workItem from="1783587948616" duration="4338000" />
-      <workItem from="1783638689597" duration="16193000" />
+      <workItem from="1783638689597" duration="25727000" />
     </task>
     <servers />
   </component>

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AnimToTextureInstancePlaybackHelpers.h"
 #include "HordeSystemType.generated.h"
 
 /**
@@ -13,7 +14,8 @@ using HordeAgentID = uint32;
 
 enum class EHordeAnimationDataIndex : uint8
 {
-	Run,
+	Forward_Run,
+	Forward_Run_Mirror,
 	Hit_RightShoulder,
 	Hit_LeftShoulder,
 };
@@ -47,6 +49,7 @@ struct ProxyRegisterResult
 	AActor* Actor = nullptr;
 	int32 ProxyStorageIndex = INDEX_NONE;
 	int32 InstanceIndex = INDEX_NONE;
+	FAnimToTextureAutoPlayData AnimToTextureAutoPlayData = FAnimToTextureAutoPlayData(); 
 	bool bSucceeded = false;
 };
 
@@ -241,14 +244,9 @@ struct HordeStatusStorage
 
 struct HordeProxyStorage
 {
-	/* 
-	 * Horde Proxy System using VAT(Vertex Animation Texture)
-	 * FInterVector2 : X = Animation Start Frame, Y = Animation End Frame 
-	 * 
-	 */
-	TArray<FIntVector2>				PoseIndices;
-	TArray<int32>					InstanceIds;
-	TArray<TObjectPtr<AActor>>		PawnProxies;
+	TArray<int32>						InstanceIds;
+	TArray<FAnimToTextureAutoPlayData>	VAT_Data;
+	TArray<TObjectPtr<AActor>>			PawnProxies;
 	
 	int32 Size() const
 	{
@@ -258,22 +256,21 @@ struct HordeProxyStorage
 	void Initialize(const int32 Capacity)
 	{
 		InstanceIds.Reserve(Capacity);
-		PoseIndices.Reserve(Capacity);
+		VAT_Data.Reserve(Capacity);
 		PawnProxies.Reserve(Capacity);
-		
 	}
 	
 	bool IsValid() const
 	{
 		const int32 AgentCount = PawnProxies.Num();
 		
-		return PoseIndices.Num() == AgentCount
+		return VAT_Data.Num() == AgentCount
 			&& InstanceIds.Num() == AgentCount;
 	}
 	
-	int32 Add(AActor* Pawn, int32 InstanceId)
+	int32 Add(AActor* Pawn, int32 InstanceId, FAnimToTextureAutoPlayData AnimToTextureAutoPlayData)
 	{
-		PoseIndices.Add(FIntVector2::ZeroValue);
+		VAT_Data.Add(AnimToTextureAutoPlayData);
 		InstanceIds.Add(InstanceId);
 		return PawnProxies.Add(Pawn);
 	}
@@ -281,15 +278,15 @@ struct HordeProxyStorage
 	void RemoveAtSwap(const int32 PackedIndex)
 	{
 		check(IsValid());
-	check(PoseIndices.IsValidIndex(PackedIndex));
-	check(InstanceIds.IsValidIndex(PackedIndex));
-	check(PawnProxies.IsValidIndex(PackedIndex));
-		
-	PoseIndices.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
-	InstanceIds.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
-	PawnProxies.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		check(VAT_Data.IsValidIndex(PackedIndex));
+		check(InstanceIds.IsValidIndex(PackedIndex));
+		check(PawnProxies.IsValidIndex(PackedIndex));
+			
+		VAT_Data.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		InstanceIds.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		PawnProxies.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 
-	check(IsValid());
+		check(IsValid());
 	}
 };
 
@@ -333,6 +330,9 @@ struct FHordeNetworkFormat
 	
 	UPROPERTY()
 	uint8							PriorityTiers = 0;
+	
+	UPROPERTY()
+	FAnimToTextureAutoPlayData		AnimToTextureAutoPlayData;
 	
 	/* Horde Proxy Storage Info */
 	UPROPERTY()

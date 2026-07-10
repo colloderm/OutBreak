@@ -95,7 +95,7 @@ private:
 	UPROPERTY(Config, EditAnywhere, Category = "General|Movement", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float FlowDirectionSmoothingAlpha = 0.35f;
 
-	UPROPERTY(Config, EditAnywhere, Category = "Horde Movement|Separation", meta = (ClampMin = "0.0"))
+	UPROPERTY(Config, EditAnywhere, Category = "Horde Movement|Separation")
 	float SeparationRadius = 90.0f;
 
 	UPROPERTY(Config, EditAnywhere, Category = "Horde Movement|Separation", meta = (ClampMin = "0.0", ClampMax = "1.0"))

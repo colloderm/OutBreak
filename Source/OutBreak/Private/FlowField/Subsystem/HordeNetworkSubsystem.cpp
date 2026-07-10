@@ -39,7 +39,7 @@ void UHordeNetworkSubsystem::BeginSystem()
 	Super::BeginSystem();
 }
 
-void UHordeNetworkSubsystem::AddPayload(
+void UHordeNetworkSubsystem::HordeAddPayload(
 	const FHordeNetworkFormat& Payload)
 {
 	if (!Payload.Handle.IsValid())

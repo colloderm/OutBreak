@@ -58,7 +58,8 @@ void AHordeProxyHost::RemoveInstance(const int32 InstanceId) const
 
 void AHordeProxyHost::UpdateInstances(
 	TArray<int32>& InstanceIds,
-	const TArray<FTransform>& Transforms) const
+	const TArray<FTransform>& Transforms,
+	const TArray<FAnimToTextureAutoPlayData>& AnimToTextureAutoPlayDatas) const
 {
 	if (!ensureAlwaysMsgf(
 		IsValid(InstancedStaticMesh),
@@ -79,8 +80,8 @@ void AHordeProxyHost::UpdateInstances(
 		return;
 	}
 	
-	InstancedStaticMesh->BatchUpdateInstancesTransforms(
-		0, Transforms, true);
+	
+	BatchHordeAnimAndTransform(Transforms, AnimToTextureAutoPlayDatas);
 }
 
 void AHordeProxyHost::PlayHordeAgentMontage(int32 InstanceID, FAnimToTextureAutoPlayData PlaybackData)
@@ -94,16 +95,15 @@ void AHordeProxyHost::PlayHordeAgentMontage(int32 InstanceID, FAnimToTextureAuto
 	);
 }
 
-void AHordeProxyHost::PlayHordeAgentsMontage(int32 InstanceID, FAnimToTextureAutoPlayData PlaybackData)
+void AHordeProxyHost::BatchHordeAnimAndTransform(const TArray<FTransform>& Transforms, const TArray<FAnimToTextureAutoPlayData>& PlaybackData) const
 {
-	// UAnimToTextureInstancePlaybackLibrary::BatchUpdateInstancesAutoPlayData
-	// (
-	// 	InstancedStaticMesh,
-	// 	InstanceID,
-	// 	PlaybackData,
-	// 	true
-	// );
-	UE_LOG(LogTemp, Display, TEXT("%s::%s: Success."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+	UAnimToTextureInstancePlaybackLibrary::BatchUpdateInstancesAutoPlayData
+	(
+		InstancedStaticMesh,
+		PlaybackData,
+		Transforms,
+		true
+	);
 }
 
 
