@@ -19,28 +19,7 @@
     <configurations />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config/DefaultGame.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultGame.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/DA_MannequinBoneAnimation.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/DA_MannequinBoneAnimation.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/MI_Manny_01_VAT.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/MI_Manny_01_VAT.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/MI_Manny_02_VAT.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/MI_Manny_02_VAT.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/StaticMesh_V500.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/StaticMesh_V500.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/TX_BonePosition.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/TX_BonePosition.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/TX_BoneRotation.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/TX_BoneRotation.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/TX_BoneWeight.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/TX_BoneWeight.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/DevB/Level_DefenseMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/DevB/Level_DefenseMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/HordeProxyHost.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/HordeProxyHost.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/BudgetOverlordSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/BudgetOverlordSubsystem.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeNetworkSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeNetworkSubsystem.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeProxySubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeProxySubsystem.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/HordeProxyHost.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/HordeProxyHost.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Settings/FlowFieldSettings.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Settings/FlowFieldSettings.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Struct/HordeSystemType.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Struct/HordeSystemType.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeNetworkSubsystem.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeNetworkSubsystem.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeProxySubsystem.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeProxySubsystem.h" afterDir="false" />
-    </list>
+    <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -296,7 +275,7 @@
       <workItem from="1783510684591" duration="5094000" />
       <workItem from="1783557022952" duration="17081000" />
       <workItem from="1783587948616" duration="4338000" />
-      <workItem from="1783638689597" duration="25727000" />
+      <workItem from="1783638689597" duration="26189000" />
     </task>
     <servers />
   </component>
