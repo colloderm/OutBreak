@@ -7,6 +7,8 @@
 #include "Components/Button.h"
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
+#include "Components/WidgetSwitcher.h"
+#include "UI/Widgets/Party/OBFriendListWidget.h"
 
 void UOBPartyWidget::NativeConstruct()
 {
@@ -26,8 +28,15 @@ void UOBPartyWidget::NativeConstruct()
 	
 	if (Party)
 		Party->OnPartyChanged.AddUObject(this, &UOBPartyWidget::Rebuild);
+	
+	if (BtnFriend)  
+		BtnFriend->OnClicked.AddDynamic(this, &UOBPartyWidget::OnFriendTabClicked);
+	
+	if (BtnRequest) 
+		BtnRequest->OnClicked.AddDynamic(this, &UOBPartyWidget::OnRequestTabClicked);
 
 	Rebuild();
+	OnFriendTabClicked();
 }
 
 void UOBPartyWidget::NativeDestruct()
@@ -75,5 +84,18 @@ void UOBPartyWidget::HandleDebugToggle()
 {
 	if (Party) 
 		Party->DebugSetLocalLeader(!Party->IsLocalLeader());
+}
+
+void UOBPartyWidget::OnFriendTabClicked()
+{
+	if (ContentSwitcher && FriendPanel) 
+		ContentSwitcher->SetActiveWidget(FriendPanel);
+	if (FriendList) 
+		FriendList->RefreshFriends();
+}
+
+void UOBPartyWidget::OnRequestTabClicked()
+{
+	if (ContentSwitcher && RequestPanel) ContentSwitcher->SetActiveWidget(RequestPanel);
 }
 

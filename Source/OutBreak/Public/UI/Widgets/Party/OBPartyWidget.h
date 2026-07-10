@@ -6,6 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "OBPartyWidget.generated.h"
 
+class UOBFriendListWidget;
+class UWidgetSwitcher;
 class UButton; 
 class UPanelWidget; 
 class UTextBlock;
@@ -32,6 +34,12 @@ protected:
 	UFUNCTION() 
 	void HandleDebugToggle();  // TEMP
 	
+	UFUNCTION() 
+	void OnFriendTabClicked();
+	
+	UFUNCTION() 
+	void OnRequestTabClicked();
+	
 protected:
 	UPROPERTY(meta = (BindWidget))         
 	TObjectPtr<UPanelWidget> MembersBox;
@@ -49,6 +57,26 @@ protected:
 	
 	UPROPERTY(meta = (BindWidgetOptional)) 
 	TObjectPtr<UButton> BtnDebugToggle;
+
+	
+	UPROPERTY(meta = (BindWidgetOptional)) 
+	TObjectPtr<UButton> BtnFriend;
+	
+	UPROPERTY(meta = (BindWidgetOptional)) 
+	TObjectPtr<UButton> BtnRequest;
+	
+	UPROPERTY(meta = (BindWidgetOptional)) 
+	TObjectPtr<UWidgetSwitcher> ContentSwitcher;
+	
+	UPROPERTY(meta = (BindWidgetOptional)) 
+	TObjectPtr<UWidget> FriendPanel;
+	
+	UPROPERTY(meta = (BindWidgetOptional)) 
+	TObjectPtr<UWidget> RequestPanel;
+	
+	// FriendPanel 안에 임베드한 WBP_FriendList 인스턴스(이름 "FriendList").
+	UPROPERTY(meta = (BindWidgetOptional)) 
+	TObjectPtr<UOBFriendListWidget> FriendList;
 	
 
 	UPROPERTY(EditAnywhere, Category = "Party") 
