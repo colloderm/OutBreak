@@ -12,6 +12,17 @@
 
 using HordeAgentID = uint32;
 
+
+/*
+ * ======================== Animation Data ========================
+ * index | Anim Name
+ * ————————————————————————————————————————————————————————————————
+ * 0.	Forward_Run
+ * 1.	Forward_Run_Mirror
+ * 2.	Hit_RightShoulder
+ * 3.	Hit_LeftShoulder
+ * ================================================================
+ */
 enum class EHordeAnimationDataIndex : uint8
 {
 	Forward_Run,
@@ -241,11 +252,21 @@ struct HordeStatusStorage
 	}
 };
 
+enum class EHordeVATPlaybackState : uint8
+{
+	Locomotion,
+	HitReaction,
+	Dead,
+};
+
 
 struct HordeProxyStorage
 {
 	TArray<int32>						InstanceIds;
-	TArray<FAnimToTextureAutoPlayData>	VAT_Data;
+	TArray<FAnimToTextureAutoPlayData>	VAT_Data; /* 실제 시각화에 전달되는 현재 애니메이션 */
+	TArray<FAnimToTextureAutoPlayData>	DesiredLoopVAT_Data; /* Hit 종료 후 돌아갈 애니메이션 (몽타주) */
+	TArray<double>						StateEndTimes; /* Hit 같은 단발 애니메이션의 종료 시각 */
+	TArray<EHordeVATPlaybackState>		PlaybackStates;
 	TArray<TObjectPtr<AActor>>			PawnProxies;
 	
 	int32 Size() const
@@ -258,32 +279,54 @@ struct HordeProxyStorage
 		InstanceIds.Reserve(Capacity);
 		VAT_Data.Reserve(Capacity);
 		PawnProxies.Reserve(Capacity);
+		DesiredLoopVAT_Data.Reserve(Capacity);
+		StateEndTimes.Reserve(Capacity);
+		PlaybackStates.Reserve(Capacity);
 	}
 	
 	bool IsValid() const
 	{
 		const int32 AgentCount = PawnProxies.Num();
 		
-		return VAT_Data.Num() == AgentCount
-			&& InstanceIds.Num() == AgentCount;
+		return VAT_Data.Num()				== AgentCount
+			&& InstanceIds.Num()			== AgentCount
+			&& DesiredLoopVAT_Data.Num()	== AgentCount
+			&& StateEndTimes.Num()			== AgentCount
+			&& PlaybackStates.Num()			== AgentCount;
 	}
 	
+	/*
+	 * @breif Proxy SoA 저장소에 대한 추가를 진행합니다.
+	 * @Param Pawn : 추가할 Proxy Actor
+	 * @Param InstanceId : Instaced Mesh Component에 추가 후 반환된 Instance ID
+	 * @Param AnimToTextureAutoPlayData : 초기 애니메이션
+	 * @return SoA PackedIndex 값
+	 */
 	int32 Add(AActor* Pawn, int32 InstanceId, FAnimToTextureAutoPlayData AnimToTextureAutoPlayData)
 	{
 		VAT_Data.Add(AnimToTextureAutoPlayData);
 		InstanceIds.Add(InstanceId);
+		DesiredLoopVAT_Data.Add(AnimToTextureAutoPlayData);
+		StateEndTimes.Add(0.f);
+		PlaybackStates.Add(EHordeVATPlaybackState::Locomotion);
 		return PawnProxies.Add(Pawn);
 	}
 	
 	void RemoveAtSwap(const int32 PackedIndex)
 	{
 		check(IsValid());
-		check(VAT_Data.IsValidIndex(PackedIndex));
 		check(InstanceIds.IsValidIndex(PackedIndex));
+		check(VAT_Data.IsValidIndex(PackedIndex));
+		check(DesiredLoopVAT_Data.IsValidIndex(PackedIndex));
+		check(StateEndTimes.IsValidIndex(PackedIndex));
+		check(PlaybackStates.IsValidIndex(PackedIndex));
 		check(PawnProxies.IsValidIndex(PackedIndex));
 			
-		VAT_Data.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		InstanceIds.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		VAT_Data.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		DesiredLoopVAT_Data.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		StateEndTimes.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
+		PlaybackStates.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 		PawnProxies.RemoveAtSwap(PackedIndex, 1, EAllowShrinking::No);
 
 		check(IsValid());

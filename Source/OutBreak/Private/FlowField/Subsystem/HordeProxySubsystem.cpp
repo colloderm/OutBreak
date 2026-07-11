@@ -17,8 +17,8 @@
 #include "Flowfield/Subsystem/HordeStatusSubsystem.h"
 
 #include "AnimToTextureInstancePlaybackHelpers.h"
-
-
+#include "../../../../../../../Program Files/Epic Games/UE_5.7/Engine/Plugins/Media/BlackmagicMedia/Source/ThirdParty/Build/Include/DeckLinkAPI_h.h"
+#include "AnimNodes/AnimNode_RandomPlayer.h"
 
 
 void UHordeProxySubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -33,6 +33,7 @@ void UHordeProxySubsystem::InitializeStorage(int32 Capacity)
 {
 	ProxyStorage.Initialize(Capacity);
 }
+
 
 ProxyRegisterResult UHordeProxySubsystem::Register(const FTransform& Transform)
 {
@@ -257,6 +258,8 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 		ProxyStorage.InstanceIds,
 		Transforms, ProxyStorage.VAT_Data);
 	ParallelProxy();
+	
+	ProcessVATStateTransitions();
 
 	if (bDiagnosticsEnabled)
 	{
@@ -285,6 +288,7 @@ void UHordeProxySubsystem::ProcessSystem(const float DeltaSeconds)
 			DebugPawnAfterLocation =
 				ProxyStorage.PawnProxies[0]->GetActorLocation();
 		}
+		
 
 		UWorld* World =
 			GetWorld();
@@ -417,18 +421,80 @@ void UHordeProxySubsystem::DestroyProxyActor(AActor* Actor)
 	Actor->Destroy();
 }
 
-void UHordeProxySubsystem::PlayHordeAgentMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex)
+void UHordeProxySubsystem::ProcessVATStateTransitions()
 {
+	check(GetWorld());
+	check(ProxyStorage.IsValid());
+	
+	const double CurrentTime = GetWorld()->GetTimeSeconds();
+	
+	const int32 AgentCount = ProxyStorage.Size();
+	
+	for(int32 PackedIndex = 0; PackedIndex < AgentCount; ++PackedIndex)
+	{
+		if (ProxyStorage.PlaybackStates[PackedIndex] != EHordeVATPlaybackState::HitReaction)
+		{
+			continue;
+		}
+		
+		if (CurrentTime < ProxyStorage.StateEndTimes[PackedIndex])
+		{
+			continue;
+		}
+		
+		ProxyStorage.PlaybackStates[PackedIndex] = EHordeVATPlaybackState::Locomotion;
+		
+		ProxyStorage.StateEndTimes[PackedIndex] = 0.0;
+		
+		/*
+		 * Hit 도중 이동 상태가 Walk에서 Run으로 바뀌었더라도
+		 * 가장 최근 DesiredLoopVAT_Data로 복원된다.
+		 * 
+		 * 추가 고려 사항 : 만약 별도의 Animation State Tree Architecture가 가능할 경우 DesiredLoopVAT_Data를 제거하고,
+		 * State로 별도로 관리하여 공간 복잡도를 줄인다.
+		 */
+		ProxyStorage.VAT_Data[PackedIndex] = ProxyStorage.DesiredLoopVAT_Data[PackedIndex];
+	}
+}
+
+void UHordeProxySubsystem::PlayHordeAgentMontage(const int32 PackedIndex, const EHordeAnimationDataIndex AnimationIndex,
+                                                 const float AnimationDuration, const float PlayRate)
+{
+	check(GetWorld());
+	
+	UAnimToTextureDataAsset* DataAsset = BudgetOverlord->GetHordeVATDataAsset();
+	
+	if (!ProxyStorage.IsValid()
+		|| !ProxyStorage.VAT_Data.IsValidIndex(PackedIndex)
+		|| DataAsset == nullptr
+		|| FMath::IsNearlyZero(PlayRate))
+	{
+		UE_LOG(LogTemp,  Error, TEXT("%s::%s : ProxyStorage, VAT_Data, DataAsset, PlayRate is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	const double CurrentTime = GetWorld()->GetTimeSeconds();
+	
+	/*
+	 * AnimToTexture Material의 Time을 현재 시점에서 0으로 되돌린다.
+	 * 
+	 * 일반 AnimTOTexture Material에서는
+	 * TimeOffset = -CurrentTime
+	 * 형태로 현재 순간부터 애니메이션을 시작할 수 있다.
+	 */
+	const float RestartTimeOffset = -static_cast<float>(CurrentTime);
+	
 	int32 Index = static_cast<int32>(AnimationIndex);
 	
 	FAnimToTextureAutoPlayData PlaybackData;
 	
 	const bool bFoundAnimation = UAnimToTextureInstancePlaybackLibrary::GetAutoPlayDataFromDataAsset
 		(
-			BudgetOverlord->GetHordeVATDataAsset(),
+			DataAsset,
 			Index,
 			PlaybackData,
-			1.0f
+			RestartTimeOffset,
+			PlayRate
 		);
 	
 	if (!bFoundAnimation)
@@ -438,6 +504,8 @@ void UHordeProxySubsystem::PlayHordeAgentMontage(int32 PackedIndex, EHordeAnimat
 	}
 	
 	ProxyStorage.VAT_Data[PackedIndex] = PlaybackData;
+	ProxyStorage.PlaybackStates[PackedIndex] = EHordeVATPlaybackState::HitReaction;
+	ProxyStorage.StateEndTimes[PackedIndex] = CurrentTime + static_cast<double>(AnimationDuration / FMath::Abs(PlayRate));
 }
 
 void UHordeProxySubsystem::ProxyOnTakeAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,

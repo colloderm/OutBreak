@@ -6,6 +6,7 @@
     <projectFile profileName="EpicGames.AspNet">../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Programs/Shared/EpicGames.AspNet/EpicGames.AspNet.csproj</projectFile>
     <projectFile kind="Docker">../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Programs/Shared/EpicGames.Perforce.Fixture/EpicGames.Perforce.Fixture.csproj</projectFile>
     <projectFile>../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Programs/UnrealBuildTool/UnrealBuildTool.csproj</projectFile>
+    <projectFile kind="Docker">../../Program Files/Epic Games/UE_5.7/Engine/Source/Programs/Shared/EpicGames.Perforce.Fixture/EpicGames.Perforce.Fixture.csproj</projectFile>
     <projectFile>Intermediate/ProjectFiles/OutBreak.vcxproj</projectFile>
     <projectFile>Intermediate/ProjectFiles/UE5.vcxproj</projectFile>
   </component>
@@ -19,7 +20,15 @@
     <configurations />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="" />
+    <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeMovementSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeMovementSubsystem.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeProxySubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeProxySubsystem.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeStatusSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/Subsystem/HordeStatusSubsystem.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Struct/HordeSystemType.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Struct/HordeSystemType.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeProxySubsystem.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/Subsystem/HordeProxySubsystem.h" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -27,6 +36,9 @@
   </component>
   <component name="DpaMonitoringSettings">
     <option name="firstShow" value="false" />
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="19" />
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -105,6 +117,69 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/WeaponStatElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.h" root0="FORCE_HIGHLIGHTING" />
   </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.034842647387574E-36" />
+      <entry key="MS500" value="6.353056570009904E-8" />
+      <entry key="S2" value="0.017034177577341138" />
+      <entry key="S5" value="0.33595794851008337" />
+      <entry key="S10" value="1.5907335871528527" />
+      <entry key="S30" value="7.349177647859076" />
+      <entry key="S60" value="14.865837921596754" />
+      <entry key="M2" value="27.58315276879822" />
+      <entry key="M5" value="67.0442228022137" />
+      <entry key="M10" value="145.57997227684774" />
+      <entry key="M15" value="218.66831077229278" />
+      <entry key="M30" value="367.21874012105513" />
+      <entry key="H1" value="499.2589538424252" />
+      <entry key="H2" value="589.5190280243222" />
+      <entry key="H4" value="642.628477332145" />
+      <entry key="D1" value="691.6359239464246" />
+      <entry key="W1" value="700.5074639359934" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.00060365002975" />
+      <entry key="S2" value="1.1570004480002065" />
+      <entry key="S5" value="1.523951478213316" />
+      <entry key="S10" value="2.0005786605877756" />
+      <entry key="S30" value="3.311918511096958" />
+      <entry key="S60" value="4.767735733864248" />
+      <entry key="M2" value="6.844062589373619" />
+      <entry key="M5" value="12.158489759817549" />
+      <entry key="M10" value="20.41481061920539" />
+      <entry key="M15" value="26.96334194495843" />
+      <entry key="M30" value="39.37314631180724" />
+      <entry key="H1" value="50.205638083005105" />
+      <entry key="H2" value="57.64473114687991" />
+      <entry key="H4" value="62.04883014161565" />
+      <entry key="D1" value="66.13349276771608" />
+      <entry key="W1" value="66.8751549196339" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="0.001227552123556473" />
+      <entry key="MS500" value="0.26175372708994865" />
+      <entry key="S2" value="0.8153586118537237" />
+      <entry key="S5" value="1.5954000346311719" />
+      <entry key="S10" value="3.329547805302989" />
+      <entry key="S30" value="10.401242880278858" />
+      <entry key="S60" value="19.405424807535205" />
+      <entry key="M2" value="34.24068420337546" />
+      <entry key="M5" value="79.02972516079276" />
+      <entry key="M10" value="165.8148549214655" />
+      <entry key="M15" value="245.45819039971025" />
+      <entry key="M30" value="406.45363186395883" />
+      <entry key="H1" value="549.3733110831772" />
+      <entry key="H2" value="647.1106514512226" />
+      <entry key="H4" value="704.6485700231785" />
+      <entry key="D1" value="757.7642924566701" />
+      <entry key="W1" value="767.3818781783806" />
+    </decayedShown>
+  </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
   &quot;associatedIndex&quot;: 5
@@ -118,6 +193,7 @@
   "keyToString": {
     "C/C++ 프로젝트.OutBreak.executor": "Run",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
     "RunOnceActivity.git.unshallow": "true",
@@ -125,12 +201,16 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "cidr.known.project.marker": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
+    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
     "git-widget-placeholder": "Horde&&FlowField__Dev",
+    "junie.onboarding.icon.badge.shown": "true",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "RiderCppLiveTemplatesSettingsId",
+    "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -239,6 +319,17 @@
       <EXTENSION ID="com.jetbrains.rider.docker.debug" isFastModeEnabled="true" isSslEnabled="false" />
       <method v="2" />
     </configuration>
+    <configuration name="EpicGames.Perforce.Fixture/Dockerfile (2)" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
+      <deployment type="dockerfile">
+        <settings>
+          <option name="containerName" value="epicgames.perforce.fixture" />
+          <option name="contextFolderPath" value="C:\UEProject\OutBreak" />
+          <option name="sourceFilePath" value="../../Program Files/Epic Games/UE_5.7/Engine/Source/Programs/Shared/EpicGames.Perforce.Fixture/Dockerfile" />
+        </settings>
+      </deployment>
+      <EXTENSION ID="com.jetbrains.rider.docker.debug" isFastModeEnabled="true" isSslEnabled="false" />
+      <method v="2" />
+    </configuration>
     <configuration name="EpicGames.Perforce.Fixture/Dockerfile" type="docker-deploy" factoryName="dockerfile" server-name="Docker">
       <deployment type="dockerfile">
         <settings>
@@ -276,6 +367,8 @@
       <workItem from="1783557022952" duration="17081000" />
       <workItem from="1783587948616" duration="4338000" />
       <workItem from="1783638689597" duration="26189000" />
+      <workItem from="1783790669562" duration="1000" />
+      <workItem from="1783790723598" duration="5561000" />
     </task>
     <servers />
   </component>
@@ -303,5 +396,9 @@
         </breakpoint>
       </breakpoints>
     </breakpoint-manager>
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>

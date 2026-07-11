@@ -20,7 +20,11 @@ public:
 	
 	void InitializeStorage(int32 Capacity);
 	
-	void PlayHordeAgentMontage(int32 PackedIndex, EHordeAnimationDataIndex AnimationIndex);
+	void PlayHordeAgentMontage(
+		const int32 PackedIndex, 
+		const EHordeAnimationDataIndex AnimationIndex,
+		const float AnimationDuration,
+		const float PlayRate);
 	
 protected:
 	ProxyRegisterResult Register(const FTransform& Transform);
@@ -34,8 +38,10 @@ protected:
 	HordeProxyStorage ProxyStorage;
 
 	friend class UBudgetOverlordSubsystem;
+	friend class UHordeMovementSubsystem;
 private:
 	void DestroyProxyActor(AActor* Actor);
+	void ProcessVATStateTransitions();
 
 	UPROPERTY(Transient)
 	TObjectPtr<class AHordeProxyHost> HordeProxy;

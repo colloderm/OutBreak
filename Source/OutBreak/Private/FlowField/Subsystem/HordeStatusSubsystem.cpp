@@ -163,7 +163,7 @@ void UHordeStatusSubsystem::Parallel()
 			continue;
 		}
 
-		BudgetOverlord->GetProxySubsystem()->PlayHordeAgentMontage(PackedIndex, EHordeAnimationDataIndex::Hit_RightShoulder);
+		BudgetOverlord->GetProxySubsystem()->PlayHordeAgentMontage(PackedIndex, EHordeAnimationDataIndex::Hit_RightShoulder, 0.5f, 1.2f);
 		ResolvedEvents.Add(
 			FResolvedHordeDamageEvent
 			{

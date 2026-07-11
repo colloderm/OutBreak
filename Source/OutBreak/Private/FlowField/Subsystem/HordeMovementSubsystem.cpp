@@ -11,6 +11,8 @@
 #include "Engine/World.h"
 #include "FlowField/Subsystem/FlowFieldSubsystem.h"
 #include "FlowField/Settings/FlowFieldSettings.h"
+#include "FlowField/Subsystem/BudgetOverlordSubsystem.h"
+#include "FlowField/Subsystem/HordeProxySubsystem.h"
 #include "HAL/IConsoleManager.h"
 
 namespace
@@ -819,16 +821,24 @@ void UHordeMovementSubsystem::Parallel(const float DeltaSeconds)
 	FVector* Velocities = MovementStorage.Velocities.GetData();
 	const FVector* FinalMoveOffsetsData = FinalMoveOffsets.GetData();
 	
+	const EHordeVATPlaybackState* AnimStates = BudgetOverlord->GetProxySubsystem()->ProxyStorage.PlaybackStates.GetData();
+	
 	ParallelFor(
 		TEXT("UHordeMovementSubsystem::Parallel"),
 			AgentCount,
 			64,
 			[
+				AnimStates,
 				Transforms,
 				Velocities,
 				FinalMoveOffsetsData
 				](const int32 AgentIndex)
 			{
+				if (AnimStates[AgentIndex] == EHordeVATPlaybackState::HitReaction)
+				{
+					return;
+				}
+				
 				const FVector CurrentPosition = 
 					Transforms[AgentIndex].GetLocation();
 				
@@ -902,6 +912,7 @@ void UHordeMovementSubsystem::SimulateClient(const float DeltaSeconds)
 {
 	check(IsInGameThread());
 	check(MovementStorage.IsValid());
+	
 
 	const UFlowFieldSettings* FlowFieldSettings =
 		GetDefault<UFlowFieldSettings>();
@@ -985,12 +996,15 @@ void UHordeMovementSubsystem::SimulateClient(const float DeltaSeconds)
 
 	const float* MoveSpeeds =
 		MovementStorage.MoveSpeeds.GetData();
+	
+	const EHordeVATPlaybackState* AnimStates = BudgetOverlord->GetProxySubsystem()->ProxyStorage.PlaybackStates.GetData();
 
 	ParallelFor(
 		TEXT("UHordeMovementSubsystem::SimulateClient"),
 		AgentCount,
 		64,
 		[
+			AnimStates,
 			Transforms,
 			Velocities,
 			CachedFlowDirections,
@@ -1001,6 +1015,11 @@ void UHordeMovementSubsystem::SimulateClient(const float DeltaSeconds)
 			DeltaSeconds
 		](const int32 AgentIndex)
 		{
+			if (AnimStates[AgentIndex] == EHordeVATPlaybackState::HitReaction)
+			{
+				return;
+			}
+			
 			const FVector CurrentPosition =
 				Transforms[AgentIndex].GetLocation();
 
