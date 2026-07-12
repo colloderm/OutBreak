@@ -147,3 +147,31 @@ struct OUTBREAK_API FFlowFieldPolyNode
 	NavNodeRef BestNextPolyRef = INVALID_NAVNODEREF;
 	FVector FlowDirection = FVector::ZeroVector;
 };
+
+USTRUCT()
+struct FFlowFieldNavTraversalEdge
+{
+	GENERATED_BODY()
+	
+	UPROPERTY()
+	FVector Start = FVector::ZeroVector;
+	
+	UPROPERTY()
+	FVector End = FVector::ZeroVector;
+	
+	UPROPERTY()
+	FVector Center = FVector::ZeroVector;
+	
+	UPROPERTY()
+	FVector Direciton = FVector::ZeroVector;
+	
+	UPROPERTY()
+	float Width = 0.0f;
+	
+	bool IsValid() const
+	{
+		return Width > KINDA_SMALL_NUMBER
+			&& !Start.ContainsNaN()
+			&& !End.ContainsNaN();
+	}
+};

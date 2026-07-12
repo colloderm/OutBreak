@@ -85,6 +85,7 @@ private:
 	void CollectGeneratedNavLinkNeighbors();
 	void AddDirectedNeighbor(NavNodeRef FromRef, NavNodeRef ToRef);
 	void AddLinkProxy(NavNodeRef FromRef, NavNodeRef ToRef, const FVector& FromPoint, const FVector& ToPoint, const ANavLinkProxy* LinkProxy);
+	bool FindNearestPolyEdge(const NavNodeRef PolyRef, const FVector& ReferencePoint, FFlowFieldNavTraversalEdge& OutEdge);
 	FFlowFieldTraversalBakeData BuildTraversalBakeData(
 		NavNodeRef FromRef,
 		NavNodeRef ToRef,

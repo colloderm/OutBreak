@@ -654,6 +654,94 @@ void AFlowFieldRecastNavMesh::AddLinkProxy(
 	}
 }
 
+bool AFlowFieldRecastNavMesh::FindNearestPolyEdge(const NavNodeRef PolyRef, const FVector& ReferencePoint,
+	FFlowFieldNavTraversalEdge& OutEdge)
+{
+	OutEdge = FFlowFieldNavTraversalEdge();
+	
+	if (PolyRef == INVALID_NAVNODEREF
+		|| ReferencePoint.ContainsNaN())
+	{
+		return false;
+	}
+	
+	TArray<FVector> Vertices;
+	
+	if (!GetPolyVerts(PolyRef, Vertices)
+		|| Vertices.Num() < 2)
+	{
+		return false;
+	}
+	
+	float BestDistanceSquared = TNumericLimits<float>::Max();
+	int32 BestEdgeIndex =INDEX_NONE;
+	
+	for (int32 Index = 0; Index < Vertices.Num(); ++Index)
+	{
+		const int32 NextIndex =
+			(Index + 1) % Vertices.Num();
+		
+		const FVector& EdgeStart = Vertices[Index];
+		const FVector& EdgeEnd = Vertices[NextIndex];
+		
+		// 벽의 높이 차이보다 평면상의 경계 선택이 중요하므로
+		// XY 평면에서 비교한다.
+		FVector FlatReferencePoint = ReferencePoint;
+		FVector FlatEdgeStart = EdgeStart;
+		FVector FlatEdgeEnd = EdgeEnd;
+		
+		FlatReferencePoint.Z = 0.f;
+		FlatEdgeStart.Z = 0.f;
+		FlatEdgeEnd.Z = 0.f;
+		
+		const FVector ClosestPoint = 
+			FMath::ClosestPointOnSegment(
+				FlatReferencePoint,
+				FlatEdgeStart,
+				FlatEdgeEnd);
+
+		const float DistanceSquared = 
+			FVector::DistSquared(
+				FlatReferencePoint,
+				ClosestPoint);
+		
+		if (DistanceSquared >= BestDistanceSquared)
+		{
+			continue;
+		}
+		
+		BestDistanceSquared = DistanceSquared;
+		BestEdgeIndex = Index;
+	}
+	
+	if (BestEdgeIndex == INDEX_NONE)
+	{
+		return false;
+	}
+	
+	const int32 BestNextIndex = 
+		(BestEdgeIndex + 1) % Vertices.Num();
+	
+	OutEdge.Start = Vertices[BestNextIndex];
+	OutEdge.End = Vertices[BestNextIndex];
+	OutEdge.Center = 
+		(OutEdge.Start + OutEdge.End) * 0.5f;
+	
+	OutEdge.Direciton = 
+		(OutEdge.End - OutEdge.Start).GetSafeNormal();
+	
+	OutEdge.Width = 
+		FVector::Distance(
+			OutEdge.Start,
+			OutEdge.End);
+	
+	return OutEdge.IsValid();
+		
+	
+	
+	return true;
+}
+
 FFlowFieldTraversalBakeData AFlowFieldRecastNavMesh::BuildTraversalBakeData(
 	const NavNodeRef FromRef,
 	const NavNodeRef ToRef,
