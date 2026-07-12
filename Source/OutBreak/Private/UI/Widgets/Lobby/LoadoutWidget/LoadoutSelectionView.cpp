@@ -3,7 +3,6 @@
 
 #include "UI/Widgets/Lobby/LoadoutWidget/LoadoutSelectionView.h"
 
-#include "Chaos/PBDRigidsSOAs.h"
 #include "Components/VerticalBox.h"
 #include "UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.h"
 #include "UI/Widgets/Lobby/LoadoutWidget/LoadoutCardElement.h"
