@@ -275,6 +275,7 @@ void AOBCharacterBase::HandleExtracted()
 	{
 		AbilitySystemComponent->CancelAbilities();
 	}
+	
 	// 무기 해제(부여된 발사 능력 회수 → 재발사 불가).
 	if (EquipmentComponent)
 	{
