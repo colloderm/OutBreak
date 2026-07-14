@@ -17,6 +17,7 @@ public class OutBreak : ModuleRules
 			"EnhancedInput",
 			"UMG",
 			"Niagara",
+			"AIModule",
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks",
@@ -33,7 +34,6 @@ public class OutBreak : ModuleRules
 			"ModelViewViewModel",
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
-			"AIModule",
 			"Navmesh",
 			"AnimToTexture"
 		});

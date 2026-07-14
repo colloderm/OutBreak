@@ -267,13 +267,16 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		Hit, TraceStart, TraceEnd, OB_TraceChannel_Weapon, QueryParams
 	);
 	
+	
 	AActor* HitActor = Hit.GetActor();
 
 	if (IsValid(HitActor))
 	{
-		UGameplayStatics::ApplyDamage(
+		UGameplayStatics::ApplyPointDamage(
 			HitActor,
 			WeaponData->BaseDamage,
+			ShotDirection,
+			Hit,
 			nullptr,
 			nullptr,
 			UDamageType::StaticClass());
