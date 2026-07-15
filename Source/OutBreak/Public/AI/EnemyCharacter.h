@@ -4,9 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Components/TimelineComponent.h"
 #include "EnemyCharacter.generated.h"
 
 class USkeletalMeshComponentBudgeted;
+class UMotionWarpingComponent;
+class UDamageType;
+class UPrimitiveComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(
 	LogModularAnimationProxy,
@@ -36,14 +40,71 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Animation Budget")
 	FModularAnimationProxyReducedWorkChanged
 	OnReducedAnimationWorkChanged;
+	
+
+	UMotionWarpingComponent* GetMotionWarpingComponent() const
+	{
+		return MotionWarpingComponent;
+	}
+
+	
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
 
 	virtual void EndPlay(
 		const EEndPlayReason::Type EndPlayReason) override;
+	
+	UFUNCTION()
+	virtual float TakeDamage(
+		float DamageAmount,
+		const FDamageEvent& DamageEvent,
+		AController* EventInstigator,
+		AActor* DamageCauser) override;
 
 private:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
+	
+	UPROPERTY(EditAnywhere, Category="Physica|React", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCurveFloat> ReactCurveFloat;
+	
+	UPROPERTY(EditAnywhere, Category="Physica|React", meta = (AllowPrivateAccess = "true"))
+	float ReactScale;
+	
+	/* Physical Material */
+	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPhysicalMaterial> PM_Head;
+	
+	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPhysicalMaterial> PM_Torso;
+	
+	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPhysicalMaterial> PM_Arm_R;
+	
+	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPhysicalMaterial> PM_Arm_L;
+	
+	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPhysicalMaterial> PM_Leg_R;
+	
+	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPhysicalMaterial> PM_Leg_L;
+	
+	
+	FTimeline ReactTimeline;
+	FName CacheBoneName = NAME_None;
+	
+	
+	UFUNCTION()
+	void HandleReactTimeline(float value);
+	
+	UFUNCTION()
+	void HandleReactTimelineFinished();
+	
+	bool bIsHit = false;
+	
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,

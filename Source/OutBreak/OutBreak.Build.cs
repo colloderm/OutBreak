@@ -23,6 +23,8 @@ public class OutBreak : ModuleRules
 			"GameplayTasks",
 			"NavigationSystem",
 			"DeveloperSettings",
+			"MotionWarping",
+			"PhysicsCore",
 			"AnimationBudgetAllocator",
 		});
 

@@ -21,242 +21,24 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Nav/EnemyGenNavLinksProxy.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/DA_MannequinBoneAnimation.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/DA_MannequinBoneAnimation.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/DA_VertexAnimation.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/DA_VertexAnimation.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/Mannequins/Meshes/RTG_SKM_Quinn_Simple.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/Mannequins/Meshes/RTG_SKM_Quinn_Simple.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Characters/Mannequins/Meshes/SKM_Manny_Simple.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/Mannequins/Meshes/SKM_Manny_Simple.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_FlowFieldGoalActor.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_HordeProxyActor.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_HordeProxyHost.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_ProxyActor.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Attack_LegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Attack_NeckNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_BiteLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_BiteNeckNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Dead_PositionNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Detection_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Detection_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Detection_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Detection_04Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Detection_05Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Eat_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Eat_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Eat_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Eat_04Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_EndJump_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_EndJump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Fall_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Fall_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_GetDown_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_GetDown_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_GetUp_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_GetUp_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Ground_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Ground_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Ground_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Hit_HeadNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Hit_LeftLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Hit_LeftShoulderNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Hit_RightLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Hit_RightShoulderNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Hit_SpineNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_04Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_05Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_06Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_07Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_08Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Idle_09Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LeftAttack_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LeftAttack_Charged_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LeftAttack_Charged_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LeftAttack_Charged_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LefttAttack_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LefttAttack_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LoopJump_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LoopJump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_LoopJump_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_RightAttack_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_RightAttack_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_RightAttack_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_RightAttack_Charged_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_RightAttack_Charged_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_RightAttack_Charged_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Run_BackNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Run_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Run_FrontNormal_Mirror.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Run_LeftNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Run_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Scream_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Scream_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Scream_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Scream_04Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Scream_05Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Scream_06Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Scream_07Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Sprint_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Sprint_LeftNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Sprint_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_StartJump_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Start_Jump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Walk_BackNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Walk_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Walk_LeftNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieIP_Walk_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Detection_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Detection_05Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_EndJump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_GetDown_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_GetUp_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Hit_LeftLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Hit_RightLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_LeftAttack_Charged_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_LeftAttack_Charged_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_LeftAttack_Charged_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_LefttAttack_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_LefttAttack_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_RightAttack_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_RightAttack_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_RightAttack_Charged_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_RightAttack_Charged_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_RightAttack_Charged_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Run_BackNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Run_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Run_LeftNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Run_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Scream_07Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Sprint_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Sprint_LefttNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Sprint_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_StartJump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Walk_BackNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Walk_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Walk_LefttNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/Mannequin_Animation/ZombieRM_Walk_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Attack_LegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Attack_NeckNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_BiteLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_BiteNeckNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Dead_PositionNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Detection_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Detection_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Detection_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Detection_04Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Detection_05Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Eat_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Eat_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Eat_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Eat_04Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_EndJump_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_EndJump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Fall_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Fall_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_GetDown_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_GetDown_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_GetUp_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_GetUp_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Ground_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Ground_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Ground_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Hit_HeadNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Hit_LeftLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Hit_LeftShoulderNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Hit_RightLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Hit_RightShoulderNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Hit_SpineNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_04Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_05Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_06Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_07Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_08Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Idle_09Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LeftAttack_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LeftAttack_Charged_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LeftAttack_Charged_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LeftAttack_Charged_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LefttAttack_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LefttAttack_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LoopJump_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LoopJump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_LoopJump_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_RightAttack_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_RightAttack_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_RightAttack_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_RightAttack_Charged_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_RightAttack_Charged_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_RightAttack_Charged_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Run_BackNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Run_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Run_FrontNormal_Mirror.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Run_LeftNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Run_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Scream_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Scream_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Scream_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Scream_04Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Scream_05Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Scream_06Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Scream_07Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Sprint_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Sprint_LeftNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Sprint_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_StartJump_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Start_Jump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Walk_BackNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Walk_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Walk_LeftNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieIP_Walk_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Detection_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Detection_05Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_EndJump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_GetDown_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_GetUp_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Hit_LeftLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Hit_RightLegNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_LeftAttack_Charged_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_LeftAttack_Charged_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_LeftAttack_Charged_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_LefttAttack_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_LefttAttack_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_RightAttack_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_RightAttack_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_RightAttack_Charged_01Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_RightAttack_Charged_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_RightAttack_Charged_03Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Run_BackNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Run_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Run_LeftNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Run_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Scream_07Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Sprint_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Sprint_LefttNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Sprint_RightNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_StartJump_02Normal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Walk_BackNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Walk_FrontNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Walk_LefttNormal.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Zombie/ModularAnimation/ForModularZombieRM_Walk_RightNormal.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Characters/Mannequins/Rigs/PA_Mannequin.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/Mannequins/Rigs/PA_Mannequin.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_GenNavLink2.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/DevB/BP_GenNavLink2.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_EnemyController.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_EnemyController.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieIP_Vault_L_Montage.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieIP_Vault_L_Montage.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/OutBreak.uproject" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.uproject" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/OutBreak.Build.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/OutBreak.Build.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/ModularAnimationBudgetWorldSubsystem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/AnimationBudgetWorldSubsystem.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/FlowField/ModularSkeletalMeshProxyActor.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/ModularAnimationBudgetWorldSubsystem.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/AnimationBudgetWorldSubsystem.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/FlowField/ModularSkeletalMeshProxyActor.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Nav/EnemyGenNavLinksProxy.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Nav/EnemyGenNavLinksProxy.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -273,21 +55,31 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="cidr-memory-view://0" root0="FORCE_HIGHLIGHTING" />
+    <setting file="cidr-memory-view://2" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Classes/Navigation/GeneratedNavLinksProxy.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Private/Navigation/GeneratedNavLinksProxy.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Private/Navigation/PathFollowingComponent.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/AI/Navigation/NavigationTypes.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/CapsuleComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/PrimitiveComponent.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/SkinnedMeshComponent.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/TimelineComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/EngineTypes.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/Actor.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/DamageType.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/FloatingPawnMovement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/NavMovementComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Private/Components/CharacterMovementComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Private/InstancedStaticMesh.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Private/SkinnedMeshSceneProxyDesc.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Private/Timeline.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/NavigationSystem/Private/BaseGeneratedNavLinksProxy.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/NavigationSystem/Private/NavigationSystem.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/NavigationSystem/Public/BaseGeneratedNavLinksProxy.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/NavigationSystem/Public/NavLinkCustomInterface.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/NavigationSystem/Public/NavigationSystem.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/System/AIDamageType.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -307,7 +99,6 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Nav/EnemyGenNavLinksProxy.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/System/AIDamageType.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" root0="FORCE_HIGHLIGHTING" />
@@ -400,7 +191,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
-    "C/C++ 프로젝트.OutBreak.executor": "Run",
+    "C/C++ 프로젝트.OutBreak.executor": "Debug",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
@@ -584,6 +375,10 @@
       <workItem from="1783866836425" duration="38000" />
       <workItem from="1783866956049" duration="2028000" />
       <workItem from="1783908108779" duration="41276000" />
+      <workItem from="1784074647678" duration="3142000" />
+      <workItem from="1784079849005" duration="7333000" />
+      <workItem from="1784089166917" duration="12988000" />
+      <workItem from="1784105306446" duration="14839000" />
     </task>
     <servers />
   </component>
@@ -610,6 +405,11 @@
           <properties exception="System.Threading.ThreadAbortException" breakIfHandledByOtherCode="false" displayValue="System.Threading.ThreadAbortException" />
           <option name="timeStamp" value="3" />
         </breakpoint>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h</url>
+          <line>4</line>
+          <option name="timeStamp" value="4" />
+        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>

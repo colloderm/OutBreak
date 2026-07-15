@@ -261,6 +261,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OBWeaponTrace), /*bTraceComplex=*/true);
 	QueryParams.AddIgnoredActor(Character);
 	QueryParams.AddIgnoredActor(Weapon);
+	QueryParams.bReturnPhysicalMaterial = true;
 
 	FHitResult Hit;
 	const bool bHit = GetWorld()->LineTraceSingleByChannel(

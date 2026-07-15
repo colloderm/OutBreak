@@ -6,22 +6,15 @@
 #include "AI/Nav/EnemyGenNavLinksProxy.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "AI/Struct/EnemyTraversalData.h"
 #include "EnemyMovementComponent.generated.h"
 
 
+class UAnimMontage;
 
-
-UENUM(Blueprintable)
-enum class ETraversalType : uint8
-{
-	Walk UMETA(DisplayName="Walk"),
-	Drop UMETA(DisplayName="Drop"),
-	Vault UMETA(DisplayName="Vault"),
-	Mantle UMETA(DisplayName="Mantle"),
-	ClimbUp UMETA(DisplayName="ClimbUp"),
-};
-
-
+class AEnemyCharacter;
+class UCapsuleComponent;
+class USkeletalMeshComponent;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class OUTBREAK_API UEnemyMovementComponent : public UCharacterMovementComponent
@@ -31,6 +24,16 @@ class OUTBREAK_API UEnemyMovementComponent : public UCharacterMovementComponent
 public:
 	// Sets default values for this component's properties
 	UEnemyMovementComponent();
+	
+	ETraversalType GetTraversalType() const { return TraversalType; }
+	
+	float GetVaultSpan() const { return VaultSpan; }
+	float GetVaultMinHeight() const { return VaultMinHeight; }
+	float GetVaultMaxHeight() const { return VaultMaxHeight; }
+	float GetMantleMinHeight() const { return MantleMinHeight; }
+	float GetMantleMaxHeight() const { return MantleMaxHeight; }
+	float GetClimbUpMinHeight() const { return ClimbUpMinHeight; }
+	float GetClimbUpMaxHeight() const { return ClimbUpMaxHeight; }
 
 protected:
 	// Called when the game starts
@@ -38,15 +41,26 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
 	ETraversalType TraversalType = ETraversalType::Walk;
+	
 	/* Traversal Values */
 	
-	/* Vault X:75, Z:110 */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
+	/* Vault X:75, Z:110~112 (cm.) */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault")
+	float VaultSpan = 75.f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault")
 	float VaultMinHeight = 100.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault")
 	float VaultMaxHeight = 112.f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault|Animation")
+	TObjectPtr<UAnimMontage> VaultMontage;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault|Animation")
+	float VaultPlayRate = 0.7f;
 
+	/* Mantle */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
 	float MantleMinHeight = 200.f;
 
@@ -70,6 +84,9 @@ protected:
 
 	UPROPERTY()
 	bool bIsTraversingNavLink = false;
+	
+	UPROPERTY()
+	FVector CacheMeshWorldLocation = FVector::ZeroVector;
 
 public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
@@ -79,14 +96,19 @@ public:
 
 	bool IsTraversingNavLink() const { return bIsTraversingNavLink; }
 
-	void StartNavLinkTraversal(const FVector& Destination, UPathFollowingComponent* PathFollowing, UEnemyGenNavLinksProxy* EnemyGenNavLinksProxy);
+	void StartNavLinkTraversal(const FVector& Destination, UPathFollowingComponent* PathFollowing, UEnemyGenNavLinksProxy* EnemyGenNavLinksProxy, FVector
+	                           Start, FVector End, ETraversalLinkType LinkType);
 	void FinishNavLinkTraversal();
 
 	void TickTraversalDrop();
 	void TickTraversalVault();
 	void TickTraversalMantle();
 	void TickTraversalClimbUp();
-	// Called every frame
+	
+	
+	void BeginParkour();
+	void EndParkour();
+	void BeginTraversalVault(FVector& Start, FVector& Destination);
 
 protected:
 	UPROPERTY(
@@ -102,9 +124,25 @@ protected:
 		meta = (ClampMin = "0.0"))
 	float MinimumRotationSpeed = 5.0f;
 
+	void SetTraversalType(ETraversalType NewTraversalType)
+	{
+		TraversalType = NewTraversalType;
+	}
 private:
 	/* Falling Traversal */
 	bool bFallingStart = false;
-	FTransform LatestRelativeMeshTransform = FTransform::Identity;
 	FTimerHandle AfterDropToReturnHandle;
+	
+	void OnMontageEnded(UAnimMontage* Montage, bool bInterrupted);
+	
+	UPROPERTY(Transient)
+	TObjectPtr<AEnemyCharacter> Character;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<UCapsuleComponent> CapsuleComponent;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<USkeletalMeshComponent> SkeletalMeshComponent;
+	
+	
 };

@@ -6,6 +6,9 @@
 #include "Components/CapsuleComponent.h"
 #include "IAnimationBudgetAllocator.h"
 #include "SkeletalMeshComponentBudgeted.h"
+#include "MotionWarping.h"
+#include "MotionWarpingComponent.h"
+#include "Engine/DamageEvents.h"
 
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
 
@@ -20,13 +23,40 @@ AEnemyCharacter::AEnemyCharacter(
 			UEnemyMovementComponent>(
 				ACharacter::CharacterMovementComponentName))
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 
 	UCapsuleComponent* Capsule =
 		GetCapsuleComponent();
-
+	
 	check(Capsule);
+	
+	 /* ———————————————————————————————————Set Primitive Target————————————————————————————————————————— */
+		UPrimitiveComponent* CollisionComponent = Capsule;
+	/* ———————————————————————————————————————————————————————————————————————————————————————————————— */
+	
 
+	/* ——————————————————————————————————Default Engine Collision Setting—————————————————————————————— */
+	// using Event Enable
+	CollisionComponent->SetGenerateOverlapEvents(true);
+	// Collision Setting
+	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	CollisionComponent->SetCollisionObjectType(ECC_Pawn);
+
+	// Trace Channel
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	
+	CollisionComponent->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore); /* Camera Probe */
+	CollisionComponent->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Ignore); /* Weapon */
+
+	// Object Channel
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Vehicle, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Destructible, ECR_Block);
+	/* ———————————————————————————————————————————————————————————————————————————————————————————————— */
 	Capsule->SetCanEverAffectNavigation(false);
 
 	USkeletalMeshComponentBudgeted* BudgetedMesh =
@@ -38,8 +68,43 @@ AEnemyCharacter::AEnemyCharacter(
 			"AEnemyCharacter requires "
 			"USkeletalMeshComponentBudgeted as its Mesh component."));
 
-	BudgetedMesh->SetCanEverAffectNavigation(false);
+	/* ———————————————————————————————————Set Primitive Target————————————————————————————————————————— */
+	CollisionComponent = BudgetedMesh;
+	/* ———————————————————————————————————————————————————————————————————————————————————————————————— */
+	
+	CollisionComponent->SetRelativeLocationAndRotation(
+		FVector(0.0f, 0.0f, 0.0f),
+		FRotator(0.0f, 0.0f, 0.0f));
+	
+	CollisionComponent->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -90.f), FRotator(0.0f, 0.0f, -90.0f));
 
+	/* ——————————————————————————————————Default Engine Collision Setting—————————————————————————————— */
+	// using Event Enable
+	CollisionComponent->SetGenerateOverlapEvents(true);
+	// Collision Setting
+	CollisionComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	CollisionComponent->SetCollisionObjectType(ECC_Pawn);
+
+	// Trace Channel
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+	
+	CollisionComponent->SetCollisionResponseToChannel(ECC_GameTraceChannel1, ECR_Ignore); /* Camera Probe */
+	CollisionComponent->SetCollisionResponseToChannel(ECC_GameTraceChannel2, ECR_Block); /* Weapon */
+
+	// Object Channel
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Pawn, ECR_Ignore);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Vehicle, ECR_Block);
+	CollisionComponent->SetCollisionResponseToChannel(ECC_Destructible, ECR_Block);
+	/* ———————————————————————————————————————————————————————————————————————————————————————————————— */
+	
+	BudgetedMesh->SetCanEverAffectNavigation(false);
+	
+	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
+	
 	/*
 	 * 컴포넌트가 등록되기 전에 자동 등록 설정을 활성화한다.
 	 */
@@ -72,13 +137,49 @@ void AEnemyCharacter::BeginPlay()
 	BudgetedMesh->OnReduceWork().BindUObject(
 		this,
 		&AEnemyCharacter::HandleReducedWorkChanged);
+	
+	if (IsValid(ReactCurveFloat))
+	{
+		FOnTimelineFloat UpdateDelegate;
+		UpdateDelegate.BindUFunction(
+			this,
+			FName(TEXT("HandleReactTimeline")));
+		
 
+		FOnTimelineEvent FinishedDelegate;
+		FinishedDelegate.BindUFunction(
+			this,
+			FName(TEXT("HandleReactTimelineFinished")));
+		
+		ReactTimeline.AddInterpFloat(ReactCurveFloat, UpdateDelegate);
+		ReactTimeline.SetTimelineFinishedFunc(FinishedDelegate);
+		
+		ReactTimeline.SetLooping(false);
+		ReactTimeline.SetPlayRate(1.f);
+	}
+	
+	if (!ensureAlwaysMsgf(
+		PM_Head && PM_Torso && PM_Arm_R && PM_Arm_L && PM_Leg_R && PM_Leg_L,
+		TEXT("%s::%s: VaultMontage is invalid."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Physical Material is not set."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+	}
+	
 	/*
 	 * BeginPlay 시점에는 컴포넌트 등록이 끝났으므로
 	 * 초기 중요도를 강제로 한 번 적용한다.
 	 */
 	bHasAppliedBudgetState = false;
 	ApplyAnimationBudgetSignificance();
+}
+
+void AEnemyCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	
+	ReactTimeline.TickTimeline(DeltaSeconds);
 }
 
 void AEnemyCharacter::EndPlay(
@@ -96,6 +197,96 @@ void AEnemyCharacter::EndPlay(
 	bReducedAnimationWork = false;
 
 	Super::EndPlay(EndPlayReason);
+}
+
+float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator,
+	AActor* DamageCauser)
+{
+	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	
+	if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+	{
+		const FPointDamageEvent& PointEvent =
+			static_cast<const FPointDamageEvent&>(DamageEvent);
+
+	
+		if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+		{
+			const FPointDamageEvent& PointDamageEvent =
+				static_cast<const FPointDamageEvent&>(DamageEvent);
+			
+			FHitResult HitResult= PointDamageEvent.HitInfo;
+	
+			FName BoneName = HitResult.BoneName;
+			const FVector HitDirection = HitResult.Normal;
+			TWeakObjectPtr<UPhysicalMaterial> PhyMtrl = HitResult.PhysMaterial;
+			
+			if (BoneName == FName(TEXT("pelvis")))
+			{
+				UE_LOG(LogTemp, Display, TEXT("%s::%s: Hitted Bone is pelvis"), *GetClass()->GetName(), TEXT(__FUNCTION__));
+				return ActualDamage;
+			}
+			if (!bIsHit)
+			{
+				UE_LOG(LogTemp, Display, TEXT("%s::%s: It's already a hit."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+			}
+			
+			if (PhyMtrl == PM_Head)
+			{
+				GetMesh()->HideBoneByName(FName(TEXT("Head")), PBO_None);
+			}
+			else if (PhyMtrl == PM_Arm_R)
+			{
+				GetMesh()->HideBoneByName(FName(TEXT("upperarm_r")), PBO_None);
+			}
+			else if (PhyMtrl == PM_Arm_L)
+			{
+				GetMesh()->HideBoneByName(FName(TEXT("upperarm_l")), PBO_None);
+			}
+			else if (PhyMtrl == PM_Leg_R)
+			{
+				GetMesh()->HideBoneByName(FName(TEXT("thigh_r")), PBO_None);
+			}
+			else if (PhyMtrl == PM_Leg_L)
+			{
+				GetMesh()->HideBoneByName(FName(TEXT("thigh_l")), PBO_None);
+			}
+			
+			
+			
+			
+	
+			CacheBoneName = BoneName;
+	
+			GetCharacterMovement()->StopMovementImmediately();
+	
+			GetMesh()->SetAllBodiesBelowSimulatePhysics(BoneName, true, true);
+			GetMesh()->AddImpulse(HitDirection.GetSafeNormal() * ReactScale, BoneName, true);
+	
+			ReactTimeline.PlayFromStart();
+	
+	
+			bIsHit = true;
+		}
+	}
+	
+	return ActualDamage;
+}
+void AEnemyCharacter::HandleReactTimeline(float value)
+{
+	if (CacheBoneName == NAME_None)
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Cache Bone Name is \"NAME_None\""), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	GetMesh()->SetAllBodiesBelowPhysicsBlendWeight(CacheBoneName, value);
+}
+
+void AEnemyCharacter::HandleReactTimelineFinished()
+{
+	GetMesh()->SetAllBodiesPhysicsBlendWeight(0.0f, false);
+	GetMesh()->SetAllBodiesSimulatePhysics(false);
+	bIsHit = false;
 }
 
 void AEnemyCharacter::SetAnimationSignificance(
@@ -168,9 +359,9 @@ void AEnemyCharacter::ApplyAnimationBudgetSettings()
 	BudgetedMesh->SetAutoRegisterWithBudgetAllocator(true);
 
 	/*
-	 * 중요도는 외부에서 직접 설정한다.
+	 * 중요도는 외부에서 직접 설정한다. -> true : 자동 설정
 	 */
-	BudgetedMesh->SetAutoCalculateSignificance(false);
+	BudgetedMesh->SetAutoCalculateSignificance(true);
 
 	/*
 	 * 최근 렌더링 여부를 예산 판단에 반영한다.
