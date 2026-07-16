@@ -8,7 +8,12 @@
 #include "SkeletalMeshComponentBudgeted.h"
 #include "MotionWarping.h"
 #include "MotionWarpingComponent.h"
+#include "AI/System/ModularSkeletalMeshActor.h"
 #include "Engine/DamageEvents.h"
+#include "Components/ChildActorComponent.h"
+#include "AI/System/ModularSkeletalMeshActor.h"
+#include "Animation/SkeletalMeshActor.h"
+
 
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
 
@@ -105,6 +110,8 @@ AEnemyCharacter::AEnemyCharacter(
 	
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 	
+	ChildActorComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("ChildActorComponent"));
+	
 	/*
 	 * 컴포넌트가 등록되기 전에 자동 등록 설정을 활성화한다.
 	 */
@@ -167,6 +174,8 @@ void AEnemyCharacter::BeginPlay()
 		UE_LOG(LogTemp, Error, TEXT("%s::%s: Physical Material is not set."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 	}
 	
+	ChildActorSkeletalMesh = GetChildActorSkeletalMesh(); 
+	
 	/*
 	 * BeginPlay 시점에는 컴포넌트 등록이 끝났으므로
 	 * 초기 중요도를 강제로 한 번 적용한다.
@@ -199,8 +208,32 @@ void AEnemyCharacter::EndPlay(
 	Super::EndPlay(EndPlayReason);
 }
 
+void AEnemyCharacter::PhysicalMaterialProcess(TWeakObjectPtr<UPhysicalMaterial> PhyMtrl)
+{
+	if (PhyMtrl == PM_Head)
+	{
+		GetMesh()->HideBoneByName(FName(TEXT("Head")), PBO_None);
+	}
+	else if (PhyMtrl == PM_Arm_R)
+	{
+		GetMesh()->HideBoneByName(FName(TEXT("upperarm_r")), PBO_None);
+	}
+	else if (PhyMtrl == PM_Arm_L)
+	{
+		GetMesh()->HideBoneByName(FName(TEXT("upperarm_l")), PBO_None);
+	}
+	else if (PhyMtrl == PM_Leg_R)
+	{
+		GetMesh()->HideBoneByName(FName(TEXT("thigh_r")), PBO_None);
+	}
+	else if (PhyMtrl == PM_Leg_L)
+	{
+		GetMesh()->HideBoneByName(FName(TEXT("thigh_l")), PBO_None);
+	}
+}
+
 float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator,
-	AActor* DamageCauser)
+                                  AActor* DamageCauser)
 {
 	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	
@@ -231,26 +264,8 @@ float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 				UE_LOG(LogTemp, Display, TEXT("%s::%s: It's already a hit."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 			}
 			
-			if (PhyMtrl == PM_Head)
-			{
-				GetMesh()->HideBoneByName(FName(TEXT("Head")), PBO_None);
-			}
-			else if (PhyMtrl == PM_Arm_R)
-			{
-				GetMesh()->HideBoneByName(FName(TEXT("upperarm_r")), PBO_None);
-			}
-			else if (PhyMtrl == PM_Arm_L)
-			{
-				GetMesh()->HideBoneByName(FName(TEXT("upperarm_l")), PBO_None);
-			}
-			else if (PhyMtrl == PM_Leg_R)
-			{
-				GetMesh()->HideBoneByName(FName(TEXT("thigh_r")), PBO_None);
-			}
-			else if (PhyMtrl == PM_Leg_L)
-			{
-				GetMesh()->HideBoneByName(FName(TEXT("thigh_l")), PBO_None);
-			}
+			
+			PhysicalMaterialProcess(PhyMtrl);
 			
 			
 			
@@ -272,6 +287,53 @@ float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 	
 	return ActualDamage;
 }
+
+void AEnemyCharacter::MeshPartDestruction(UPhysicalMaterial* PhysMtrl, FName BoneName)
+{
+	if (!IsValid(ChildActorSkeletalMesh))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor Skeletal Mesh is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	UWorld* World = GetWorld();
+	
+	if (!IsValid(World))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: World is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	ChildActorSkeletalMesh->HideBoneByName(BoneName, PBO_Term);
+
+}
+
+USkeletalMeshComponent* AEnemyCharacter::GetChildActorSkeletalMesh()
+{
+	if (IsValid(ChildActorComponent))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor Component is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return nullptr;
+	}
+	
+	AActor* ChildActor = ChildActorComponent->GetChildActor();
+	if (IsValid(ChildActor))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return nullptr;
+	}
+	
+	AModularSkeletalMeshActor* MeshOwner = Cast<AModularSkeletalMeshActor>(ChildActor);
+	
+	check(MeshOwner)
+	// {
+	// 	UE_LOG(LogTemp, Error, TEXT("%s::%s: MeshOwner is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+	// 	return nullptr;
+	// }
+	
+	return MeshOwner->LeaderHead;
+}
+
 void AEnemyCharacter::HandleReactTimeline(float value)
 {
 	if (CacheBoneName == NAME_None)

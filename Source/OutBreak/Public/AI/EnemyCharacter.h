@@ -11,6 +11,8 @@ class USkeletalMeshComponentBudgeted;
 class UMotionWarpingComponent;
 class UDamageType;
 class UPrimitiveComponent;
+class UChildActorComponent;
+
 
 DECLARE_LOG_CATEGORY_EXTERN(
 	LogModularAnimationProxy,
@@ -55,6 +57,8 @@ protected:
 
 	virtual void EndPlay(
 		const EEndPlayReason::Type EndPlayReason) override;
+
+	void PhysicalMaterialProcess(TWeakObjectPtr<UPhysicalMaterial> PhyMtrl);
 	
 	UFUNCTION()
 	virtual float TakeDamage(
@@ -62,10 +66,18 @@ protected:
 		const FDamageEvent& DamageEvent,
 		AController* EventInstigator,
 		AActor* DamageCauser) override;
+	
+	void MeshPartDestruction(UPhysicalMaterial* PhysMtrl, FName BoneName);
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UChildActorComponent> ChildActorComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USkeletalMeshComponent> ChildActorSkeletalMesh;
 	
 	UPROPERTY(EditAnywhere, Category="Physica|React", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCurveFloat> ReactCurveFloat;
@@ -96,6 +108,8 @@ private:
 	FTimeline ReactTimeline;
 	FName CacheBoneName = NAME_None;
 	
+	
+	USkeletalMeshComponent* GetChildActorSkeletalMesh();
 	
 	UFUNCTION()
 	void HandleReactTimeline(float value);
