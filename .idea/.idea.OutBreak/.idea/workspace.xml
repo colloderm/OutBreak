@@ -21,12 +21,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/System/ModularSkeletalMeshActor.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/System/ModularSkeletalMeshActor.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" afterDir="false" />
     </list>
@@ -45,6 +43,7 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
+    <setting file="cidr-memory-view://4" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Classes/Navigation/GeneratedNavLinksProxy.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Private/Navigation/GeneratedNavLinksProxy.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Private/Navigation/PathFollowingComponent.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -64,6 +63,7 @@
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Private/InstancedStaticMesh.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Private/SkinnedMeshSceneProxyDesc.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Private/Timeline.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Launch/Private/Windows/LaunchWindows.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/NavigationSystem/Private/BaseGeneratedNavLinksProxy.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/NavigationSystem/Private/NavigationSystem.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/NavigationSystem/Public/BaseGeneratedNavLinksProxy.h" root0="FORCE_HIGHLIGHTING" />
@@ -182,7 +182,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
-    "C/C++ 프로젝트.OutBreak.executor": "Run",
+    "C/C++ 프로젝트.OutBreak.executor": "Debug",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "RunOnceActivity.MCP Project settings loaded": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
@@ -370,7 +370,8 @@
       <workItem from="1784079849005" duration="7333000" />
       <workItem from="1784089166917" duration="12988000" />
       <workItem from="1784105306446" duration="14839000" />
-      <workItem from="1784160504198" duration="9516000" />
+      <workItem from="1784160504198" duration="11667000" />
+      <workItem from="1784184855140" duration="8338000" />
     </task>
     <servers />
   </component>

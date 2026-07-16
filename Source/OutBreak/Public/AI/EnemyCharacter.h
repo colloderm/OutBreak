@@ -12,6 +12,7 @@ class UMotionWarpingComponent;
 class UDamageType;
 class UPrimitiveComponent;
 class UChildActorComponent;
+class AModularSkeletalMeshActor;
 
 
 DECLARE_LOG_CATEGORY_EXTERN(
@@ -67,41 +68,54 @@ protected:
 		AController* EventInstigator,
 		AActor* DamageCauser) override;
 	
-	void MeshPartDestruction(UPhysicalMaterial* PhysMtrl, FName BoneName);
+	void MeshPartDestruction(UStaticMesh* MeshAsset, FName BoneName);
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UChildActorComponent> ChildActorComponent;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
+	// UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
+	// TSubclassOf<AModularSkeletalMeshActor> ChildActorClass;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> ChildActorSkeletalMesh;
 	
-	UPROPERTY(EditAnywhere, Category="Physica|React", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, Category="Physical|React", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCurveFloat> ReactCurveFloat;
 	
-	UPROPERTY(EditAnywhere, Category="Physica|React", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, Category="Physical|React", meta = (AllowPrivateAccess = "true"))
 	float ReactScale;
 	
+	/* Physical Mesh */
+	UPROPERTY(EditAnywhere, Category="Physical|Mesh", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMesh> SM_Arm_R;
+	UPROPERTY(EditAnywhere, Category="Physical|Mesh", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMesh> SM_Arm_L;
+	UPROPERTY(EditAnywhere, Category="Physical|Mesh", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMesh> SM_Leg_R;
+	UPROPERTY(EditAnywhere, Category="Physical|Mesh", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UStaticMesh> SM_Leg_L;
+	
 	/* Physical Material */
-	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPhysicalMaterial> PM_Head;
 	
-	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPhysicalMaterial> PM_Torso;
 	
-	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPhysicalMaterial> PM_Arm_R;
 	
-	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPhysicalMaterial> PM_Arm_L;
 	
-	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPhysicalMaterial> PM_Leg_R;
 	
-	UPROPERTY(EditAnywhere, Category="Physica|Material", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UPhysicalMaterial> PM_Leg_L;
 	
 	

@@ -12,7 +12,7 @@
 #include "Engine/DamageEvents.h"
 #include "Components/ChildActorComponent.h"
 #include "AI/System/ModularSkeletalMeshActor.h"
-#include "Animation/SkeletalMeshActor.h"
+#include "Engine/StaticMeshActor.h"
 
 
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
@@ -111,6 +111,7 @@ AEnemyCharacter::AEnemyCharacter(
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 	
 	ChildActorComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("ChildActorComponent"));
+	ChildActorComponent->SetupAttachment(GetMesh());
 	
 	/*
 	 * 컴포넌트가 등록되기 전에 자동 등록 설정을 활성화한다.
@@ -216,19 +217,19 @@ void AEnemyCharacter::PhysicalMaterialProcess(TWeakObjectPtr<UPhysicalMaterial> 
 	}
 	else if (PhyMtrl == PM_Arm_R)
 	{
-		GetMesh()->HideBoneByName(FName(TEXT("upperarm_r")), PBO_None);
+		MeshPartDestruction(SM_Arm_R, FName(TEXT("upperarm_r")));
 	}
 	else if (PhyMtrl == PM_Arm_L)
 	{
-		GetMesh()->HideBoneByName(FName(TEXT("upperarm_l")), PBO_None);
+		MeshPartDestruction(SM_Arm_L, FName(TEXT("upperarm_l")));
 	}
 	else if (PhyMtrl == PM_Leg_R)
 	{
-		GetMesh()->HideBoneByName(FName(TEXT("thigh_r")), PBO_None);
+		MeshPartDestruction(SM_Leg_R, FName(TEXT("thigh_r")));
 	}
 	else if (PhyMtrl == PM_Leg_L)
 	{
-		GetMesh()->HideBoneByName(FName(TEXT("thigh_l")), PBO_None);
+		MeshPartDestruction(SM_Leg_L, FName(TEXT("thigh_l")));
 	}
 }
 
@@ -288,11 +289,23 @@ float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 	return ActualDamage;
 }
 
-void AEnemyCharacter::MeshPartDestruction(UPhysicalMaterial* PhysMtrl, FName BoneName)
+void AEnemyCharacter::MeshPartDestruction(UStaticMesh* MeshAsset, FName BoneName)
 {
 	if (!IsValid(ChildActorSkeletalMesh))
 	{
 		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor Skeletal Mesh is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	if (!IsValid(MeshAsset))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Mesh Asset is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	if (BoneName == NAME_None)
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: BoneName is Name_None."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
 	
@@ -304,20 +317,67 @@ void AEnemyCharacter::MeshPartDestruction(UPhysicalMaterial* PhysMtrl, FName Bon
 		return;
 	}
 	
-	ChildActorSkeletalMesh->HideBoneByName(BoneName, PBO_Term);
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = GetOwner();
+	SpawnParams.SpawnCollisionHandlingOverride =
+		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	
+	FTransform SpawnTransform = ChildActorSkeletalMesh->GetSocketTransform(BoneName);
+	AStaticMeshActor* MeshPart = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), SpawnTransform, SpawnParams);
+	UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(MeshPart->GetRootComponent());
+	MeshComp->SetMobility(EComponentMobility::Movable);
+	MeshComp->SetStaticMesh(MeshAsset);
 
+	MeshComp->SetCollisionProfileName(TEXT("PhysicsActor"));
+	MeshComp->SetGenerateOverlapEvents(false);
+
+	MeshComp->SetSimulatePhysics(true);
+	MeshComp->WakeAllRigidBodies();
+	
+	ChildActorSkeletalMesh->HideBoneByName(BoneName, PBO_None);
+	
+	USkeletalMeshComponent* CharacterMesh = GetMesh();
+
+	const int32 CharacterBoneIndex =
+		CharacterMesh
+			? CharacterMesh->GetBoneIndex(BoneName)
+			: INDEX_NONE;
+
+	const int32 ChildBoneIndex =
+		ChildActorSkeletalMesh
+			? ChildActorSkeletalMesh->GetBoneIndex(BoneName)
+			: INDEX_NONE;
+
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT(
+			"Hide Bone: Name=%s "
+			"CharacterIndex=%d ChildIndex=%d "
+			"ChildOwner=%s ChildMesh=%s"),
+		*BoneName.ToString(),
+		CharacterBoneIndex,
+		ChildBoneIndex,
+		*GetNameSafe(
+			ChildActorSkeletalMesh
+				? ChildActorSkeletalMesh->GetOwner()
+				: nullptr),
+		*GetNameSafe(
+			ChildActorSkeletalMesh
+				? ChildActorSkeletalMesh->GetSkeletalMeshAsset()
+				: nullptr));
 }
 
 USkeletalMeshComponent* AEnemyCharacter::GetChildActorSkeletalMesh()
 {
-	if (IsValid(ChildActorComponent))
+	if (!IsValid(ChildActorComponent))
 	{
 		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor Component is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return nullptr;
 	}
 	
 	AActor* ChildActor = ChildActorComponent->GetChildActor();
-	if (IsValid(ChildActor))
+	if (!IsValid(ChildActor))
 	{
 		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return nullptr;

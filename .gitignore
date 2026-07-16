@@ -77,8 +77,20 @@ DerivedDataCache/*
 .idea/*
 
 # Dev B ignore
-Content/Infected
-Content/Zombie_Pack
+Content/Infected/Infected_Female/Character_Poses
+Content/Infected/Infected_Female/Control_Rig
+Content/Infected/Infected_Female/Physics_Assets
+Content/Infected/Infected_Female/Static_Posed_Characters
+Content/Infected/Infected_Female/BP_Modular_Female.uasset
+Content/Infected/Infected_Female/BP_Modular_Rig_Female1.uasset
+
+Content/Infected/Infected_Groups
+Content/Infected/Infected_Male
+Content/Infected/Levels
+Content/Infected/Materials
+Content/Infected/Systems
+Content/Infected.zip
+Content/Infected/Textures
 Content/PostABundle
 Content/__ExternalActors__
 Content/__ExternalObjects__
