@@ -73,6 +73,8 @@ AEnemyCharacter::AEnemyCharacter(
 			"AEnemyCharacter requires "
 			"USkeletalMeshComponentBudgeted as its Mesh component."));
 
+	
+	
 	/* ———————————————————————————————————Set Primitive Target————————————————————————————————————————— */
 	CollisionComponent = BudgetedMesh;
 	/* ———————————————————————————————————————————————————————————————————————————————————————————————— */
@@ -330,7 +332,10 @@ void AEnemyCharacter::MeshPartDestruction(UStaticMesh* MeshAsset, FName BoneName
 
 	MeshComp->SetCollisionProfileName(TEXT("PhysicsActor"));
 	MeshComp->SetGenerateOverlapEvents(false);
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
 
+	MeshComp->SetCanEverAffectNavigation(false);
+	MeshComp->SetMassOverrideInKg(NAME_None, 300.f);
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
 	
