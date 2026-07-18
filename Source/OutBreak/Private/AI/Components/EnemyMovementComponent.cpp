@@ -78,17 +78,18 @@ void UEnemyMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType
 			TickTraversalDrop();
 			break;
 
-		case ETraversalType::Vault:
-			TickTraversalVault();
-			break;
-
-		case ETraversalType::Mantle:
-			TickTraversalMantle();
-			break;
-
-		case ETraversalType::ClimbUp:
-			TickTraversalClimbUp();
-			break;
+		/* 현재 불 필요한 로직 */
+		// case ETraversalType::Vault:
+		// 	TickTraversalVault();
+		// 	break;
+		//
+		// case ETraversalType::Mantle:
+		// 	TickTraversalMantle();
+		// 	break;
+		//
+		// case ETraversalType::ClimbUp:
+		// 	TickTraversalClimbUp();
+		// 	break;
 
 		case ETraversalType::Walk:
 		default:
@@ -161,7 +162,8 @@ void UEnemyMovementComponent::StartNavLinkTraversal(const FVector& Destination, 
 		}
 		else
 		{
-			
+			BegineTraversalClimbUp(Start, TraversalDestination);
+			break;
 		}
 		break;
 	case ETraversalLinkType::None:
@@ -514,7 +516,153 @@ void UEnemyMovementComponent::BeginTraversalVault(FVector& Start, FVector& Desti
 		VaultMontage);
 }
 
+void UEnemyMovementComponent::BegineTraversalClimbUp(FVector& Start, FVector& Destination)
+{
+	UAnimMontage* AnimMontage = ClimbUpMontage;
+	float PlayRate = ClimbUpPlayRate;
+	
+	if (!ensureAlwaysMsgf(
+		IsValid(AnimMontage),
+		TEXT("%s::%s: VaultMontage is invalid."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
+	{
+		SetTraversalType(ETraversalType::Walk);
+		return;	
+	}
+	
+	if (!IsValid(Character))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Owmer Pawn is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	if (!IsValid(CapsuleComponent))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Capsule is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	if (!IsValid(SkeletalMeshComponent))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Mesh is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	UAnimInstance* AnimInstance = SkeletalMeshComponent->GetAnimInstance();
+	
+	if (!IsValid(AnimInstance))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: AnimInstance is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	if (AnimInstance->IsAnyMontagePlaying())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("%s::%s: Any Montage is Playing."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
+	UMotionWarpingComponent* MotionWarping = Character->GetMotionWarpingComponent();
+	
+	const FVector ActorToDestinationDifference = Destination - Start;
+	const FVector ActorToDestinationDifference2D = ActorToDestinationDifference * FVector(1.f, 1.f, 0.f);
+	
+	const FVector ActorToDestSafeNormal2D = ActorToDestinationDifference2D.GetSafeNormal();
+	const float TargetHeight = Destination.Z - Start.Z;
+	const float CapsuleHeight = Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 2;
+	const float CapsuleRadius = Character->GetCapsuleComponent()->GetScaledCapsuleRadius();
+	
+	const FVector StartPos = Start + (ActorToDestSafeNormal2D * (CapsuleRadius * 6.5));
+	
+	
+	const FRotator WarpRotation = ActorToDestinationDifference2D.Rotation();
+	
+	
+	const FVector WarpTarget1 =  StartPos;
+	const FVector WarpTarget2 =  StartPos + FVector(0.f, 0.f, TargetHeight - CapsuleHeight);
+	const FVector WarpTarget3 =	 WarpTarget2 + FVector(0.f, 0.f, CapsuleHeight) + (ActorToDestSafeNormal2D * CapsuleRadius * 1.5);
+	const FVector WarpTarget4 =	 WarpTarget3 + (ActorToDestSafeNormal2D * CapsuleRadius * 3.5);
+	
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s : World is Invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	DrawDebugSphere(World, WarpTarget1, 20, 12, FColor::Green, false, 30.f, 0, 1);
+	DrawDebugSphere(World, WarpTarget2, 20, 12, FColor::White, false, 30.f, 0, 1);
+	DrawDebugSphere(World, WarpTarget3, 20, 12, FColor::Blue, false, 30.f, 0, 1);
+	DrawDebugSphere(World, WarpTarget4, 20, 12, FColor::White, false, 30.f, 0, 1);
+	
+	BeginParkour();
+	
+	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(
+		FName(TEXT("1")),
+		WarpTarget1,
+		WarpRotation);
+	
+	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(
+		FName(TEXT("2")),
+		WarpTarget2,
+		WarpRotation);
+	
+	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(
+		FName(TEXT("3")),
+		WarpTarget3,
+		WarpRotation);
+	
+	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(
+		FName(TEXT("4")),
+		WarpTarget4,
+		WarpRotation);
+	
+	const float MontageDuration = Character->PlayAnimMontage(AnimMontage, PlayRate);
+	
+	if (!ensureAlwaysMsgf(
+		MontageDuration > 0.f,
+		TEXT("%s::%s: Failed to play montage : %s"),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__),
+		*GetNameSafe(AnimMontage)))
+	{
+		return;
+	}
+	
+	FOnMontageEnded EndDelegate;
+	EndDelegate.BindUObject(
+		this,
+		&UEnemyMovementComponent::OnMontageEnded);
+	
+	// 재생 성공 후 연결해야 활성 Montage Instace에 들어감
+	AnimInstance->Montage_SetEndDelegate(
+		EndDelegate,
+		AnimMontage);
+	
+}
+
 void UEnemyMovementComponent::OnMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
+	if (!IsValid(Montage))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s : Montage is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+
+	/* @breif ActiveTraversalMontage : 현재 사용중인 Montage Caching. */
+	// if (Montage != ActiveTraversalMontage)
+	// {
+	// 	UE_LOG(
+	// 		LogTemp,
+	// 		Warning,
+	// 		TEXT("%s::%s: Unexpected montage ended: %s"),
+	// 		*GetClass()->GetName(),
+	// 		TEXT(__FUNCTION__),
+	// 		*GetNameSafe(Montage));
+	//
+	// 	return;
+	// }
+	
+	
 	EndParkour();
 }

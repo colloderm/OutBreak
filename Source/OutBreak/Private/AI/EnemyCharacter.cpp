@@ -339,7 +339,7 @@ void AEnemyCharacter::MeshPartDestruction(UStaticMesh* MeshAsset, FName BoneName
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
 	
-	ChildActorSkeletalMesh->HideBoneByName(BoneName, PBO_None);
+	ChildActorSkeletalMesh->HideBoneByName(BoneName, PBO_Term);
 	
 	USkeletalMeshComponent* CharacterMesh = GetMesh();
 

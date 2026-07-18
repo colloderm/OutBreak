@@ -66,12 +66,27 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
 	float MantleMaxHeight = 240.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Mantle|Animation")
+	TObjectPtr<UAnimMontage> MantleMontage;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Mantle|Animation")
+	float MantlePlayRate = 0.7f;
+	
+	/* Climb Up */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|ClimbUp")
 	float ClimbUpMinHeight = 360.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|ClimbUp")
 	float ClimbUpMaxHeight = 370.f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|ClimbUp|Animation")
+	TObjectPtr<UAnimMontage> ClimbUpMontage;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|ClimbUp|Animation")
+	float ClimbUpPlayRate = 0.7f;
+	
+	
 
 	UPROPERTY()
 	FVector TraversalDestination = FVector::ZeroVector;
@@ -109,6 +124,7 @@ public:
 	void BeginParkour();
 	void EndParkour();
 	void BeginTraversalVault(FVector& Start, FVector& Destination);
+	void BegineTraversalClimbUp(FVector& Start, FVector& Destination);
 
 protected:
 	UPROPERTY(

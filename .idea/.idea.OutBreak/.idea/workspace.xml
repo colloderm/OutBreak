@@ -21,14 +21,30 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyLimbComponent.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyStatusComponent.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyBaseActorComponent.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyLimbComponent.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyStatusComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Infected/Infected_Female/Static_Meshes/SM_Infected_Woman_Arms_L.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Infected/Infected_Female/Static_Meshes/SM_Infected_Woman_Arms_L.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Infected/Infected_Female/Static_Meshes/SM_Infected_Woman_Arms_R.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Infected/Infected_Female/Static_Meshes/SM_Infected_Woman_Arms_R.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Infected/Infected_Female/Static_Meshes/SM_Infected_Woman_Legs_L.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Infected/Infected_Female/Static_Meshes/SM_Infected_Woman_Legs_L.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Infected/Infected_Female/Static_Meshes/SM_Infected_Woman_Legs_R.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Infected/Infected_Female/Static_Meshes/SM_Infected_Woman_Legs_R.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/SK_Mannequin_Sequence.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieA_Idle_Safty_R_Vault_Retargeted.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieA_Idle_Safty_R_Vault_Retargeted_Montage.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_ClimbUp.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_ClimbUpOver.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_JumpAttack_L.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_JumpAttack_R.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_Mantle.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_Vault_L.uasset" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Ultimate_Traversal_Anims/Demo/Mannequin/Character/Mesh/RTG_Mannequin.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Ultimate_Traversal_Anims/Demo/Mannequin/Character/Mesh/RTG_Mannequin.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,6 +67,7 @@
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/EngineTypes.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Experimental/Chaos/Public/Chaos/PBDRigidsSOAs.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/FieldNotification/Public/FieldNotificationDelegate.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -70,6 +87,7 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyBaseActorComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Nav/EnemyGenNavLinksProxy.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" root0="FORCE_HIGHLIGHTING" />
@@ -96,61 +114,61 @@
   <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="4.124862939412436E-23" />
-      <entry key="MS500" value="3.3348946850297345E-5" />
-      <entry key="S2" value="0.08215536552993735" />
-      <entry key="S5" value="0.6962364542692305" />
-      <entry key="S10" value="1.8978879491042078" />
-      <entry key="S30" value="4.03310102115924" />
-      <entry key="S60" value="5.077482209585649" />
-      <entry key="M2" value="10.482569084253019" />
-      <entry key="M5" value="72.8205055389097" />
-      <entry key="M10" value="211.19477903265266" />
-      <entry key="M15" value="332.88677406580314" />
-      <entry key="M30" value="587.7913704115629" />
-      <entry key="H1" value="835.7383828490308" />
-      <entry key="H2" value="1018.8908196539277" />
-      <entry key="H4" value="1131.9604632847045" />
-      <entry key="D1" value="1239.774086257727" />
-      <entry key="W1" value="1259.6460953175797" />
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.0" />
+      <entry key="S2" value="1.0" />
+      <entry key="S5" value="1.0" />
+      <entry key="S10" value="1.0" />
+      <entry key="S30" value="1.0000000307698558" />
+      <entry key="S60" value="1.0007841946950167" />
+      <entry key="M2" value="1.1431858981455352" />
+      <entry key="M5" value="4.912370240344513" />
+      <entry key="M10" value="17.99279927199998" />
+      <entry key="M15" value="40.53648262398821" />
+      <entry key="M30" value="159.80376292903492" />
+      <entry key="H1" value="448.73815232066727" />
+      <entry key="H2" value="831.0428382718302" />
+      <entry key="H4" value="1158.1266468934596" />
+      <entry key="D1" value="1544.5132531600407" />
+      <entry key="W1" value="1624.267592663531" />
     </decayedCancelled>
     <decayedSelected>
-      <entry key="MS100" value="1.0000000354411338" />
-      <entry key="MS500" value="1.0323520288701025" />
-      <entry key="S2" value="1.4246004966333536" />
-      <entry key="S5" value="1.7571318155583393" />
-      <entry key="S10" value="2.060472580107722" />
-      <entry key="S30" value="2.5695890622097943" />
-      <entry key="S60" value="2.9696645950917806" />
-      <entry key="M2" value="4.512724189861741" />
-      <entry key="M5" value="13.256938222700029" />
-      <entry key="M10" value="27.656316141431486" />
-      <entry key="M15" value="39.194878545087136" />
-      <entry key="M30" value="62.035412307286904" />
-      <entry key="H1" value="83.49672555944872" />
-      <entry key="H2" value="99.17298950366538" />
-      <entry key="H4" value="108.82303752464497" />
-      <entry key="D1" value="118.01890968522122" />
-      <entry key="W1" value="119.7139149706754" />
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="1.5736833087263666E-170" />
+      <entry key="S5" value="1.709484496286878E-68" />
+      <entry key="S10" value="2.1901845990660634E-34" />
+      <entry key="S30" value="1.7620552096122227E-11" />
+      <entry key="S60" value="1.1106947884528804E-5" />
+      <entry key="M2" value="0.009250570273609628" />
+      <entry key="M5" value="0.5424504363027625" />
+      <entry key="M10" value="2.4914437028734917" />
+      <entry key="M15" value="5.115059243374264" />
+      <entry key="M30" value="17.074702512778455" />
+      <entry key="H1" value="44.70252930290269" />
+      <entry key="H2" value="80.52042337343289" />
+      <entry key="H4" value="110.84045499117927" />
+      <entry key="D1" value="146.4205657246509" />
+      <entry key="W1" value="153.74037338642853" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="4.24400031090024E-8" />
-      <entry key="MS500" value="0.034148076055487614" />
-      <entry key="S2" value="0.5940543348408708" />
-      <entry key="S5" value="1.6379570563618158" />
-      <entry key="S10" value="3.267379663133824" />
-      <entry key="S30" value="6.218995906833685" />
-      <entry key="S60" value="7.817520051587836" />
-      <entry key="M2" value="14.833046948441954" />
-      <entry key="M5" value="85.8738854303819" />
-      <entry key="M10" value="238.60979756259155" />
-      <entry key="M15" value="371.8389848174922" />
-      <entry key="M30" value="649.6196155018766" />
-      <entry key="H1" value="919.089989756657" />
-      <entry key="H2" value="1117.9759898422155" />
-      <entry key="H4" value="1240.7348958034277" />
-      <entry key="D1" value="1357.7841504994526" />
-      <entry key="W1" value="1379.3587270691537" />
+      <entry key="MS100" value="0.019236631458514317" />
+      <entry key="MS500" value="0.4537595776585804" />
+      <entry key="S2" value="0.8207416088104984" />
+      <entry key="S5" value="0.9240225724468234" />
+      <entry key="S10" value="0.9612609283887613" />
+      <entry key="S30" value="0.9869165760916807" />
+      <entry key="S60" value="0.9942236349898562" />
+      <entry key="M2" value="1.1482936771231547" />
+      <entry key="M5" value="5.443126109042974" />
+      <entry key="M10" value="20.462486299011776" />
+      <entry key="M15" value="45.62163678321941" />
+      <entry key="M30" value="176.82493361238056" />
+      <entry key="H1" value="493.3665767569372" />
+      <entry key="H2" value="911.4945950810252" />
+      <entry key="H4" value="1268.919200457104" />
+      <entry key="D1" value="1690.9231604481768" />
+      <entry key="W1" value="1778.006364505348" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -162,31 +180,31 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "C/C++ 프로젝트.OutBreak.executor": "Debug",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "cidr.known.project.marker": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "Zombie__AI__System",
-    "junie.onboarding.icon.badge.shown": "true",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "RiderCppLiveTemplatesSettingsId",
-    "to.speed.mode.migration.done": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;C/C++ 프로젝트.OutBreak.executor&quot;: &quot;Debug&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Zombie__AI__System&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;RiderCppLiveTemplatesSettingsId&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager" selected="C/C++ 프로젝트.OutBreak">
     <configuration name="OutBreak" type="CppProject" factoryName="C++ Project">
       <configuration_1 setup="1">
@@ -356,7 +374,10 @@
       <workItem from="1784184855140" duration="8338000" />
       <workItem from="1784211299162" duration="136000" />
       <workItem from="1784211623256" duration="217000" />
-      <workItem from="1784215481915" duration="1810000" />
+      <workItem from="1784215481915" duration="3529000" />
+      <workItem from="1784362152541" duration="3387000" />
+      <workItem from="1784387369553" duration="887000" />
+      <workItem from="1784390950401" duration="3987000" />
     </task>
     <servers />
   </component>
