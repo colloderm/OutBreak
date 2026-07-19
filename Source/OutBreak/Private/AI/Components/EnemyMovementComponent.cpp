@@ -476,6 +476,21 @@ void UEnemyMovementComponent::BeginTraversalVault(FVector& Start, FVector& Desti
 	const FVector WarpTarget2 =  ActorPos + (ActorToDestinationDifference * 0.5) + FVector(0.f, 0.f, VaultMinHeight);
 	const FVector WarpTarget3 =	 Destination;
 	
+	
+	if (bTraversalDrawDebug)
+	{
+		UWorld* World = GetWorld();
+		if (!IsValid(World))
+		{
+			UE_LOG(LogTemp, Error, TEXT("%s::%s : World is Invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+			return;
+		}
+		DrawDebugSphere(World, WarpTarget1, 20, 12, FColor::Green, false, DrawTime, 0, 1);
+		DrawDebugSphere(World, WarpTarget2, 20, 12, FColor::White, false, DrawTime, 0, 1);
+		DrawDebugSphere(World, WarpTarget3, 20, 12, FColor::Red, false, DrawTime, 0, 1);
+	}
+
+	
 	BeginParkour();
 	
 	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(
@@ -565,6 +580,8 @@ void UEnemyMovementComponent::BegineTraversalClimbUp(FVector& Start, FVector& De
 	
 	UMotionWarpingComponent* MotionWarping = Character->GetMotionWarpingComponent();
 	
+	
+	const FVector ActorPos = Character->GetActorLocation();
 	const FVector ActorToDestinationDifference = Destination - Start;
 	const FVector ActorToDestinationDifference2D = ActorToDestinationDifference * FVector(1.f, 1.f, 0.f);
 	
@@ -573,16 +590,16 @@ void UEnemyMovementComponent::BegineTraversalClimbUp(FVector& Start, FVector& De
 	const float CapsuleHeight = Character->GetCapsuleComponent()->GetScaledCapsuleHalfHeight() * 2;
 	const float CapsuleRadius = Character->GetCapsuleComponent()->GetScaledCapsuleRadius();
 	
-	const FVector StartPos = Start + (ActorToDestSafeNormal2D * (CapsuleRadius * 6.5));
+	const FVector StartPos = ActorPos + (ActorToDestSafeNormal2D * (CapsuleRadius * 6.5));
 	
 	
 	const FRotator WarpRotation = ActorToDestinationDifference2D.Rotation();
 	
 	
 	const FVector WarpTarget1 =  StartPos;
-	const FVector WarpTarget2 =  StartPos + FVector(0.f, 0.f, TargetHeight - CapsuleHeight);
+	const FVector WarpTarget2 =  WarpTarget1 + FVector(0.f, 0.f, TargetHeight - CapsuleHeight);
 	const FVector WarpTarget3 =	 WarpTarget2 + FVector(0.f, 0.f, CapsuleHeight) + (ActorToDestSafeNormal2D * CapsuleRadius * 1.5);
-	const FVector WarpTarget4 =	 WarpTarget3 + (ActorToDestSafeNormal2D * CapsuleRadius * 3.5);
+	const FVector WarpTarget4 =	 WarpTarget3 + (ActorToDestSafeNormal2D * CapsuleRadius * 3);
 	
 	UWorld* World = GetWorld();
 	if (!IsValid(World))
@@ -590,10 +607,10 @@ void UEnemyMovementComponent::BegineTraversalClimbUp(FVector& Start, FVector& De
 		UE_LOG(LogTemp, Error, TEXT("%s::%s : World is Invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
-	DrawDebugSphere(World, WarpTarget1, 20, 12, FColor::Green, false, 30.f, 0, 1);
-	DrawDebugSphere(World, WarpTarget2, 20, 12, FColor::White, false, 30.f, 0, 1);
-	DrawDebugSphere(World, WarpTarget3, 20, 12, FColor::Blue, false, 30.f, 0, 1);
-	DrawDebugSphere(World, WarpTarget4, 20, 12, FColor::White, false, 30.f, 0, 1);
+	DrawDebugSphere(World, WarpTarget1, 20, 12, FColor::Green, false, DrawTime, 0, 1);
+	DrawDebugSphere(World, WarpTarget2, 20, 12, FColor::White, false, DrawTime, 0, 1);
+	DrawDebugSphere(World, WarpTarget3, 20, 12, FColor::Blue, false, DrawTime, 0, 1);
+	DrawDebugSphere(World, WarpTarget4, 20, 12, FColor::White, false, DrawTime, 0, 1);
 	
 	BeginParkour();
 	

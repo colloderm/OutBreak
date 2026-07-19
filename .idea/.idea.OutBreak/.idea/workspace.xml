@@ -21,30 +21,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyLimbComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyStatusComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyBaseActorComponent.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyLimbComponent.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyStatusComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/SK_Mannequin_Sequence.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieA_Idle_Safty_R_Vault_Retargeted.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieA_Idle_Safty_R_Vault_Retargeted_Montage.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_ClimbUp.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_ClimbUpOver.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_JumpAttack_L.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_JumpAttack_R.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_Mantle.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/Zombie_Vault_L.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieIP_Vault_L_Montage.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieIP_Vault_L_Montage.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Ultimate_Traversal_Anims/Demo/Mannequin/Character/Mesh/RTG_Mannequin.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Ultimate_Traversal_Anims/Demo/Mannequin/Character/Mesh/RTG_Mannequin.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyStatusComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyStatusComponent.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -61,8 +45,6 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="cidr-memory-view://0" root0="FORCE_HIGHLIGHTING" />
-    <setting file="cidr-memory-view://1" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Core/Public/Math/Vector.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/EngineTypes.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Experimental/Chaos/Public/Chaos/PBDRigidsSOAs.h" root0="FORCE_HIGHLIGHTING" />
@@ -114,61 +96,61 @@
   <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.0" />
-      <entry key="MS500" value="1.0" />
-      <entry key="S2" value="1.0" />
-      <entry key="S5" value="1.0" />
-      <entry key="S10" value="1.0" />
-      <entry key="S30" value="1.0000000307698558" />
-      <entry key="S60" value="1.0007841946950167" />
-      <entry key="M2" value="1.1431858981455352" />
-      <entry key="M5" value="4.912370240344513" />
-      <entry key="M10" value="17.99279927199998" />
-      <entry key="M15" value="40.53648262398821" />
-      <entry key="M30" value="159.80376292903492" />
-      <entry key="H1" value="448.73815232066727" />
-      <entry key="H2" value="831.0428382718302" />
-      <entry key="H4" value="1158.1266468934596" />
-      <entry key="D1" value="1544.5132531600407" />
-      <entry key="W1" value="1624.267592663531" />
+      <entry key="MS100" value="1.022119184242616" />
+      <entry key="MS500" value="1.904746568668311" />
+      <entry key="S2" value="3.576305686553602" />
+      <entry key="S5" value="4.998289202217058" />
+      <entry key="S10" value="8.448541201672661" />
+      <entry key="S30" value="23.520131986344214" />
+      <entry key="S60" value="35.416370938471644" />
+      <entry key="M2" value="44.8042703504046" />
+      <entry key="M5" value="52.15865322394608" />
+      <entry key="M10" value="55.11658625264445" />
+      <entry key="M15" value="57.251937916387305" />
+      <entry key="M30" value="81.09595749524878" />
+      <entry key="H1" value="226.70908238649133" />
+      <entry key="H2" value="568.4839191992096" />
+      <entry key="H4" value="971.2538345241147" />
+      <entry key="D1" value="1560.4533340148369" />
+      <entry key="W1" value="1696.1660911444776" />
     </decayedCancelled>
     <decayedSelected>
-      <entry key="MS100" value="0.0" />
-      <entry key="MS500" value="0.0" />
-      <entry key="S2" value="1.5736833087263666E-170" />
-      <entry key="S5" value="1.709484496286878E-68" />
-      <entry key="S10" value="2.1901845990660634E-34" />
-      <entry key="S30" value="1.7620552096122227E-11" />
-      <entry key="S60" value="1.1106947884528804E-5" />
-      <entry key="M2" value="0.009250570273609628" />
-      <entry key="M5" value="0.5424504363027625" />
-      <entry key="M10" value="2.4914437028734917" />
-      <entry key="M15" value="5.115059243374264" />
-      <entry key="M30" value="17.074702512778455" />
-      <entry key="H1" value="44.70252930290269" />
-      <entry key="H2" value="80.52042337343289" />
-      <entry key="H4" value="110.84045499117927" />
-      <entry key="D1" value="146.4205657246509" />
-      <entry key="W1" value="153.74037338642853" />
+      <entry key="MS100" value="1.1035272943251002E-193" />
+      <entry key="MS500" value="2.5618672146464888E-39" />
+      <entry key="S2" value="2.2497753495441786E-10" />
+      <entry key="S5" value="1.383106625044497E-4" />
+      <entry key="S10" value="0.011760555365476983" />
+      <entry key="S30" value="0.22740985272214578" />
+      <entry key="S60" value="0.47687509132072103" />
+      <entry key="M2" value="0.6905614319672951" />
+      <entry key="M5" value="0.8623469650038391" />
+      <entry key="M10" value="0.9336507063068672" />
+      <entry key="M15" value="1.0334908734227295" />
+      <entry key="M30" value="3.133012745517031" />
+      <entry key="H1" value="16.877600824820355" />
+      <entry key="H2" value="49.000357416546386" />
+      <entry key="H4" value="86.5814629117487" />
+      <entry key="D1" value="141.24368942075816" />
+      <entry key="W1" value="153.79665353716118" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="0.019236631458514317" />
-      <entry key="MS500" value="0.4537595776585804" />
-      <entry key="S2" value="0.8207416088104984" />
-      <entry key="S5" value="0.9240225724468234" />
-      <entry key="S10" value="0.9612609283887613" />
-      <entry key="S30" value="0.9869165760916807" />
-      <entry key="S60" value="0.9942236349898562" />
-      <entry key="M2" value="1.1482936771231547" />
-      <entry key="M5" value="5.443126109042974" />
-      <entry key="M10" value="20.462486299011776" />
-      <entry key="M15" value="45.62163678321941" />
-      <entry key="M30" value="176.82493361238056" />
-      <entry key="H1" value="493.3665767569372" />
-      <entry key="H2" value="911.4945950810252" />
-      <entry key="H4" value="1268.919200457104" />
-      <entry key="D1" value="1690.9231604481768" />
-      <entry key="W1" value="1778.006364505348" />
+      <entry key="MS100" value="0.9669738601449033" />
+      <entry key="MS500" value="1.88258669348137" />
+      <entry key="S2" value="3.565062217175892" />
+      <entry key="S5" value="4.9786285806187704" />
+      <entry key="S10" value="8.382434337062442" />
+      <entry key="S30" value="23.57405523444929" />
+      <entry key="S60" value="35.73407988927363" />
+      <entry key="M2" value="45.383281167575014" />
+      <entry key="M5" value="52.96565017264145" />
+      <entry key="M10" value="56.02028345319134" />
+      <entry key="M15" value="58.26414968050138" />
+      <entry key="M30" value="84.21045234930153" />
+      <entry key="H1" value="243.55343812924121" />
+      <entry key="H2" value="617.4394077229947" />
+      <entry key="H4" value="1057.7961810148965" />
+      <entry key="D1" value="1701.6864316258914" />
+      <entry key="W1" value="1849.961097493713" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -182,7 +164,7 @@
   </component>
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
-    &quot;C/C++ 프로젝트.OutBreak.executor&quot;: &quot;Debug&quot;,
+    &quot;C/C++ 프로젝트.OutBreak.executor&quot;: &quot;Run&quot;,
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
@@ -378,6 +360,7 @@
       <workItem from="1784362152541" duration="3387000" />
       <workItem from="1784387369553" duration="887000" />
       <workItem from="1784390950401" duration="3987000" />
+      <workItem from="1784432759089" duration="1369000" />
     </task>
     <servers />
   </component>

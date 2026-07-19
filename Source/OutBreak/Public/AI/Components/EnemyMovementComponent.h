@@ -87,6 +87,13 @@ protected:
 	float ClimbUpPlayRate = 0.7f;
 	
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Debug")
+	bool bTraversalDrawDebug;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Debug")
+	float DrawTime = 10.f;
+	
+	
 
 	UPROPERTY()
 	FVector TraversalDestination = FVector::ZeroVector;
@@ -102,6 +109,7 @@ protected:
 	
 	UPROPERTY()
 	FVector CacheMeshWorldLocation = FVector::ZeroVector;
+	
 
 public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,

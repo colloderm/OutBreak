@@ -15,6 +15,18 @@ class OUTBREAK_API UEnemyStatusComponent : public UEnemyBaseActorComponent
 public:
 	// Sets default values for this component's properties
 	UEnemyStatusComponent();
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool bIsHasArm_R;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool bIsHasArm_L;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool bIsHasLeg_R;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	bool bIsHasArm_R;
 
 protected:
 	// Called when the game starts
