@@ -13,6 +13,7 @@ class UDamageType;
 class UPrimitiveComponent;
 class UChildActorComponent;
 class AModularSkeletalMeshActor;
+class UEnemyStatusComponent;
 
 
 DECLARE_LOG_CATEGORY_EXTERN(
@@ -50,7 +51,7 @@ public:
 		return MotionWarpingComponent;
 	}
 
-	
+	USkeletalMeshComponent* GetChildActorSkeletalMesh();
 
 protected:
 	virtual void BeginPlay() override;
@@ -69,10 +70,15 @@ protected:
 		AActor* DamageCauser) override;
 	
 	void MeshPartDestruction(UStaticMesh* MeshAsset, FName BoneName);
+	
+	
 
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnemyStatusComponent> EnemyStatusComponent;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UChildActorComponent> ChildActorComponent;
@@ -123,7 +129,7 @@ private:
 	FName CacheBoneName = NAME_None;
 	
 	
-	USkeletalMeshComponent* GetChildActorSkeletalMesh();
+	
 	
 	UFUNCTION()
 	void HandleReactTimeline(float value);

@@ -23,12 +23,13 @@
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieIP_Vault_L_Montage.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Mannequin_Animation/Parkour/ZombieIP_Vault_L_Montage.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyStatusComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyStatusComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyBaseActorComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyBaseActorComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyStatusComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyStatusComponent.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,6 +47,7 @@
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Core/Public/Math/Vector.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/SceneComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/EngineTypes.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Experimental/Chaos/Public/Chaos/PBDRigidsSOAs.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/FieldNotification/Public/FieldNotificationDelegate.h" root0="FORCE_HIGHLIGHTING" />
@@ -96,61 +98,61 @@
   <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.022119184242616" />
-      <entry key="MS500" value="1.904746568668311" />
-      <entry key="S2" value="3.576305686553602" />
-      <entry key="S5" value="4.998289202217058" />
-      <entry key="S10" value="8.448541201672661" />
-      <entry key="S30" value="23.520131986344214" />
-      <entry key="S60" value="35.416370938471644" />
-      <entry key="M2" value="44.8042703504046" />
-      <entry key="M5" value="52.15865322394608" />
-      <entry key="M10" value="55.11658625264445" />
-      <entry key="M15" value="57.251937916387305" />
-      <entry key="M30" value="81.09595749524878" />
-      <entry key="H1" value="226.70908238649133" />
-      <entry key="H2" value="568.4839191992096" />
-      <entry key="H4" value="971.2538345241147" />
-      <entry key="D1" value="1560.4533340148369" />
-      <entry key="W1" value="1696.1660911444776" />
+      <entry key="MS100" value="1.0000012071195545" />
+      <entry key="MS500" value="1.065516404719808" />
+      <entry key="S2" value="1.5059266005134644" />
+      <entry key="S5" value="1.761438804745651" />
+      <entry key="S10" value="1.8726260898346376" />
+      <entry key="S30" value="2.2132915598805853" />
+      <entry key="S60" value="5.876602648828521" />
+      <entry key="M2" value="19.260730114332233" />
+      <entry key="M5" value="48.72532179916991" />
+      <entry key="M10" value="72.88127236635022" />
+      <entry key="M15" value="88.85162606347524" />
+      <entry key="M30" value="134.91364449199858" />
+      <entry key="H1" value="255.30812604704863" />
+      <entry key="H2" value="555.426841877283" />
+      <entry key="H4" value="1032.6243239345176" />
+      <entry key="D1" value="1965.412525568325" />
+      <entry key="W1" value="2217.372447937272" />
     </decayedCancelled>
     <decayedSelected>
-      <entry key="MS100" value="1.1035272943251002E-193" />
-      <entry key="MS500" value="2.5618672146464888E-39" />
-      <entry key="S2" value="2.2497753495441786E-10" />
-      <entry key="S5" value="1.383106625044497E-4" />
-      <entry key="S10" value="0.011760555365476983" />
-      <entry key="S30" value="0.22740985272214578" />
-      <entry key="S60" value="0.47687509132072103" />
-      <entry key="M2" value="0.6905614319672951" />
-      <entry key="M5" value="0.8623469650038391" />
-      <entry key="M10" value="0.9336507063068672" />
-      <entry key="M15" value="1.0334908734227295" />
-      <entry key="M30" value="3.133012745517031" />
-      <entry key="H1" value="16.877600824820355" />
-      <entry key="H2" value="49.000357416546386" />
-      <entry key="H4" value="86.5814629117487" />
-      <entry key="D1" value="141.24368942075816" />
-      <entry key="W1" value="153.79665353716118" />
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="3.427326811396249E-124" />
+      <entry key="S2" value="1.360626357230196E-31" />
+      <entry key="S5" value="4.5029336923787815E-13" />
+      <entry key="S10" value="6.710390221740824E-7" />
+      <entry key="S30" value="0.008759856987305635" />
+      <entry key="S60" value="0.09672768442987852" />
+      <entry key="M2" value="0.3869360246364117" />
+      <entry key="M5" value="1.3982354072916299" />
+      <entry key="M10" value="3.3279959669666495" />
+      <entry key="M15" value="5.226952239734964" />
+      <entry key="M30" value="10.817385673407934" />
+      <entry key="H1" value="23.264166460719107" />
+      <entry key="H2" value="51.94638276017908" />
+      <entry key="H4" value="96.6678142596188" />
+      <entry key="D1" value="183.41308479153875" />
+      <entry key="W1" value="206.77218802943773" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="0.9669738601449033" />
-      <entry key="MS500" value="1.88258669348137" />
-      <entry key="S2" value="3.565062217175892" />
-      <entry key="S5" value="4.9786285806187704" />
-      <entry key="S10" value="8.382434337062442" />
-      <entry key="S30" value="23.57405523444929" />
-      <entry key="S60" value="35.73407988927363" />
-      <entry key="M2" value="45.383281167575014" />
-      <entry key="M5" value="52.96565017264145" />
-      <entry key="M10" value="56.02028345319134" />
-      <entry key="M15" value="58.26414968050138" />
-      <entry key="M30" value="84.21045234930153" />
-      <entry key="H1" value="243.55343812924121" />
-      <entry key="H2" value="617.4394077229947" />
-      <entry key="H4" value="1057.7961810148965" />
-      <entry key="D1" value="1701.6864316258914" />
-      <entry key="W1" value="1849.961097493713" />
+      <entry key="MS100" value="4.8292666568308685E-5" />
+      <entry key="MS500" value="0.17429407040204228" />
+      <entry key="S2" value="1.0478809597729275" />
+      <entry key="S5" value="1.5394843069398298" />
+      <entry key="S10" value="1.7537946341932387" />
+      <entry key="S30" value="2.178192145989578" />
+      <entry key="S60" value="5.93749906476849" />
+      <entry key="M2" value="19.604834124037026" />
+      <entry key="M5" value="50.078925861690614" />
+      <entry key="M10" value="76.16759556218592" />
+      <entry key="M15" value="94.0389874134741" />
+      <entry key="M30" value="145.69523318093695" />
+      <entry key="H1" value="278.5368406391966" />
+      <entry key="H2" value="607.3330270226746" />
+      <entry key="H4" value="1129.2534091243328" />
+      <entry key="D1" value="2148.812945751992" />
+      <entry key="W1" value="2424.1425850199635" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -360,7 +362,9 @@
       <workItem from="1784362152541" duration="3387000" />
       <workItem from="1784387369553" duration="887000" />
       <workItem from="1784390950401" duration="3987000" />
-      <workItem from="1784432759089" duration="1369000" />
+      <workItem from="1784432759089" duration="8122000" />
+      <workItem from="1784468164887" duration="286000" />
+      <workItem from="1784472876400" duration="5000" />
     </task>
     <servers />
   </component>
@@ -387,11 +391,6 @@
           <properties exception="System.Threading.ThreadAbortException" breakIfHandledByOtherCode="false" displayValue="System.Threading.ThreadAbortException" />
           <option name="timeStamp" value="3" />
         </breakpoint>
-        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
-          <url>file://$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h</url>
-          <line>4</line>
-          <option name="timeStamp" value="4" />
-        </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>

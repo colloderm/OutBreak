@@ -18,7 +18,7 @@ public:
 	// Sets default values for this component's properties
 	UEnemyBaseActorComponent();
 	
-	FORCEINLINE const AEnemyCharacter* GetEnemyCharacter() { return EnemyCharacter; }
+	AEnemyCharacter* GetEnemyCharacter();
 
 protected:
 	// Called when the game starts

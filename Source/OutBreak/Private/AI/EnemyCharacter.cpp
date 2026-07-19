@@ -6,13 +6,12 @@
 #include "Components/CapsuleComponent.h"
 #include "IAnimationBudgetAllocator.h"
 #include "SkeletalMeshComponentBudgeted.h"
-#include "MotionWarping.h"
 #include "MotionWarpingComponent.h"
 #include "AI/System/ModularSkeletalMeshActor.h"
 #include "Engine/DamageEvents.h"
 #include "Components/ChildActorComponent.h"
-#include "AI/System/ModularSkeletalMeshActor.h"
 #include "Engine/StaticMeshActor.h"
+#include "AI/Components/EnemyStatusComponent.h"
 
 
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
@@ -111,6 +110,7 @@ AEnemyCharacter::AEnemyCharacter(
 	BudgetedMesh->SetCanEverAffectNavigation(false);
 	
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
+	EnemyStatusComponent = CreateDefaultSubobject<UEnemyStatusComponent>(TEXT("EnemyStatusComponent"));
 	
 	ChildActorComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("ChildActorComponent"));
 	ChildActorComponent->SetupAttachment(GetMesh());

@@ -7,6 +7,33 @@
 #include "EnemyStatusComponent.generated.h"
 
 
+UENUM(Blueprintable)
+enum class Limb : uint8
+{
+	Head,
+};
+
+USTRUCT(BlueprintType)
+struct FLimbData
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bIsHas = true;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float MaxDurability;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	float Durability;
+	
+	FLimbData() = default;
+	
+	FLimbData(bool inHas, float inMaxDurability, float inDurability)
+		: bIsHas(inHas), MaxDurability(inMaxDurability), Durability(inDurability) {}
+	
+};
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class OUTBREAK_API UEnemyStatusComponent : public UEnemyBaseActorComponent
 {
@@ -16,24 +43,38 @@ public:
 	// Sets default values for this component's properties
 	UEnemyStatusComponent();
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	bool bIsHasArm_R;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool bIsDrawDebug;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	bool bIsHasArm_L;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLimbData Head = FLimbData(true, 100, 100);
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	bool bIsHasLeg_R;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLimbData Body = FLimbData(true, 100, 100) ;
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
-	bool bIsHasArm_R;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLimbData Arm_R = FLimbData(true, 100, 100);
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLimbData Arm_L = FLimbData(true, 100, 100);
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLimbData Leg_R = FLimbData(true, 100, 100);
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FLimbData Leg_L = FLimbData(true, 100, 100);
 
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
 public:
+	
 	// Called every frame
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 	                           FActorComponentTickFunction* ThisTickFunction) override;
+	
+private:
+	
+	void DrawDebug();
 };

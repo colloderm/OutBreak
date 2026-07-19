@@ -13,16 +13,20 @@ UEnemyBaseActorComponent::UEnemyBaseActorComponent()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 	
-	EnemyCharacter = Cast<AEnemyCharacter>(GetOwner());
+	
 
 	// ...
 }
+
+AEnemyCharacter* UEnemyBaseActorComponent::GetEnemyCharacter() { return EnemyCharacter; }
 
 
 // Called when the game starts
 void UEnemyBaseActorComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	EnemyCharacter = Cast<AEnemyCharacter>(GetOwner());
 
 	// ...
 	
