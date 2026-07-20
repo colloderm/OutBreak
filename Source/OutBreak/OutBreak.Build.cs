@@ -26,6 +26,7 @@ public class OutBreak : ModuleRules
 			"MotionWarping",
 			"PhysicsCore",
 			"AnimationBudgetAllocator",
+			"GameplayStateTreeModule",
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
@@ -37,7 +38,7 @@ public class OutBreak : ModuleRules
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
 			"Navmesh",
-			"AnimToTexture"
+			"AnimToTexture", 
 		});
 		
 		if (Target.Type == TargetType.Editor)

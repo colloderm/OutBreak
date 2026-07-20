@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "AI/Data/EnemyAsset.h"
+#include "AI/Interface/EnemyComponentInterface.h"
 #include "EnemyBaseActorComponent.generated.h"
 
 
@@ -23,6 +25,9 @@ public:
 protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
 
 public:
 	// Called every frame
@@ -32,5 +37,7 @@ public:
 private:
 	UPROPERTY(meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AEnemyCharacter> EnemyCharacter;
+	
+	
 	
 };

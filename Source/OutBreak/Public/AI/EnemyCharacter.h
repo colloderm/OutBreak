@@ -4,8 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Components/TimelineComponent.h"
 #include "EnemyCharacter.generated.h"
+
+class UEnemyAsset;
 
 class USkeletalMeshComponentBudgeted;
 class UMotionWarpingComponent;
@@ -14,6 +15,8 @@ class UPrimitiveComponent;
 class UChildActorComponent;
 class AModularSkeletalMeshActor;
 class UEnemyStatusComponent;
+class UEnemyPhysicalComponent;
+class UStateTreeAIComponent;
 
 
 DECLARE_LOG_CATEGORY_EXTERN(
@@ -34,17 +37,29 @@ class OUTBREAK_API AEnemyCharacter : public ACharacter
 public:
 	AEnemyCharacter(
 		const FObjectInitializer& ObjectInitializer);
-
+	
+private:
+	void InitializeComponents();
+	void InitializeAsset();
+public:
+	
+	/* ====================================== ABA ===================================== */
 	UFUNCTION(BlueprintCallable, Category = "Animation Budget")
 	void SetAnimationSignificance(float InSignificance);
 
 	UFUNCTION(BlueprintPure, Category = "Animation Budget|Debug")
 	FString GetAnimationBudgetDebugSummary() const;
+	
 
 	UPROPERTY(BlueprintAssignable, Category = "Animation Budget")
 	FModularAnimationProxyReducedWorkChanged
 	OnReducedAnimationWorkChanged;
+	/* ================================================================================ */
 	
+	UEnemyAsset* GetEnemyAsset() const
+	{
+		return EnemyAsset;
+	}
 
 	UMotionWarpingComponent* GetMotionWarpingComponent() const
 	{
@@ -52,6 +67,10 @@ public:
 	}
 
 	USkeletalMeshComponent* GetChildActorSkeletalMesh();
+	
+	void StopCharacterMovement();
+	
+	void Dead();
 
 protected:
 	virtual void BeginPlay() override;
@@ -59,8 +78,7 @@ protected:
 
 	virtual void EndPlay(
 		const EEndPlayReason::Type EndPlayReason) override;
-
-	void PhysicalMaterialProcess(TWeakObjectPtr<UPhysicalMaterial> PhyMtrl);
+	
 	
 	UFUNCTION()
 	virtual float TakeDamage(
@@ -69,75 +87,34 @@ protected:
 		AController* EventInstigator,
 		AActor* DamageCauser) override;
 	
-	void MeshPartDestruction(UStaticMesh* MeshAsset, FName BoneName);
 	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
 	
-
-private:
+	/* ================================================== Components ============================================= */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMotionWarpingComponent> MotionWarpingComponent;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UEnemyStatusComponent> EnemyStatusComponent;
+	TObjectPtr<UEnemyStatusComponent> StatusComponent;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnemyPhysicalComponent> PhysicalComponent;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UChildActorComponent> ChildActorComponent;
 	
-	// UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
-	// TSubclassOf<AModularSkeletalMeshActor> ChildActorClass;
+	/* =========================================================================================================== */
 	
+
+private:
+	
+	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> ChildActorSkeletalMesh;
+
 	
-	UPROPERTY(EditAnywhere, Category="Physical|React", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UCurveFloat> ReactCurveFloat;
-	
-	UPROPERTY(EditAnywhere, Category="Physical|React", meta = (AllowPrivateAccess = "true"))
-	float ReactScale;
-	
-	/* Physical Mesh */
-	UPROPERTY(EditAnywhere, Category="Physical|Mesh", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMesh> SM_Arm_R;
-	UPROPERTY(EditAnywhere, Category="Physical|Mesh", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMesh> SM_Arm_L;
-	UPROPERTY(EditAnywhere, Category="Physical|Mesh", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMesh> SM_Leg_R;
-	UPROPERTY(EditAnywhere, Category="Physical|Mesh", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UStaticMesh> SM_Leg_L;
-	
-	/* Physical Material */
-	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UPhysicalMaterial> PM_Head;
-	
-	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UPhysicalMaterial> PM_Torso;
-	
-	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UPhysicalMaterial> PM_Arm_R;
-	
-	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UPhysicalMaterial> PM_Arm_L;
-	
-	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UPhysicalMaterial> PM_Leg_R;
-	
-	UPROPERTY(EditAnywhere, Category="Physical|Material", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UPhysicalMaterial> PM_Leg_L;
-	
-	
-	FTimeline ReactTimeline;
-	FName CacheBoneName = NAME_None;
-	
-	
-	
-	
-	UFUNCTION()
-	void HandleReactTimeline(float value);
-	
-	UFUNCTION()
-	void HandleReactTimelineFinished();
-	
-	bool bIsHit = false;
 	
 	UPROPERTY(
 		EditDefaultsOnly,

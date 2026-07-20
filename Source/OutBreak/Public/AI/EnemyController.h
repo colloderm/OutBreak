@@ -6,6 +6,7 @@
 #include "DetourCrowdAIController.h"
 #include "EnemyController.generated.h"
 
+
 UCLASS()
 class OUTBREAK_API AEnemyController : public ADetourCrowdAIController
 {
@@ -15,6 +16,8 @@ public:
 	// Sets default values for this actor's properties
 	AEnemyController();
 
+	void InitializeComponents();
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -22,4 +25,12 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	
+	
+private:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class UStateTreeAIComponent> StateTreeComponent;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class UAIPerceptionComponent> AIPerceptionComponent;
 };

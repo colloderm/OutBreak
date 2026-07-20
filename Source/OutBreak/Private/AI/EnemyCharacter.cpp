@@ -2,16 +2,23 @@
 
 #include "AI/EnemyCharacter.h"
 
-#include "AI/Components/EnemyMovementComponent.h"
-#include "Components/CapsuleComponent.h"
-#include "IAnimationBudgetAllocator.h"
-#include "SkeletalMeshComponentBudgeted.h"
-#include "MotionWarpingComponent.h"
-#include "AI/System/ModularSkeletalMeshActor.h"
 #include "Engine/DamageEvents.h"
+
+#include "SkeletalMeshComponentBudgeted.h"
+#include "IAnimationBudgetAllocator.h"
+
+#include "AI/Data/EnemyAsset.h"
+
 #include "Components/ChildActorComponent.h"
-#include "Engine/StaticMeshActor.h"
+#include "Components/CapsuleComponent.h"
+#include "MotionWarpingComponent.h"
+
+#include "AI/Components/EnemyMovementComponent.h"
 #include "AI/Components/EnemyStatusComponent.h"
+#include "AI/Components/EnemyPhysicalComponent.h"
+
+
+#include "AI/System/ModularSkeletalMeshActor.h"
 
 
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
@@ -29,7 +36,17 @@ AEnemyCharacter::AEnemyCharacter(
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	UCapsuleComponent* Capsule =
+
+	InitializeComponents();
+	/*
+	 * 컴포넌트가 등록되기 전에 자동 등록 설정을 활성화한다.
+	 */
+	ApplyAnimationBudgetSettings();
+}
+
+void AEnemyCharacter::InitializeComponents()
+{
+		UCapsuleComponent* Capsule =
 		GetCapsuleComponent();
 	
 	check(Capsule);
@@ -78,10 +95,6 @@ AEnemyCharacter::AEnemyCharacter(
 	CollisionComponent = BudgetedMesh;
 	/* ———————————————————————————————————————————————————————————————————————————————————————————————— */
 	
-	CollisionComponent->SetRelativeLocationAndRotation(
-		FVector(0.0f, 0.0f, 0.0f),
-		FRotator(0.0f, 0.0f, 0.0f));
-	
 	CollisionComponent->SetRelativeLocationAndRotation(FVector(0.f, 0.f, -90.f), FRotator(0.0f, 0.0f, -90.0f));
 
 	/* ——————————————————————————————————Default Engine Collision Setting—————————————————————————————— */
@@ -110,21 +123,31 @@ AEnemyCharacter::AEnemyCharacter(
 	BudgetedMesh->SetCanEverAffectNavigation(false);
 	
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
-	EnemyStatusComponent = CreateDefaultSubobject<UEnemyStatusComponent>(TEXT("EnemyStatusComponent"));
+	PhysicalComponent = CreateDefaultSubobject<UEnemyPhysicalComponent>(TEXT("PhysicalComponent"));
 	
 	ChildActorComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("ChildActorComponent"));
 	ChildActorComponent->SetupAttachment(GetMesh());
 	
-	/*
-	 * 컴포넌트가 등록되기 전에 자동 등록 설정을 활성화한다.
-	 */
-	ApplyAnimationBudgetSettings();
+	
+}
+
+void AEnemyCharacter::InitializeAsset()
+{
+	if(!ensureAlwaysMsgf(IsValid(EnemyAsset),
+		TEXT("%s::%s: Enemy Asset is invalid."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
+	{
+		return;
+	}
 }
 
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
+	InitializeAsset();
+	
 	USkeletalMeshComponentBudgeted* BudgetedMesh =
 		Cast<USkeletalMeshComponentBudgeted>(GetMesh());
 
@@ -148,35 +171,6 @@ void AEnemyCharacter::BeginPlay()
 		this,
 		&AEnemyCharacter::HandleReducedWorkChanged);
 	
-	if (IsValid(ReactCurveFloat))
-	{
-		FOnTimelineFloat UpdateDelegate;
-		UpdateDelegate.BindUFunction(
-			this,
-			FName(TEXT("HandleReactTimeline")));
-		
-
-		FOnTimelineEvent FinishedDelegate;
-		FinishedDelegate.BindUFunction(
-			this,
-			FName(TEXT("HandleReactTimelineFinished")));
-		
-		ReactTimeline.AddInterpFloat(ReactCurveFloat, UpdateDelegate);
-		ReactTimeline.SetTimelineFinishedFunc(FinishedDelegate);
-		
-		ReactTimeline.SetLooping(false);
-		ReactTimeline.SetPlayRate(1.f);
-	}
-	
-	if (!ensureAlwaysMsgf(
-		PM_Head && PM_Torso && PM_Arm_R && PM_Arm_L && PM_Leg_R && PM_Leg_L,
-		TEXT("%s::%s: VaultMontage is invalid."),
-		*GetClass()->GetName(),
-		TEXT(__FUNCTION__)))
-	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: Physical Material is not set."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-	}
-	
 	ChildActorSkeletalMesh = GetChildActorSkeletalMesh(); 
 	
 	/*
@@ -191,7 +185,6 @@ void AEnemyCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	
-	ReactTimeline.TickTimeline(DeltaSeconds);
 }
 
 void AEnemyCharacter::EndPlay(
@@ -211,29 +204,6 @@ void AEnemyCharacter::EndPlay(
 	Super::EndPlay(EndPlayReason);
 }
 
-void AEnemyCharacter::PhysicalMaterialProcess(TWeakObjectPtr<UPhysicalMaterial> PhyMtrl)
-{
-	if (PhyMtrl == PM_Head)
-	{
-		GetMesh()->HideBoneByName(FName(TEXT("Head")), PBO_None);
-	}
-	else if (PhyMtrl == PM_Arm_R)
-	{
-		MeshPartDestruction(SM_Arm_R, FName(TEXT("upperarm_r")));
-	}
-	else if (PhyMtrl == PM_Arm_L)
-	{
-		MeshPartDestruction(SM_Arm_L, FName(TEXT("upperarm_l")));
-	}
-	else if (PhyMtrl == PM_Leg_R)
-	{
-		MeshPartDestruction(SM_Leg_R, FName(TEXT("thigh_r")));
-	}
-	else if (PhyMtrl == PM_Leg_L)
-	{
-		MeshPartDestruction(SM_Leg_L, FName(TEXT("thigh_l")));
-	}
-}
 
 float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator,
                                   AActor* DamageCauser)
@@ -252,168 +222,60 @@ float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 				static_cast<const FPointDamageEvent&>(DamageEvent);
 			
 			FHitResult HitResult= PointDamageEvent.HitInfo;
-	
-			FName BoneName = HitResult.BoneName;
-			const FVector HitDirection = HitResult.Normal;
-			TWeakObjectPtr<UPhysicalMaterial> PhyMtrl = HitResult.PhysMaterial;
 			
-			if (BoneName == FName(TEXT("pelvis")))
-			{
-				UE_LOG(LogTemp, Display, TEXT("%s::%s: Hitted Bone is pelvis"), *GetClass()->GetName(), TEXT(__FUNCTION__));
-				return ActualDamage;
-			}
-			if (!bIsHit)
-			{
-				UE_LOG(LogTemp, Display, TEXT("%s::%s: It's already a hit."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-			}
-			
-			
-			PhysicalMaterialProcess(PhyMtrl);
-			
-			
-			
-			
-	
-			CacheBoneName = BoneName;
-	
-			GetCharacterMovement()->StopMovementImmediately();
-	
-			GetMesh()->SetAllBodiesBelowSimulatePhysics(BoneName, true, true);
-			GetMesh()->AddImpulse(HitDirection.GetSafeNormal() * ReactScale, BoneName, true);
-	
-			ReactTimeline.PlayFromStart();
-	
-	
-			bIsHit = true;
+			PhysicalComponent->ActionPhysical(HitResult, DamageAmount);
 		}
 	}
 	
 	return ActualDamage;
 }
 
-void AEnemyCharacter::MeshPartDestruction(UStaticMesh* MeshAsset, FName BoneName)
+USkeletalMeshComponent*
+AEnemyCharacter::GetChildActorSkeletalMesh()
 {
-	if (!IsValid(ChildActorSkeletalMesh))
+	if (!ensureAlwaysMsgf(
+		IsValid(ChildActorComponent),
+		TEXT("%s::%s: ChildActorComponent is invalid."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
 	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor Skeletal Mesh is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-		return;
-	}
-	
-	if (!IsValid(MeshAsset))
-	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: Mesh Asset is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-		return;
-	}
-	
-	if (BoneName == NAME_None)
-	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: BoneName is Name_None."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-		return;
-	}
-	
-	UWorld* World = GetWorld();
-	
-	if (!IsValid(World))
-	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: World is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-		return;
-	}
-	
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.Owner = GetOwner();
-	SpawnParams.SpawnCollisionHandlingOverride =
-		ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	
-	FTransform SpawnTransform = ChildActorSkeletalMesh->GetSocketTransform(BoneName);
-	AStaticMeshActor* MeshPart = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), SpawnTransform, SpawnParams);
-	UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(MeshPart->GetRootComponent());
-	MeshComp->SetMobility(EComponentMobility::Movable);
-	MeshComp->SetStaticMesh(MeshAsset);
-
-	MeshComp->SetCollisionProfileName(TEXT("PhysicsActor"));
-	MeshComp->SetGenerateOverlapEvents(false);
-	MeshComp->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
-
-	MeshComp->SetCanEverAffectNavigation(false);
-	MeshComp->SetMassOverrideInKg(NAME_None, 300.f);
-	MeshComp->SetSimulatePhysics(true);
-	MeshComp->WakeAllRigidBodies();
-	
-	ChildActorSkeletalMesh->HideBoneByName(BoneName, PBO_Term);
-	
-	USkeletalMeshComponent* CharacterMesh = GetMesh();
-
-	const int32 CharacterBoneIndex =
-		CharacterMesh
-			? CharacterMesh->GetBoneIndex(BoneName)
-			: INDEX_NONE;
-
-	const int32 ChildBoneIndex =
-		ChildActorSkeletalMesh
-			? ChildActorSkeletalMesh->GetBoneIndex(BoneName)
-			: INDEX_NONE;
-
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT(
-			"Hide Bone: Name=%s "
-			"CharacterIndex=%d ChildIndex=%d "
-			"ChildOwner=%s ChildMesh=%s"),
-		*BoneName.ToString(),
-		CharacterBoneIndex,
-		ChildBoneIndex,
-		*GetNameSafe(
-			ChildActorSkeletalMesh
-				? ChildActorSkeletalMesh->GetOwner()
-				: nullptr),
-		*GetNameSafe(
-			ChildActorSkeletalMesh
-				? ChildActorSkeletalMesh->GetSkeletalMeshAsset()
-				: nullptr));
-}
-
-USkeletalMeshComponent* AEnemyCharacter::GetChildActorSkeletalMesh()
-{
-	if (!IsValid(ChildActorComponent))
-	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor Component is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return nullptr;
 	}
-	
-	AActor* ChildActor = ChildActorComponent->GetChildActor();
-	if (!IsValid(ChildActor))
+
+	AModularSkeletalMeshActor* MeshOwner =
+		Cast<AModularSkeletalMeshActor>(
+			ChildActorComponent->GetChildActor());
+
+	if (!ensureAlwaysMsgf(
+		IsValid(MeshOwner),
+		TEXT("%s::%s: Child actor must be "
+			 "AModularSkeletalMeshActor."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
 	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: Child Actor is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return nullptr;
 	}
-	
-	AModularSkeletalMeshActor* MeshOwner = Cast<AModularSkeletalMeshActor>(ChildActor);
-	
-	check(MeshOwner)
-	// {
-	// 	UE_LOG(LogTemp, Error, TEXT("%s::%s: MeshOwner is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-	// 	return nullptr;
-	// }
-	
+
+	if (!ensureAlwaysMsgf(
+		IsValid(MeshOwner->LeaderHead),
+		TEXT("%s::%s: LeaderHead is invalid."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
+	{
+		return nullptr;
+	}
+
 	return MeshOwner->LeaderHead;
 }
 
-void AEnemyCharacter::HandleReactTimeline(float value)
+void AEnemyCharacter::StopCharacterMovement()
 {
-	if (CacheBoneName == NAME_None)
-	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: Cache Bone Name is \"NAME_None\""), *GetClass()->GetName(), TEXT(__FUNCTION__));
-		return;
-	}
-	GetMesh()->SetAllBodiesBelowPhysicsBlendWeight(CacheBoneName, value);
+	GetMovementComponent()->StopMovementImmediately();
 }
 
-void AEnemyCharacter::HandleReactTimelineFinished()
+void AEnemyCharacter::Dead()
 {
-	GetMesh()->SetAllBodiesPhysicsBlendWeight(0.0f, false);
-	GetMesh()->SetAllBodiesSimulatePhysics(false);
-	bIsHit = false;
+	Destroy();
 }
 
 void AEnemyCharacter::SetAnimationSignificance(

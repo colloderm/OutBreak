@@ -3,10 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AI/Interface/EnemyComponentInterface.h"
 #include "AI/Nav/EnemyGenNavLinksProxy.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "AI/Struct/EnemyTraversalData.h"
+#include "AI/Interface/EnemyComponentInterface.h"
 #include "EnemyMovementComponent.generated.h"
 
 
@@ -34,6 +36,7 @@ public:
 	float GetMantleMaxHeight() const { return MantleMaxHeight; }
 	float GetClimbUpMinHeight() const { return ClimbUpMinHeight; }
 	float GetClimbUpMaxHeight() const { return ClimbUpMaxHeight; }
+
 
 protected:
 	// Called when the game starts
@@ -110,7 +113,9 @@ protected:
 	UPROPERTY()
 	FVector CacheMeshWorldLocation = FVector::ZeroVector;
 	
-
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
+	
 public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 							   FActorComponentTickFunction* ThisTickFunction) override;

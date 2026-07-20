@@ -37,6 +37,7 @@ void UEnemyMovementComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
+	
 	AEnemyCharacter* OwnerCharacter = Cast<AEnemyCharacter>(GetOwner());
 	
 	if (!IsValid(OwnerCharacter))

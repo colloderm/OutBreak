@@ -27,7 +27,8 @@ void UEnemyBaseActorComponent::BeginPlay()
 	Super::BeginPlay();
 	
 	EnemyCharacter = Cast<AEnemyCharacter>(GetOwner());
-
+	
+	EnemyAsset = EnemyCharacter->GetEnemyAsset();
 	// ...
 	
 }
@@ -41,4 +42,5 @@ void UEnemyBaseActorComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 
 	// ...
 }
+
 
