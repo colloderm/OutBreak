@@ -136,9 +136,32 @@ void UOBEquipmentComponent::AttachWeaponToOwner()
 
 	ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
 	if (!OwnerCharacter || !OwnerCharacter->GetMesh()) return;
-	auto ChildMesh = Cast<USkeletalMeshComponent>(OwnerCharacter->GetMesh()->GetChildComponent(0));
+
+	// 총은 "보이는 손"에 있어야 하므로 시각용 자식 메시에 부착한다.
+	// 메인(소스) 메시에 붙이면 리타겟 비율 차이만큼 총이 손에서 벗어난다.
+	// ponytail: 첫 자식 스켈레탈 메시를 시각용으로 간주. 자식 메시가 2개 이상 되면 이름/태그 지정으로 승급.
+	USkeletalMeshComponent* TargetMesh = OwnerCharacter->GetMesh();
+	TArray<USceneComponent*> Children;
+	OwnerCharacter->GetMesh()->GetChildrenComponents(false, Children);
+	for (USceneComponent* C : Children)
+	{
+		if (USkeletalMeshComponent* SK = Cast<USkeletalMeshComponent>(C)) { TargetMesh = SK; break; }
+	}
+
+	// 무기별 소켓(비어 있으면 컴포넌트 기본값).
+	const UOBWeaponData* Data = CurrentWeapon->GetWeaponData();
+	const FName SocketToUse = (Data && !Data->AttachSocket.IsNone()) ? Data->AttachSocket : AttachSocketName;
+
+	// 소켓이 없으면 컴포넌트 원점(발밑)에 붙어 총이 바닥에 떨어진다. 조용히 실패하지 않도록 경고.
+	if (!TargetMesh->DoesSocketExist(SocketToUse))
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Equip] 소켓 '%s' 이(가) %s 에 없습니다. 무기가 컴포넌트 원점에 붙습니다."),
+			*SocketToUse.ToString(), *TargetMesh->GetName());
+	}
+
 	const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
-	CurrentWeapon->AttachToComponent(ChildMesh, AttachRules, AttachSocketName);
+	CurrentWeapon->AttachToComponent(TargetMesh, AttachRules, SocketToUse);
 }
 
 void UOBEquipmentComponent::ApplyCosmeticEquip()

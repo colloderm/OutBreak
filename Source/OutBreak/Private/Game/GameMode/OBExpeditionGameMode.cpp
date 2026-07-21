@@ -17,6 +17,7 @@
 #include "DrawDebugHelpers.h"
 #include "Character/OBCharacterBase.h"
 #include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
 
 AOBExpeditionGameMode::AOBExpeditionGameMode()
 {
@@ -442,6 +443,117 @@ uint8 AOBExpeditionGameMode::ResolveTeamForCode(const FString& PartyCode)
 		return NewTeam;                             // 새 코드 → 고유 팀
 	}
 	return NextTeamId++;                            // 솔로(협동 아님) → 고유 팀
+}
+
+bool AOBExpeditionGameMode::ShouldEnterDownedState(AController* C) const
+{
+	return HasLivingTeammate(C);
+}
+
+bool AOBExpeditionGameMode::HasLivingTeammate(AController* C) const
+{
+	if (!C || !GameState) return false;
+	const AOBPlayerStateBase* Me = C->GetPlayerState<AOBPlayerStateBase>();
+	if (!Me) return false;
+	const uint8 Team = Me->GetTeamId();
+	
+	for (APlayerState* PS : GameState->PlayerArray)
+	{
+		const AOBPlayerStateBase* OBPS = Cast<AOBPlayerStateBase>(PS);
+		if (!OBPS || OBPS == Me) continue;
+		if (OBPS->GetTeamId() == Team && OBPS->GetExpeditionStatus() == EOBPlayerExpeditionStatus::Alive) return true;
+	}
+	
+	return false;
+}
+
+void AOBExpeditionGameMode::NotifyPlayerDowned(AController* C)
+{
+	if (!C) return;
+	
+	uint8 Team = 0;
+	if (AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Downed);
+		Team = PS->GetTeamId();
+	}
+	
+	// 블리드아웃 타이머
+	FTimerHandle& T = BleedOutTimers.FindOrAdd(C);
+	FTimerDelegate D = FTimerDelegate::CreateUObject(this, &AOBExpeditionGameMode::FinishDownedPlayer, C);
+	GetWorldTimerManager().SetTimer(T, D, BleedOutSeconds, false);
+	
+	// 마지막 생존자가 다운됐을 수 있음 -> 팀 전멸 검사
+	CheckTeamWipe(Team);
+}
+
+void AOBExpeditionGameMode::RevivePlayer(AController* C)
+{
+	if (!C) return;
+	
+	if (FTimerHandle* T = BleedOutTimers.Find(C))
+	{
+		GetWorldTimerManager().ClearTimer(*T);
+		BleedOutTimers.Remove(C);
+	}
+	if (AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>())
+	{
+		if (PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Downed) return;
+		PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Alive);
+	}
+	if (APawn* P = C->GetPawn())
+		if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(P))
+			Char->ReviveFromDowned(ReviveHealthPercent);
+}
+
+void AOBExpeditionGameMode::FinishDownedPlayer(AController* C)
+{
+	if (!C) return;
+	if (FTimerHandle* T = BleedOutTimers.Find(C))
+	{
+		GetWorldTimerManager().ClearTimer(*T);
+		BleedOutTimers.Remove(C);
+	}
+	
+	uint8 Team = 0;
+	if (AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>())
+	{
+		if (PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Downed) return; // 이미 부활 처리됨
+		PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Dead);
+		Team = PS->GetTeamId();
+	}
+	if (APawn* P = C->GetPawn())
+		if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(P))
+			Char->FinishDeathFromDowned();
+	
+	CheckTeamWipe(Team);
+	CheckEndConditions();
+}
+
+void AOBExpeditionGameMode::CheckTeamWipe(uint8 TeamId)
+{
+	if (!GameState) return;
+	
+	bool bAnyAlive = false;
+	TArray<AController*> DownedControllers;
+	for (APlayerState* PS : GameState->PlayerArray)
+	{
+		AOBPlayerStateBase* OBPS = Cast<AOBPlayerStateBase>(PS);
+		if (!OBPS || OBPS->GetTeamId() != TeamId) continue;
+		
+		const EOBPlayerExpeditionStatus S = OBPS->GetExpeditionStatus();
+		if (S == EOBPlayerExpeditionStatus::Alive)
+			bAnyAlive = true;
+		else if (S == EOBPlayerExpeditionStatus::Downed)
+			DownedControllers.Add(OBPS->GetOwningController());
+	}
+	
+	// 팀에 Alive 없음 -> 다운자 전원 사망(팀 전멸, 부활 불가)
+	if (!bAnyAlive)
+	{
+		for (AController* DC : DownedControllers)
+			FinishDownedPlayer(DC);
+	}
 }
 
 void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin)

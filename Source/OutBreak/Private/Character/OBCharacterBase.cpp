@@ -92,37 +92,42 @@ void AOBCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	// 상태에 대한 내용을 모든 클라이언트로 복제.
 	DOREPLIFETIME(AOBCharacterBase, bIsDead);
 	DOREPLIFETIME(AOBCharacterBase, bIsAiming);
+	DOREPLIFETIME(AOBCharacterBase, bIsDowned);
 }
 
 void AOBCharacterBase::HandleDeath()
 {
 	// 서버 권위 + 중복 방지.
-	if (!HasAuthority() || bIsDead) return;
+	if (!HasAuthority() || bIsDead || bIsDowned) return;
 	
+	// 컨트롤러를 먼저 캡처(리스폰 시 UnPossess로 null 될 수 있음)
+	AController* C = GetController();
+	AOBGameModeBase* GM = GetWorld()->GetAuthGameMode<AOBGameModeBase>();
+
+	// 팀에 생존자 있으면 다운(부활 여지), 없으면 즉시 사망.
+	if (GM && GM->ShouldEnterDownedState(C))
+	{
+		EnterDownedState();
+		GM->NotifyPlayerDowned(C);
+		return;
+	}
+	
+	// --- 즉시 사망 ---
 	bIsDead = true;
-	
-	// 능력 정리 + 사망 태그(능력 발동 차단용)
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->CancelAbilities();
 		AbilitySystemComponent->AddLooseGameplayTag(OBGameplayTags::State_Dead);
 	}
 	
-	// 무기 해제(부여 능력 회수 + 부기 파괴)
 	if (EquipmentComponent)
-	{
 		EquipmentComponent->UnequipWeapon();
-	}
 	
 	// 서버측 물리/이동 비활성
 	StartDeath();
 	
-	// 컨트롤러를 먼저 캡처(리스폰 시 UnPossess로 null 될 수 있음)
-	AController* DyingController = GetController();
-	if (AOBGameModeBase* GameMode = GetWorld()->GetAuthGameMode<AOBGameModeBase>())
-	{
-		GameMode->RequestRespawn(DyingController, this);
-	}
+	if (GM)
+		GM->RequestRespawn(C, this);
 }
 
 void AOBCharacterBase::Multicast_DrawFireTrace_Implementation(const FVector& Start, const FVector& End, bool bHit)
@@ -164,7 +169,20 @@ void AOBCharacterBase::DisablePawnForDeath()
 void AOBCharacterBase::StartDeath()
 {
 	DisablePawnForDeath();
-	StartRagdoll();
+	if (DeathMontage)   // 죽는 몽타주 재생 후
+	{
+		float Dur = 0.f;
+		if (USkeletalMeshComponent* M = GetMesh())
+			if (UAnimInstance* Anim = M->GetAnimInstance())
+				Dur = Anim->Montage_Play(DeathMontage);
+		// 몽타주 끝나면 래그돌(타이머).
+		FTimerHandle H;
+		GetWorldTimerManager().SetTimer(H, this, &AOBCharacterBase::StartRagdoll, FMath::Max(0.1f, Dur - 0.1f), false);
+	}
+	else
+	{
+		StartRagdoll(); // 기존: 즉시 래그돌
+	}
 }
 
 void AOBCharacterBase::StartRagdoll()
@@ -284,6 +302,67 @@ void AOBCharacterBase::HandleExtracted()
 	// (폰 숨김/충돌·이동 정지는 GameMode가 처리)
 }
 
+void AOBCharacterBase::EnterDownedState()
+{
+	if (!HasAuthority()) return;
+	bIsDowned = true; // 복제 -> OnRep_IsDowned(다운 연출)
+	
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->CancelAbilities();
+		AbilitySystemComponent->AddLooseGameplayTag(OBGameplayTags::State_Downed);
+	}
+	if (EquipmentComponent)
+		EquipmentComponent->UnequipWeapon();
+	
+	// 이동만 정지(충돌은 유지 -> 부활 상호작용 가능)
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->StopMovementImmediately();
+		Move->DisableMovement();
+	}
+}
+
+void AOBCharacterBase::ReviveFromDowned(float HealthFraction)
+{
+	if (!HasAuthority() || !bIsDowned) return;
+	bIsDowned = false;
+	
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->RemoveLooseGameplayTag(OBGameplayTags::State_Downed);
+		// 체력 일부 회복(프로젝트 AttributeSet 접근자에 맞게).
+		const float NewHealth = FMath::Max(1.f, UOBAttributeSetBase::GetMaxHealthAttribute().GetNumericValue(
+			AbilitySystemComponent->GetAttributeSet(UOBAttributeSetBase::StaticClass())) * HealthFraction);
+		AbilitySystemComponent->SetNumericAttributeBase(UOBAttributeSetBase::GetHealthAttribute(), NewHealth);
+	}
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+		Move->SetMovementMode(MOVE_Walking);
+}
+
+void AOBCharacterBase::FinishDeathFromDowned()
+{
+	if (!HasAuthority()) return;
+	bIsDowned = false;
+	bIsDead = true;
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->RemoveLooseGameplayTag(OBGameplayTags::State_Downed);
+		AbilitySystemComponent->AddLooseGameplayTag(OBGameplayTags::State_Dead);
+	}
+	StartDeath(); // 래그돌
+}
+
+FGameplayTag AOBCharacterBase::GetHoldStyleTag() const
+{
+	if (EquipmentComponent)
+		if (AOBWeaponBase* W = EquipmentComponent->GetCurrentWeapon())
+			if (UOBWeaponData* Data = W->GetWeaponData())
+				return Data->HoldStyleTag;
+	
+	return FGameplayTag(); // 무장 안 함 = 빈 태그(=Unarmed)
+}
+
 void AOBCharacterBase::ApplyCombatFocusPostProcess()
 {
 	if (!FollowCamera) return;
@@ -316,6 +395,13 @@ void AOBCharacterBase::UpdateCombatOrientation()
 		MoveComp->bOrientRotationToMovement = !bCombat;   // 평소엔 이동 방향
 	}
 	bUseControllerRotationYaw = bCombat;
+	
+	// GASP 애님 측 회전 모드도 같이 전환. 이걸 빼면 캡슐만 돌고 몸통은 천천히 따라온다.
+	if (bCombat != bLastCombatOrientation)
+	{
+		bLastCombatOrientation = bCombat;
+		OnCombatOrientationChanged(bCombat);
+	}
 }
 
 void AOBCharacterBase::Tick(float DeltaSeconds)
@@ -419,6 +505,16 @@ void AOBCharacterBase::OnRep_PlayerState()
 	Super::OnRep_PlayerState();
 
 	InitAbilitySystemComponent();
+}
+
+void AOBCharacterBase::OnRep_IsDowned()
+{
+	if (bIsDowned && DownedEnterMontage)      // EditDefaultsOnly UAnimMontage*
+	{
+		if (USkeletalMeshComponent* M = GetMesh())
+			if (UAnimInstance* Anim = M->GetAnimInstance())
+				Anim->Montage_Play(DownedEnterMontage);
+	}
 }
 
 void AOBCharacterBase::InitAbilitySystemComponent()

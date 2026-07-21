@@ -20,6 +20,10 @@ public:
 	*/
 	virtual void RequestRespawn(AController* Controller, APawn* DeadPawn);
 	
+	// 치명타 시 '다운'으로 갈지(팀 생존자 존재). 베이스=항상 false(즉시 사망).
+	virtual bool ShouldEnterDownedState(AController* C) const { return false; }
+	// 다운 처리(블리드아웃 시작). 베이스=무동작.
+	virtual void NotifyPlayerDowned(AController* C) {}
 protected:
 	// 사망 후 리스폰까지 지연 시간(초)
 	UPROPERTY(EditDefaultsOnly, Category = "Respawn")

@@ -53,6 +53,10 @@ public:
 	// 플레이어 접속 종료. 마지막 생존자가 나갔을 수 있어 종료 조건을 재평가.
 	virtual void Logout(AController* Exiting) override;
 	
+	virtual bool ShouldEnterDownedState(AController* C) const override; // 팀 생존자 존재?
+	virtual void NotifyPlayerDowned(AController* C) override;           // 블리드아웃 시작
+	void RevivePlayer(AController* C);
+	
 protected:
 	virtual void StartPlay() override;
 
@@ -90,9 +94,15 @@ protected:
 	UOBExpeditionMapData* ResolveMapData();
 	
 	//~ 개인 탈출구(스폰 기준 원거리 + 주변 좌우, 팀 분산, 세션 랜덤) ----------
-	void CollectPersonalExtractPoints();                                   // 태그 마커 수집
-	void AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin); // 스폰 확정 후 배정
+	void CollectPersonalExtractPoints();											 // 태그 마커 수집
+	void AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin);		 // 스폰 확정 후 배정
 	TArray<AActor*> SelectPersonalMarkers(const FVector& SpawnOrigin, uint8 TeamId); // 선정 알고리즘
+	
+	// 진입 URL 옵션(?party=<코드>) 파싱을 위해 오버라이드.
+	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId,
+		const FString& Options, const FString& Portal) override;
+	
+	uint8 ResolveTeamForCode(const FString& PartyCode); // 코드→TeamId(같은 코드=같은 팀, 없으면 고유)
 
 protected:
 	// 이 맵의 세션 설정(정원/시간). 맵별 GameMode BP에서 해당 맵의 MapData 에셋을 지정.
@@ -144,11 +154,16 @@ protected:
 	UPROPERTY(Transient)
 	TObjectPtr<UOBExpeditionMapData> ActiveMapData;
 	
-	// 진입 URL 옵션(?party=<코드>) 파싱을 위해 오버라이드.
-	virtual FString InitNewPlayer(APlayerController* NewPlayerController, const FUniqueNetIdRepl& UniqueId,
-		const FString& Options, const FString& Portal) override;
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Down")
+	float BleedOutSeconds = 30.f;
 	
-	uint8 ResolveTeamForCode(const FString& PartyCode); // 코드→TeamId(같은 코드=같은 팀, 없으면 고유)
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Down")
+	float ReviveHealthPercent = 0.35f;
+	
+private:
+	void FinishDownedPlayer(AController* C);   // 블리드아웃/전멸 → 사망 확정
+	void CheckTeamWipe(uint8 TeamId);          // 팀에 Alive 0명이면 다운자 전원 사망
+	bool HasLivingTeammate(AController* C) const;
 
 private:	
 	FTimerHandle SessionTimerHandle;
@@ -184,4 +199,6 @@ private:
 	
 	// 코드(파티/솔로) → 배정된 TeamId. 같은 코드=같은 팀, 새 코드=중복없는 고유 발급.
 	TMap<FString, uint8> PartyTeams;
+
+	TMap<TObjectPtr<AController>, FTimerHandle> BleedOutTimers;
 };

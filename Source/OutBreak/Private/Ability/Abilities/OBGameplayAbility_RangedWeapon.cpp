@@ -12,6 +12,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
+#include "Camera/CameraComponent.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
 
@@ -245,16 +246,54 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	UOBWeaponData* WeaponData = Weapon->GetWeaponData();
 	if (!WeaponData) return;
 
-	FVector ViewLocation;
-	FRotator ViewRotation;
-	Character->GetActorEyesViewPoint(ViewLocation, ViewRotation);
-
-	// 퍼짐 각도만큼 랜덤 콘 적용(서버 권위 랜덤).
+	// 1) 카메라에서 전방으로 트레이스해 실제 조준점을 구한다(크로스헤어=화면 중앙과 일치).
+	FVector CamLoc;
+	FRotator CamRot;
+	if (UCameraComponent* Cam = Character->GetFollowCamera())
+	{
+		CamLoc = Cam->GetComponentLocation();
+		CamRot = Cam->GetComponentRotation();
+	}
+	else
+	{
+		Character->GetActorEyesViewPoint(CamLoc, CamRot); // 폴백
+	}
+	
+	const FVector CamEnd = CamLoc + CamRot.Vector() * WeaponData->Range;
+	
+	FCollisionQueryParams AimParams(SCENE_QUERY_STAT(OBAimProbe), /*bTraceComplex=*/true);
+	AimParams.AddIgnoredActor(Character);
+	AimParams.AddIgnoredActor(Weapon);
+	
+	// 카메라~머즐 사이 벽에 맞으면 조준점을 그 지점으로. 아니면 먼 지점.
+	FHitResult AimHit;
+	FVector AimPoint = GetWorld()->LineTraceSingleByChannel(
+		AimHit, CamLoc, CamEnd, OB_TraceChannel_Weapon, AimParams) 
+		? AimHit.ImpactPoint : CamEnd;
+	
+	// 2) 실제 탄환은 머즐에서 조준점으로. 여기에 스프레드 콘 적용.
+	const FVector MuzzleLoc = Weapon->GetMuzzleLocation();
+	
+	// 카메라가 벽에 끼면 조준점이 머즐 뒤에 잡혀 탄이 뒤로 나간다. 카메라 전방으로 폴백.
+	if (FVector::DotProduct(AimPoint - MuzzleLoc, CamRot.Vector()) <= 0.f)
+	{
+		AimPoint = MuzzleLoc + CamRot.Vector() * WeaponData->Range;
+	}
+	
+	const FVector AimDir = (AimPoint - MuzzleLoc).GetSafeNormal();
+	
 	const float SpreadRadians = FMath::DegreesToRadians(GetCurrentSpreadAngle());
-	const FVector ShotDirection = (SpreadRadians > 0.0f)
-		? FMath::VRandCone(ViewRotation.Vector(), SpreadRadians) : ViewRotation.Vector();
-	const FVector TraceStart = ViewLocation; // 사격 시작
-	const FVector TraceEnd = TraceStart + ShotDirection * WeaponData->Range; // 사격 끝
+	const FVector ShotDirection = (SpreadRadians > 0.f) ? FMath::VRandCone(AimDir, SpreadRadians) : AimDir;
+	
+	// 벽에 밀착하면 무기 메시가 벽을 관통해 머즐이 벽 너머에 놓인다.
+	// 몸통→머즐 구간이 막혀 있으면 시작점을 몸통으로 당겨 탄이 벽에 정상적으로 박히게 한다.
+	const FVector BodyOrigin = Character->GetActorLocation();
+	FHitResult MuzzleBlock;
+	const bool bMuzzleBlocked = GetWorld()->LineTraceSingleByChannel(
+		MuzzleBlock, BodyOrigin, MuzzleLoc, OB_TraceChannel_Weapon, AimParams);
+	
+	const FVector TraceStart = bMuzzleBlocked ? BodyOrigin : MuzzleLoc;
+	const FVector TraceEnd = TraceStart + ShotDirection * WeaponData->Range;
 
 	// 사격 트레이스: Weapon 채널(캐릭터/벽 Block, 카메라 프로브와 분리).
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OBWeaponTrace), /*bTraceComplex=*/true);
