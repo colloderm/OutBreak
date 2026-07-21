@@ -9,6 +9,7 @@
 #include "Navigation/PathFollowingComponent.h"
 #include "AI/Struct/EnemyTraversalData.h"
 #include "AI/Interface/EnemyComponentInterface.h"
+#include "AI/Data/EnemyState.h"
 #include "EnemyMovementComponent.generated.h"
 
 
@@ -29,14 +30,6 @@ public:
 	
 	ETraversalType GetTraversalType() const { return TraversalType; }
 	
-	float GetVaultSpan() const { return VaultSpan; }
-	float GetVaultMinHeight() const { return VaultMinHeight; }
-	float GetVaultMaxHeight() const { return VaultMaxHeight; }
-	float GetMantleMinHeight() const { return MantleMinHeight; }
-	float GetMantleMaxHeight() const { return MantleMaxHeight; }
-	float GetClimbUpMinHeight() const { return ClimbUpMinHeight; }
-	float GetClimbUpMaxHeight() const { return ClimbUpMaxHeight; }
-
 
 protected:
 	// Called when the game starts
@@ -45,49 +38,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
 	ETraversalType TraversalType = ETraversalType::Walk;
 	
-	/* Traversal Values */
-	
-	/* Vault X:75, Z:110~112 (cm.) */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault")
-	float VaultSpan = 75.f;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault")
-	float VaultMinHeight = 100.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault")
-	float VaultMaxHeight = 112.f;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault|Animation")
-	TObjectPtr<UAnimMontage> VaultMontage;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Vault|Animation")
-	float VaultPlayRate = 0.7f;
-
-	/* Mantle */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
-	float MantleMinHeight = 200.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal")
-	float MantleMaxHeight = 240.f;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Mantle|Animation")
-	TObjectPtr<UAnimMontage> MantleMontage;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Mantle|Animation")
-	float MantlePlayRate = 0.7f;
-	
-	/* Climb Up */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|ClimbUp")
-	float ClimbUpMinHeight = 360.f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|ClimbUp")
-	float ClimbUpMaxHeight = 370.f;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|ClimbUp|Animation")
-	TObjectPtr<UAnimMontage> ClimbUpMontage;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|ClimbUp|Animation")
-	float ClimbUpPlayRate = 0.7f;
 	
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement|Traversal|Debug")
@@ -127,7 +78,14 @@ public:
 	void StartNavLinkTraversal(const FVector& Destination, UPathFollowingComponent* PathFollowing, UEnemyGenNavLinksProxy* EnemyGenNavLinksProxy, FVector
 	                           Start, FVector End, ETraversalLinkType LinkType);
 	void FinishNavLinkTraversal();
+	
+	void SetLocomotationState(ELocomotionWalkRunState State);
+	
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Movement|State")
+	ELocomotionWalkRunState GetLocomotionState() { return WalkingRunState; }
 
+	
+private:
 	void TickTraversalDrop();
 	void TickTraversalVault();
 	void TickTraversalMantle();
@@ -173,5 +131,7 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<USkeletalMeshComponent> SkeletalMeshComponent;
 	
+	UPROPERTY(Transient)
+	ELocomotionWalkRunState WalkingRunState = ELocomotionWalkRunState::Walking;
 	
 };

@@ -108,13 +108,8 @@ protected:
 	
 
 private:
-	
-	
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USkeletalMeshComponent> ChildActorSkeletalMesh;
-
-	
 	
 	UPROPERTY(
 		EditDefaultsOnly,

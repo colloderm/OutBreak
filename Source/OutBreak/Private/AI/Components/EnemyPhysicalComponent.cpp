@@ -4,6 +4,7 @@
 #include "AI/Components/EnemyPhysicalComponent.h"
 
 #include "AI/EnemyCharacter.h"
+#include "AI/Components/EnemyMovementComponent.h"
 #include "Engine/StaticMeshActor.h"
 
 // Sets default values for this component's properties
@@ -99,12 +100,13 @@ void UEnemyPhysicalComponent::ActionPhysical(FHitResult HitResult, float DamageA
 		UE_LOG(LogTemp, Display, TEXT("%s::%s: Hitted Bone is pelvis"), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
-	if (bIsHit)
+	
+	if (Limbes.Find("Head")->bIsHas == false)
 	{
-		UE_LOG(LogTemp, Display, TEXT("%s::%s: It's already a hit."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-		return;
+		Action_Dead();
 	}
 	
+	Health -= DamageAmount;
 	
 	CacheBoneName = BoneName;
 	
@@ -132,17 +134,17 @@ void UEnemyPhysicalComponent::ActionPhysical(FHitResult HitResult, float DamageA
 		ActionLimb(LimbMeshes->SM_Leg_L, FName(TEXT("thigh_l")), DamageAmount);
 	}
 	
+	
+	if (bIsHit)
+	{
+		UE_LOG(LogTemp, Display, TEXT("%s::%s: It's already a hit."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+	
 	TargetMesh->SetAllBodiesBelowSimulatePhysics(BoneName, true, true);
 	TargetMesh->AddImpulse(HitDirection.GetSafeNormal() * PhysicalReact->ReactScale, BoneName, true);
 	
 	ReactTimeline.PlayFromStart();
-	
-	if (Limbes.Find("Head")->bIsHas == false)
-	{
-		Action_Dead();
-	}
-	
-	Health -= DamageAmount;
 	
 	bIsHit = true;
 }
@@ -194,10 +196,53 @@ void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName,
 				MeshComp->SetSimulatePhysics(true);
 				MeshComp->WakeAllRigidBodies();
 			}
-
+			
 			ProxyMesh->HideBoneByName(BoneName, PBO_Term);
+			
+			AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+			if (!IsValid(OwnerCharacter))
+			{
+				UE_LOG(LogTemp, Error, TEXT("%s::%s: Owner Character is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+				return;
+			}
+			UEnemyMovementComponent* MovementComponent =  Cast<UEnemyMovementComponent>(OwnerCharacter->GetMovementComponent());
+			if (!IsValid(MovementComponent))
+			{
+				UE_LOG(LogTemp, Error, TEXT("%s::%s: Movement Component is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+				return;
+			}
+			
+			
+			MovementComponent->SetLocomotationState(EvaluateLocomotionState());
 		}
 	}
+}
+
+ELocomotionWalkRunState UEnemyPhysicalComponent::EvaluateLocomotionState() const
+{
+	const FLimbData* Arm_R = Limbes.Find(FName(TEXT("upperarm_r")));
+	const FLimbData* Arm_L = Limbes.Find(FName(TEXT("upperarm_l")));
+	const FLimbData* Leg_R = Limbes.Find(FName(TEXT("thigh_r")));
+	const FLimbData* Leg_L = Limbes.Find(FName(TEXT("thigh_l")));
+	
+	
+	int MissingLimb_Arm = FMath::Clamp((!Arm_R->bIsHas + !Arm_L->bIsHas), 0, 2);
+	
+	
+	if (!Leg_R->bIsHas || !Leg_L->bIsHas)
+	{
+		if (MissingLimb_Arm == 2)
+		{
+			return ELocomotionWalkRunState::Dead;	
+		}
+		else if (MissingLimb_Arm == 1)
+		{
+			return ELocomotionWalkRunState::SlowCrawling;
+		}
+		
+		return ELocomotionWalkRunState::Crawling;
+	}
+	return ELocomotionWalkRunState::Walking;
 }
 
 void UEnemyPhysicalComponent::Action_Dead()

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "EnemyBaseActorComponent.h"
 #include "Components/TimelineComponent.h"
+#include "AI/Data/EnemyState.h"
 #include "EnemyPhysicalComponent.generated.h"
 
 
@@ -56,6 +57,7 @@ public:
 
 private:
 	void ActionLimb(UStaticMesh* MeshAsset, FName BoneName, float Damage);
+	ELocomotionWalkRunState EvaluateLocomotionState() const;
 	
 	float Health = 200.f;
 	

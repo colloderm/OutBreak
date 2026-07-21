@@ -18,6 +18,7 @@ public:
 
 	void InitializeComponents();
 
+	
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -25,8 +26,7 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-	
-	
+
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<class UStateTreeAIComponent> StateTreeComponent;

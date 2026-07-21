@@ -40,6 +40,8 @@ void UEnemyMovementComponent::BeginPlay()
 	
 	AEnemyCharacter* OwnerCharacter = Cast<AEnemyCharacter>(GetOwner());
 	
+	EnemyAsset = OwnerCharacter->GetEnemyAsset();
+	
 	if (!IsValid(OwnerCharacter))
 	{
 		UE_LOG(LogTemp, Error, TEXT("%s::%s: Owmer Pawn is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
@@ -219,6 +221,31 @@ void UEnemyMovementComponent::FinishNavLinkTraversal()
 		IsValid(CustomLink))
 	{
 		PathFollowing->FinishUsingCustomLink(CustomLink);
+	}
+}
+
+void UEnemyMovementComponent::SetLocomotationState(ELocomotionWalkRunState State)
+{
+	switch (State)
+	{
+	case ELocomotionWalkRunState::Walking:
+		WalkingRunState = State;
+		MaxWalkSpeed = 550;
+		break;
+	case ELocomotionWalkRunState::Crawling:
+		WalkingRunState = State;
+		MaxWalkSpeed = 207;
+		break;
+	case ELocomotionWalkRunState::SlowCrawling:
+		WalkingRunState = ELocomotionWalkRunState::Crawling;
+		MaxWalkSpeed = 68;
+		break;	
+	case ELocomotionWalkRunState::Dead:
+		MaxWalkSpeed = 0;
+		Character->Dead();
+		break;
+	default:
+		break;
 	}
 }
 
@@ -421,8 +448,10 @@ void UEnemyMovementComponent::EndParkour()
 
 void UEnemyMovementComponent::BeginTraversalVault(FVector& Start, FVector& Destination)
 {
+	
+	UAnimMontage* Montage = EnemyAsset->GetTraversalSetting()->VaultMontage;
 	if (!ensureAlwaysMsgf(
-		IsValid(VaultMontage),
+		IsValid(Montage),
 		TEXT("%s::%s: VaultMontage is invalid."),
 		*GetClass()->GetName(),
 		TEXT(__FUNCTION__)))
@@ -474,7 +503,7 @@ void UEnemyMovementComponent::BeginTraversalVault(FVector& Start, FVector& Desti
 	const FRotator VaultRotation = UKismetMathLibrary::FindLookAtRotation(ActorPosXY, DestinationXY);
 	
 	const FVector WarpTarget1 =  ActorPos;
-	const FVector WarpTarget2 =  ActorPos + (ActorToDestinationDifference * 0.5) + FVector(0.f, 0.f, VaultMinHeight);
+	const FVector WarpTarget2 =  ActorPos + (ActorToDestinationDifference * 0.5) + FVector(0.f, 0.f, EnemyAsset->GetTraversalSetting()->VaultMinHeight);
 	const FVector WarpTarget3 =	 Destination;
 	
 	
@@ -509,14 +538,14 @@ void UEnemyMovementComponent::BeginTraversalVault(FVector& Start, FVector& Desti
 		WarpTarget3,
 		VaultRotation);
 	
-	const float MontageDuration = Character->PlayAnimMontage(VaultMontage, VaultPlayRate);
+	const float MontageDuration = Character->PlayAnimMontage(Montage, EnemyAsset->GetTraversalSetting()->VaultPlayRate);
 	
 	if (!ensureAlwaysMsgf(
 		MontageDuration > 0.f,
 		TEXT("%s::%s: Failed to play montage : %s"),
 		*GetClass()->GetName(),
 		TEXT(__FUNCTION__),
-		*GetNameSafe(VaultMontage)))
+		*GetNameSafe(Montage)))
 	{
 		return;
 	}
@@ -529,13 +558,13 @@ void UEnemyMovementComponent::BeginTraversalVault(FVector& Start, FVector& Desti
 	// 재생 성공 후 연결해야 활성 Montage Instace에 들어감
 	AnimInstance->Montage_SetEndDelegate(
 		EndDelegate,
-		VaultMontage);
+		Montage);
 }
 
 void UEnemyMovementComponent::BegineTraversalClimbUp(FVector& Start, FVector& Destination)
 {
-	UAnimMontage* AnimMontage = ClimbUpMontage;
-	float PlayRate = ClimbUpPlayRate;
+	UAnimMontage* AnimMontage = EnemyAsset->GetTraversalSetting()->ClimbUpMontage;
+	float PlayRate = EnemyAsset->GetTraversalSetting()->ClimbUpPlayRate;
 	
 	if (!ensureAlwaysMsgf(
 		IsValid(AnimMontage),
