@@ -214,27 +214,8 @@ float UOBGameplayAbility_RangedWeapon::GetFireInterval() const
 
 float UOBGameplayAbility_RangedWeapon::GetCurrentSpreadAngle() const
 {
-	AOBWeaponBase* Weapon = GetEquippedWeapon();
-	UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
-	if (!Data) return 0.0f;
-
-	float Spread = Data->BaseSpreadDegrees;
-
-	if (AOBCharacterBase* Character = GetOBCharacterFromActorInfo())
-	{
-		// 조준 중이면 탄퍼짐 감소.
-		if (Character->IsAiming())
-		{
-			Spread *= Data->ADSSpreadMultiplier;
-		}
-		// 이동 중이면 증가(수평 속도 기준).
-		if (Character->GetVelocity().SizeSquared2D() > FMath::Square(10.0f))
-		{
-			Spread *= Data->MovingSpreadMultiplier;
-		}
-	}
-
-	return Spread;
+	const AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
+	return Character ? Character->GetCurrentSpreadAngle() : 0.f;
 }
 
 void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()

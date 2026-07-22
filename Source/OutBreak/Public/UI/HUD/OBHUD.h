@@ -73,4 +73,10 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UUserWidget> SessionTimerWidget;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> CrosshairWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> CrosshairWidget;
 };

@@ -60,6 +60,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "OB|Combat")
 	bool IsRecentlyFired() const { return bRecentlyFired; }
 	
+	// 현재 탄퍼짐 각도(도). 발사 트레이스와 크로스헤어가 같은 값을 쓴다.
+	UFUNCTION(BlueprintPure, Category = "OB|Combat")
+	float GetCurrentSpreadAngle() const;
+	
 	// 발사 시 집중 효과 펄스(로컬용)
 	void AddFireFocusPulse(float PulseAmount);
 	

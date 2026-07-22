@@ -246,6 +246,22 @@ void AOBCharacterBase::UpdateAimingState()
 	UpdateCombatOrientation();   // 조준 변화 시 지향 갱신
 }
 
+float AOBCharacterBase::GetCurrentSpreadAngle() const
+{
+	const UOBEquipmentComponent* Equip = FindComponentByClass<UOBEquipmentComponent>();
+	const AOBWeaponBase* Weapon = Equip ? Equip->GetCurrentWeapon() : nullptr;
+	const UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
+	if (!Data) return 0.f;
+	
+	float Spread = Data->BaseSpreadDegrees;
+	if (bIsAiming)
+		Spread *= Data->ADSSpeedMultiplier;
+	if (GetVelocity().SizeSquared2D() > FMath::Square(10.f))
+		Spread *= Data->MovingSpreadMultiplier;
+	
+	return Spread;
+}
+
 void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
 {
 	// 로컬 전용
