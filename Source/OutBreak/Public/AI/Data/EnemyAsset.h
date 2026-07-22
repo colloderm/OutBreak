@@ -109,6 +109,28 @@ struct FTraversalSetting
 	float ClimbUpPlayRate = 0.7f;
 };
 
+
+USTRUCT(BlueprintType)
+struct FEnemyPerception
+{
+	GENERATED_BODY()
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sight|Config")
+	float SightDegree = 70.f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sight|Config")
+	float SightRadius = 2500.f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sight|Config")
+	float LoseSightRadius = 3500.f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sight|Config")
+	float MaxAge = 3.f;
+	
+	
+
+};
+
 /**
  * 
  */
