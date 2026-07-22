@@ -369,16 +369,6 @@ void AOBCharacterBase::FinishDeathFromDowned()
 	StartDeath(); // 래그돌
 }
 
-FGameplayTag AOBCharacterBase::GetHoldStyleTag() const
-{
-	if (EquipmentComponent)
-		if (AOBWeaponBase* W = EquipmentComponent->GetCurrentWeapon())
-			if (UOBWeaponData* Data = W->GetWeaponData())
-				return Data->HoldStyleTag;
-	
-	return FGameplayTag(); // 무장 안 함 = 빈 태그(=Unarmed)
-}
-
 void AOBCharacterBase::ApplyCombatFocusPostProcess()
 {
 	if (!FollowCamera) return;

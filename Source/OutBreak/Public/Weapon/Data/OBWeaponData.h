@@ -101,10 +101,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
 	TSubclassOf<UAnimInstance> EquippedAnimLayer;
 	
-	// 무기 홀드 스타일(애님 Chooser 입력). Weapon.HoldStyle.* 태그로 관리.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation", Meta = (Categories = "Weapon.HoldStyle"))
-	FGameplayTag HoldStyleTag;
-	
 	// ===== 원거리 전용 (WeaponType == Ranged 일 때만 표시) =====
 	
 	// 탄약 타입
@@ -136,6 +132,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "1",
 		EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
 	int32 BurstCount = 3;
+	
+	// 1회 발사당 탄자 수(샷건 산탄). 1이면 단일 탄.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "1",
+		EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
+	int32 PelletsPerShot = 1;
 	
 	// 발사음(무기별).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Audio",

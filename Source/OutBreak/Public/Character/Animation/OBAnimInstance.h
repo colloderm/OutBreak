@@ -31,10 +31,6 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "State", Meta = (AllowPrivateAccess = "true"))
 	bool bIsAiming = false;
 	
-	// 현재 무기 홀드 스타일 태그 → Chooser 입력.
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon", Meta = (AllowPrivateAccess = "true"))
-	FGameplayTag HoldStyleTag;
-	
 	// 현재 무기의 상체 오버레이 로코모션(없으면 null). AnimGraph의 BlendSpace Player 입력.
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UBlendSpace> CurrentOverlayLocomotion;

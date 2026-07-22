@@ -85,9 +85,6 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Combat")
 	void OnCombatOrientationChanged(bool bCombat);
 	
-	UFUNCTION(BlueprintPure, Category = "Weapon")
-	FGameplayTag GetHoldStyleTag() const;
-	
 public:
 	/*
 	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).

@@ -264,7 +264,6 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	const FVector AimDir = (AimPoint - MuzzleLoc).GetSafeNormal();
 	
 	const float SpreadRadians = FMath::DegreesToRadians(GetCurrentSpreadAngle());
-	const FVector ShotDirection = (SpreadRadians > 0.f) ? FMath::VRandCone(AimDir, SpreadRadians) : AimDir;
 	
 	// 벽에 밀착하면 무기 메시가 벽을 관통해 머즐이 벽 너머에 놓인다.
 	// 몸통→머즐 구간이 막혀 있으면 시작점을 몸통으로 당겨 탄이 벽에 정상적으로 박히게 한다.
@@ -274,35 +273,20 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		MuzzleBlock, BodyOrigin, MuzzleLoc, OB_TraceChannel_Weapon, AimParams);
 	
 	const FVector TraceStart = bMuzzleBlocked ? BodyOrigin : MuzzleLoc;
-	const FVector TraceEnd = TraceStart + ShotDirection * WeaponData->Range;
 
 	// 사격 트레이스: Weapon 채널(캐릭터/벽 Block, 카메라 프로브와 분리).
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OBWeaponTrace), /*bTraceComplex=*/true);
 	QueryParams.AddIgnoredActor(Character);
 	QueryParams.AddIgnoredActor(Weapon);
-
-	FHitResult Hit;
-	const bool bHit = GetWorld()->LineTraceSingleByChannel(
-		Hit, TraceStart, TraceEnd, OB_TraceChannel_Weapon, QueryParams
-	);
-
-#if ENABLE_DRAW_DEBUG
-	const FVector DebugEnd = bHit ? Hit.ImpactPoint : TraceEnd;
-	if (bDrawDebugTrace)
-	{
-		// 서버에서 호출 → 모든 클라이언트가 동일하게 그린다.
-		Character->Multicast_DrawFireTrace(TraceStart, DebugEnd, bHit);
-	}
-#endif
 	
 	// 소스 ASC를 먼저 확보(발사 큐는 명중 여부와 무관하게 발생).
 	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
-
-	// --- 발사 큐: 총구 화염 + 사격음 (매 발사) ---
+	
+	// --- 발사 큐: 총구 화염 + 사격음. 탄자 수와 무관하게 1회 ---
 	if (SourceASC)
 	{
 		FGameplayCueParameters FireCueParams;
-		FireCueParams.Location = Weapon->GetMuzzleLocation(); // 머즐 위치(큐에 실어 복제)
+		FireCueParams.Location = MuzzleLoc;
 		FireCueParams.Instigator = Character;
 		FireCueParams.SourceObject = Weapon;
 		SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Fire, FireCueParams);
@@ -313,37 +297,58 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	{
 		Character->Multicast_PlayFireMontage(WeaponData->AttackMontage);
 	}
-
-	if (!bHit || !Hit.GetActor()) return; // 빗나감: 발사 큐만 재생하고 종료.
 	
-	// --- 피격 큐: 탄착 이펙트 (명중 지점) ---
-	if (SourceASC)
+	// --- 탄자 루프: 샷건은 1회 발사에 여러 발이 각자 퍼진다 ---
+	// ponytail: 탄자마다 임팩트 큐를 개별 멀티캐스트. 8발이면 8회 — 대역폭이 문제되면 큐 1회로 묶을 것.
+	const int32 Pellets = FMath::Max(1, WeaponData->PelletsPerShot);
+	for (int32 PelletIndex = 0; PelletIndex < Pellets; ++PelletIndex)
 	{
-		FGameplayCueParameters ImpactCueParams;
-		ImpactCueParams.Location = Hit.ImpactPoint;      // 탄착 위치
-		ImpactCueParams.Normal = Hit.ImpactNormal;			// 표면 방향(이펙트 회전용)
-		ImpactCueParams.PhysicalMaterial = Hit.PhysMaterial;
-		SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Impact, ImpactCueParams);
-	}
+		const FVector ShotDirection = (SpreadRadians > 0.f) ? FMath::VRandCone(AimDir, SpreadRadians) : AimDir;
+		const FVector TraceEnd = TraceStart + ShotDirection * WeaponData->Range;
+		
+		FHitResult Hit;
+		const bool bHit = GetWorld()->LineTraceSingleByChannel(
+			Hit, TraceStart, TraceEnd, OB_TraceChannel_Weapon, QueryParams);
+
+#if ENABLE_DRAW_DEBUG
+		if (bDrawDebugTrace)
+		{
+			// 서버에서 호출 → 모든 클라이언트가 동일하게 그린다.
+			const FVector DebugEnd = bHit ? Hit.ImpactPoint : TraceEnd;
+			Character->Multicast_DrawFireTrace(TraceStart, DebugEnd, bHit);
+		}
+#endif
+
+		if (!bHit || !Hit.GetActor()) return; // 빗나감: 발사 큐만 재생하고 종료.
 	
-	// 같은 팀이면 무기 피해 무시(탄착 이펙트는 이미 재생됨).
-	if (AOBPlayerStateBase::AreSameTeam(Character, Hit.GetActor())) return;
+		// --- 피격 큐: 탄착 이펙트 (명중 지점) ---
+		if (SourceASC)
+		{
+			FGameplayCueParameters ImpactCueParams;
+			ImpactCueParams.Location = Hit.ImpactPoint;      // 탄착 위치
+			ImpactCueParams.Normal = Hit.ImpactNormal;			// 표면 방향(이펙트 회전용)
+			ImpactCueParams.PhysicalMaterial = Hit.PhysMaterial;
+			SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Impact, ImpactCueParams);
+		}
+	
+		// 같은 팀이면 무기 피해 무시(탄착 이펙트는 이미 재생됨).
+		if (AOBPlayerStateBase::AreSameTeam(Character, Hit.GetActor())) return;
 
-	// --- 데미지 적용 ---
-	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Hit.GetActor());
+		// --- 데미지 적용 ---
+		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Hit.GetActor());
+		if (!TargetASC || !WeaponData->DamageEffect || !SourceASC) continue;
 
-	if (!TargetASC || !WeaponData->DamageEffect) return;
+		// 데미지 GE 스펙 생성 + SetByCaller로 무기 데미지 주입.
+		FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
+		Context.AddSourceObject(Weapon);
+		Context.AddHitResult(Hit);
 
-	// 데미지 GE 스펙 생성 + SetByCaller로 무기 데미지 주입.
-	FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
-	Context.AddSourceObject(Weapon);
-	Context.AddHitResult(Hit);
+		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(WeaponData->DamageEffect, GetAbilityLevel(), Context);
 
-	FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(WeaponData->DamageEffect, GetAbilityLevel(), Context);
-
-	if (SpecHandle.IsValid())
-	{
-		SpecHandle.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, WeaponData->BaseDamage);
-		SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data, TargetASC);
+		if (SpecHandle.IsValid())
+		{
+			SpecHandle.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, WeaponData->BaseDamage);
+			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data, TargetASC);
+		}
 	}
 }
