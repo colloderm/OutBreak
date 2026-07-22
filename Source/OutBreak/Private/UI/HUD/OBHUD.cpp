@@ -28,6 +28,13 @@ void AOBHUD::BeginPlay()
 	{
 		HandlePawnChanged(nullptr, CurrentPawn);
 	}
+	
+	// 세션 타이머(12시 방향). 상시 존재, Visibility 바인딩이 InProgress 때만 표시.
+	if (SessionTimerWidgetClass)
+	{
+		SessionTimerWidget = CreateWidget<UUserWidget>(PC, SessionTimerWidgetClass);
+		if (SessionTimerWidget) SessionTimerWidget->AddToViewport();
+	}
 }
 
 void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)

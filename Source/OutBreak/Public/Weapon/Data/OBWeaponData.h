@@ -5,8 +5,11 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
+#include "Weapon/Data/OBWeaponTypes.h"
 #include "OBWeaponData.generated.h"
 
+class UBlendSpace;
+class UAnimSequence;
 class UNiagaraSystem;
 class USoundBase;
 class UTexture2D;
@@ -15,43 +18,6 @@ class UOBAbilitySet;
 class USkeletalMesh;
 class UGameplayEffect;
 class UAnimInstance;
-
-UENUM(BlueprintType)
-enum class EOBWeaponCategory : uint8
-{
-	// 주무기
-	AssaultRifle UMETA(DisplayName = "Assault Rifle"),
-	SniperRifle  UMETA(DisplayName = "Sniper Rifle"),
-	SMG          UMETA(DisplayName = "SMG"),
-	Shotgun      UMETA(DisplayName = "Shotgun"),
-	// 보조무기
-	Pistol		 UMETA(DisplayName = "Pistol"),
-	// 근접무기
-	Melee		 UMETA(DisplayName = "Melee"),
-};
-
-UENUM(BlueprintType)
-enum class EOBWeaponFireMode : uint8
-{
-	Single		UMETA(DisplayName = "Single"),   // 단발
-	Burst		UMETA(DisplayName = "Burst"),    // 점사
-	FullAuto	UMETA(DisplayName = "Full Auto") // 연사
-};
-
-UENUM(BlueprintType)
-enum class EOBWeaponType : uint8
-{
-	Ranged UMETA(DisplayName = "Ranged"),
-	Melee  UMETA(DisplayName = "Melee")
-};
-
-UENUM(BlueprintType)
-enum class EOBWeaponSlot : uint8
-{
-	Primary   UMETA(DisplayName = "Primary"),
-	Secondary UMETA(DisplayName = "Secondary"),
-	Melee     UMETA(DisplayName = "Melee")
-};
 
 UCLASS(BlueprintType, Const)
 class OUTBREAK_API UOBWeaponData : public UPrimaryDataAsset
@@ -70,6 +36,10 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual")
 	TObjectPtr<USkeletalMesh> WeaponMesh;
+	
+	// 무기를 부착할 캐릭터 메시 소켓. 무기마다 메시 원점이 달라 개별 지정.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Visual")
+	FName AttachSocket = TEXT("hand_r_Socket");
 	
 	// 무기 타입
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
@@ -99,6 +69,22 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|GAS")
 	TObjectPtr<UOBAbilitySet> AbilitySet;
 	
+	// 무기 장착 중 상체에 덮을 오버레이 로코모션(X=Direction, Y=Speed). Layered Blend Per Bone 입력.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
+	TObjectPtr<UBlendSpace> OverlayLocomotion;
+	
+	// 무기 장착 중 사용할 조준 오프셋(X=Yaw, Y=Pitch). 없으면 기본 AO 유지.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
+	TObjectPtr<UBlendSpace> AimOffset;
+
+	// ADS 시 상체 포즈. 없으면 오버레이 로코모션 그대로.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
+	TObjectPtr<UAnimSequence> ADSPose;
+	
+	// 스프린트 중 상체 포즈(양손 파지). 비우면 스프린트 시 오버레이 해제(권총 등).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
+	TObjectPtr<UAnimSequence> SprintPose;
+	
 	// 원거리=발사 몽타주 / 근접=스윙 몽타주.	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
 	TObjectPtr<UAnimMontage> AttackMontage;
@@ -115,6 +101,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
 	TSubclassOf<UAnimInstance> EquippedAnimLayer;
 	
+	// 무기 홀드 스타일(애님 Chooser 입력). Weapon.HoldStyle.* 태그로 관리.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation", Meta = (Categories = "Weapon.HoldStyle"))
+	FGameplayTag HoldStyleTag;
 	
 	// ===== 원거리 전용 (WeaponType == Ranged 일 때만 표시) =====
 	

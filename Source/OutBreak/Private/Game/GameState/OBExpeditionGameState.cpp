@@ -3,6 +3,7 @@
 #include "Game/GameState/OBExpeditionGameState.h"
 
 #include "Net/UnrealNetwork.h"
+#include "Player/State/OBPlayerStateBase.h"
 
 AOBExpeditionGameState::AOBExpeditionGameState()
 {
@@ -55,6 +56,26 @@ void AOBExpeditionGameState::SetFinalMinute(bool bInFinalMinute)
 	bFinalMinute = bInFinalMinute;
 	// 현재는 별도 델리게이트 없이 bFinalMinute 값을 위젯이 폴링/바인딩으로 읽음.
 	// Step 9(호드 어그로)에서 서버측 트리거 로직을 GameMode에 추가 예정.
+}
+
+TArray<AOBPlayerStateBase*> AOBExpeditionGameState::GetExpeditionPlayers() const
+{
+	TArray<AOBPlayerStateBase*> Out;
+	for (APlayerState* PS : PlayerArray)
+	{
+		if (AOBPlayerStateBase* OBPS = Cast<AOBPlayerStateBase>(PS))
+		{
+			Out.Add(OBPS);
+		}
+	}
+	
+	return Out;
+}
+
+FText AOBExpeditionGameState::GetTimeRemainingText() const
+{
+	const int32 T = FMath::Max(0, TimeRemaining);
+	return FText::FromString(FString::Printf(TEXT("%02d:%02d"), T / 60, T % 60));
 }
 
 void AOBExpeditionGameState::OnRep_Phase()

@@ -7,6 +7,7 @@
 #include "Game/Expedition/OBExpeditionTypes.h"
 #include "OBExpeditionGameState.generated.h"
 
+class AOBPlayerStateBase;
 // HUD/위젯이 "페이즈가 바뀌었다"를 이벤트로 구독하기 위한 것.
 // - 왜 델리게이트인가: 위젯이 매 프레임 Tick으로 폴링하지 않고, 값이 바뀔 때만 콜백받게 하려고.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOBExpeditionPhaseChanged, EOBExpeditionPhase, NewPhase);
@@ -25,7 +26,7 @@ public:
 	
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
-	//~ 서버 전용 세터 (GameMode(Step 3)가 호출) ------------------------------
+	//~ 서버 전용 세터 ------------------------------
 	
 	// 페이즈 전환
 	void SetPhase(EOBExpeditionPhase NewPhase);
@@ -50,13 +51,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	int32 GetSessionLength() const { return SessionLength; };
 	
-	// 세션 시작 이후 경과 초. 탈출구(Step 5)가 개인/공용 시간창 판정에 사용.
+	// 세션 시작 이후 경과 초. 탈출구가 개인/공용 시간창 판정에 사용.
 	// - 예: ElapsedSeconds < 600(10분) 이면 개인 탈출구만, 이후 공용 탈출구.
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	int32 GetElapsedSeconds() const { return FMath::Max(0, SessionLength - TimeRemaining); }
 
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	bool IsInProgress() const { return Phase == EOBExpeditionPhase::InProgress; }
+	
+	// 결과창용: 세션 참가자 목록(결과 표시). PlayerArray를 우리 타입으로 캐스팅.
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	TArray<AOBPlayerStateBase*> GetExpeditionPlayers() const;
+	
+	// HUD용 "mm:ss" 문자열.
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	FText GetTimeRemainingText() const;
 	
 public:
 	//~ HUD 구독용 델리게이트 인스턴스 ----------------------------------------

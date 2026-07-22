@@ -68,11 +68,16 @@ void UOBMatchmakingSubsystem::StartSession()
 	}
 	
 	// 알파 IP-direct: MapData 테스트 주소 우선, 없으면 기본 주소.
-	const FString Address = SelectedMap->TestServerAddress.IsEmpty() ? DefaultServerAddress : SelectedMap->TestServerAddress;
+	FString Address = SelectedMap->TestServerAddress.IsEmpty() ? DefaultServerAddress : SelectedMap->TestServerAddress;
+
+	// 파티 코드가 있으면 URL 옵션으로 전달 → 서버가 같은 코드끼리 같은 팀 배정.
+	if (!PartyCode.IsEmpty())
+	{
+		Address += FString::Printf(TEXT("?party=%s"), *PartyCode);
+	}
 
 	UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 데디 접속 → %s"), *Address);
 
-	// TODO(실 매칭): 백엔드가 빈자리 있는 세션 서버 주소를 반환하도록 교체.
 	if (UGameInstance* GI = GetGameInstance())
 		if (APlayerController* PC = GI->GetFirstLocalPlayerController())
 			PC->ClientTravel(Address, TRAVEL_Absolute);   // 비seamless 전체 로드로 서버 접속

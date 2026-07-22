@@ -19,11 +19,29 @@ AOBExtractionZone::AOBExtractionZone()
 
 	Trigger = CreateDefaultSubobject<USphereComponent>(TEXT("Trigger"));
 	SetRootComponent(Trigger);
+	
 	Trigger->InitSphereRadius(300.f);
-	Trigger->SetCollisionProfileName(TEXT("Trigger")); // Overlap 전용 프로파일
+	Trigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	Trigger->SetCollisionObjectType(ECC_WorldDynamic);
+	Trigger->SetCollisionResponseToAllChannels(ECR_Ignore);
+	Trigger->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	Trigger->SetGenerateOverlapEvents(true);
 
 	bReplicates = false; // 판정은 서버 전용, 결과는 PlayerState로 복제
+}
+
+void AOBExtractionZone::ConfigureAsPersonal(AController* InOwner)
+{
+	// 소유 클라에만 복제 → 본인만 위치/메시가 보임(팀원도 안 보임).
+	SetReplicates(true);
+	bOnlyRelevantToOwner = true;
+	SetOwner(InOwner);
+}
+
+void AOBExtractionZone::SetActiveWindow(int32 InStartSec, int32 InEndSec)
+{
+	ActiveStartSec = InStartSec;
+	ActiveEndSec = InEndSec;
 }
 
 // Called when the game starts or when spawned
@@ -37,6 +55,10 @@ void AOBExtractionZone::BeginPlay()
 		Trigger->OnComponentBeginOverlap.AddDynamic(this, &AOBExtractionZone::OnTriggerBeginOverlap);
 		Trigger->OnComponentEndOverlap.AddDynamic(this, &AOBExtractionZone::OnTriggerEndOverlap);
 	}
+	
+	// 활성 상태 주기 체크(서버/클라 모두). 클라(소유자)에서 비콘이 렌더됨.
+	CheckActiveState();
+	GetWorldTimerManager().SetTimer(ActiveCheckTimer, this, &AOBExtractionZone::CheckActiveState, 1.0f, true);
 }
 
 void AOBExtractionZone::OnTriggerBeginOverlap(UPrimitiveComponent*, AActor* OtherActor,
@@ -150,5 +172,15 @@ bool AOBExtractionZone::CanPlayerExtract(AController* /*C*/) const
 AOBExpeditionGameState* AOBExtractionZone::GetExpeditionGameState() const
 {
 	return GetWorld() ? GetWorld()->GetGameState<AOBExpeditionGameState>() : nullptr;
+}
+
+void AOBExtractionZone::CheckActiveState()
+{
+	const bool bNow = IsActiveNow();
+	if (bNow != bLastActiveState)
+	{
+		bLastActiveState = bNow;
+		OnExtractionActiveChanged(bNow); // BP: 비콘 on/off
+	}
 }
 

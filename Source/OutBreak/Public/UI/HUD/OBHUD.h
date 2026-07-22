@@ -67,4 +67,10 @@ protected:
 	
 	UPROPERTY()
 	TObjectPtr<UOBConsumableWidget> ConsumableWidget;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> SessionTimerWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> SessionTimerWidget;
 };

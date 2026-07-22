@@ -13,7 +13,7 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Matchmaking/OBMatchmakingSubsystem.h"
-#include "Party/OBPartySubsystem.h"
+#include "Online/OBOnlinePartySubsystem.h"
 
 void UOBExpeditionSelectWidget::NativeConstruct()
 {
@@ -90,10 +90,18 @@ void UOBExpeditionSelectWidget::BuildList()
 
 void UOBExpeditionSelectWidget::HandleEntryClicked(UOBExpeditionMapData* InMap)
 {
-	// 단일 선택: 클릭한 지역만 선택 표시(세션 1개 = 맵 1개).
-	SelectedMap = InMap;
+	// 재클릭이면 선택 해제(토글), 아니면 단일 선택.
+	SelectedMap = (SelectedMap == InMap) ? nullptr : InMap;
+
 	for (UOBExpeditionMapEntryWidget* E : Entries)
-		if (E) E->SetSelected(E->GetMapData() == SelectedMap);
+	{
+		if (E)
+		{
+			E->SetSelected(E->GetMapData() == SelectedMap);
+		}
+	}
+
+	RefreshGating();
 }
 
 void UOBExpeditionSelectWidget::RefreshGating()
@@ -103,21 +111,32 @@ void UOBExpeditionSelectWidget::RefreshGating()
 	const EOBMatchmakingState St = Matchmaking ? Matchmaking->GetState() : EOBMatchmakingState::Idle;
 	if (St == EOBMatchmakingState::Searching)
 	{
-		StartButton->SetIsEnabled(true);  
+		StartButton->SetVisibility(ESlateVisibility::Visible);
+		StartButton->SetIsEnabled(true); // 취소 허용
 		return;
-	} // 취소 허용
+	}
 	
 	if (St == EOBMatchmakingState::Starting)
 	{
+		StartButton->SetVisibility(ESlateVisibility::Visible);
 		StartButton->SetIsEnabled(false); 
 		return;
 	}
+	
+	// Idle: 지역 선택 전이면 버튼 자체를 숨김.
+	if (SelectedMap == nullptr)
+	{
+		StartButton->SetVisibility(ESlateVisibility::Collapsed);
+		return;
+	}
 
-	// Idle: 팀장 + 지역선택 시에만.
+	// 지역 선택됨 → 버튼 표시, 팀장만 누를 수 있게 활성.
+	StartButton->SetVisibility(ESlateVisibility::Visible);
+	
 	APlayerController* PC = GetOwningPlayer();
 	AOBPlayerStateBase* PS = PC ? PC->GetPlayerState<AOBPlayerStateBase>() : nullptr;
 	const bool bLeader = PS ? PS->IsPartyLeader() : false;
-	StartButton->SetIsEnabled(bLeader && (SelectedMap != nullptr));
+	StartButton->SetIsEnabled(bLeader);
 }
 
 void UOBExpeditionSelectWidget::HandleMatchStateChanged(EOBMatchmakingState NewState)
@@ -150,20 +169,39 @@ void UOBExpeditionSelectWidget::HandleMatchTick(int32 RemainingSeconds)
 
 void UOBExpeditionSelectWidget::HandleStartClicked()
 {
-	if (!Matchmaking) return;
-
-	if (Matchmaking->GetState() == EOBMatchmakingState::Searching)
+	// 1) 솔로 매칭 중이면 중지(토글). 파티는 매칭 검색을 안 쓰므로 이 분기와 무관.
+	if (Matchmaking && Matchmaking->GetState() == EOBMatchmakingState::Searching)
 	{
-		Matchmaking->CancelMatchmaking(); // 매칭중 → 중지
+		Matchmaking->CancelMatchmaking();
 		return;
 	}
 	
 	if (!SelectedMap) return;
 	
-	bool bParty = false;
-	if (UGameInstance* GI = GetGameInstance())
-		if (UOBPartySubsystem* Party = GI->GetSubsystem<UOBPartySubsystem>())
-			bParty = (Party->GetPartySize() >= 2);   // 2인+ = 파티 큐
-	
-	Matchmaking->StartMatchmaking(SelectedMap, bParty);
+	UGameInstance* GI = GetGameInstance();
+	if (!GI) return;
+
+	// 2) [M8-3] Steam 파티 중이면 → 온라인 경로.
+	//    리더(=이 버튼 누를 수 있는 유일한 사람): 팀원에게 출발 신호 브로드캐스트 + 자신 이동.
+	//    멤버: 이 함수에 오지 않음(버튼 비활성). PollLeaderStart로 자동 팔로우.
+	if (UOBOnlinePartySubsystem* Online = GI->GetSubsystem<UOBOnlinePartySubsystem>())
+	{
+		if (Online->IsInParty())
+		{
+			const FString Addr = SelectedMap->TestServerAddress;
+			if (Addr.IsEmpty())
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[Expedition] 선택 맵 TestServerAddress 비어있음 → 파티 시작 불가"));
+				return;
+			}
+			Online->LeaderStartExpedition(Addr);
+			return;
+		}
+	}
+
+	// 3) 솔로 → 기존 매칭(검색 후 이동). 실 파티는 위에서 처리하므로 bParty=false.
+	if (Matchmaking)
+	{
+		Matchmaking->StartMatchmaking(SelectedMap, /*bParty=*/false);
+	}
 }

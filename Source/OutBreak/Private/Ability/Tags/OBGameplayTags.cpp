@@ -15,6 +15,7 @@ namespace OBGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Consumable_Grenade, "InputTag.Consumable.Grenade");
 	
 	UE_DEFINE_GAMEPLAY_TAG(State_Dead,				"State.Dead");
+	UE_DEFINE_GAMEPLAY_TAG(State_Downed,			"State.Downed");
 	UE_DEFINE_GAMEPLAY_TAG(State_Reloading,			"State.Reloading");
 	UE_DEFINE_GAMEPLAY_TAG(State_Aiming,			"State.Aiming");
 	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Switching,  "State.Weapon.Switching");
@@ -33,6 +34,13 @@ namespace OBGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Ammo_Pistol,       "Ammo.Pistol");
 	
 	UE_DEFINE_GAMEPLAY_TAG(Melee, "Melee");
+	
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Unarmed,    "Weapon.HoldStyle.Unarmed");
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Rifle,		"Weapon.HoldStyle.Rifle");
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Pistol,		"Weapon.HoldStyle.Pistol");
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Melee,		"Weapon.HoldStyle.Melee");
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Heal,		"Weapon.HoldStyle.Heal");
+	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Grenade,	"Weapon.HoldStyle.Grenade");
 	
 	UE_DEFINE_GAMEPLAY_TAG(Item_Bandage,	"Item.Bandage");
 	UE_DEFINE_GAMEPLAY_TAG(Item_Grenade,	"Item.Grenade");
