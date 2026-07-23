@@ -32,6 +32,12 @@ void UOBLoadoutSubsystem::SetWeapon(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBas
 	SaveToDisk();
 }
 
+void UOBLoadoutSubsystem::ClearLoadout()
+{
+	CurrentLoadout.SlotWeapons.Empty();
+	SaveToDisk();
+}
+
 TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetSelectedClasses() const
 {
 	TArray<TSubclassOf<AOBWeaponBase>> Out;

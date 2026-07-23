@@ -460,12 +460,12 @@ AOBInteractableActor* AOBPlayerController::GetCurrentInteractable() const
 	return CurrentInteractable.Get();
 }
 
-void AOBPlayerController::OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass)
+UUserWidget* AOBPlayerController::OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass)
 {
-	if (!IsLocalController() || !WidgetClass || ActiveInteractionWidget) return;
+	if (!IsLocalController() || !WidgetClass || ActiveInteractionWidget) return nullptr;
 
 	ActiveInteractionWidget = CreateWidget<UUserWidget>(this, WidgetClass);
-	if (!ActiveInteractionWidget) return;
+	if (!ActiveInteractionWidget) return nullptr;
 	
 	ActiveInteractionWidget->SetIsFocusable(true);
 	ActiveInteractionWidget->AddToViewport();
@@ -478,6 +478,8 @@ void AOBPlayerController::OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetC
 	// 이동/시점 잠금(UI 연 플레이어만 영향).
 	SetIgnoreMoveInput(true);
 	SetIgnoreLookInput(true);
+	
+	return ActiveInteractionWidget;   // NPC가 바인딩·초기화용으로 사용
 }
 
 void AOBPlayerController::CloseInteractionWidget()

@@ -400,7 +400,6 @@ void AOBCharacterBase::UpdateCombatOrientation()
 	{
 		MoveComp->bOrientRotationToMovement = !bCombat;   // 평소엔 이동 방향
 	}
-	bUseControllerRotationYaw = bCombat;
 	
 	// GASP 애님 측 회전 모드도 같이 전환. 이걸 빼면 캡슐만 돌고 몸통은 천천히 따라온다.
 	if (bCombat != bLastCombatOrientation)

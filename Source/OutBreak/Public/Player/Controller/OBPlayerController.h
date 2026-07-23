@@ -175,7 +175,8 @@ public:
 	void Server_SetPartyLeader(bool bLeader);
 	
 	// 상호작용 위젯 오픈/클로즈(커서·UIOnly·이동잠금을 여기서 일괄 처리).
-	void OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass);
+	UFUNCTION(BlueprintCallable)
+	UUserWidget* OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass);
 	void CloseInteractionWidget();
 
 	// 범위 내 상호작용 대상 등록(액터가 호출).

@@ -12,7 +12,7 @@
  * - Home에서 무기 선택 → SetWeapon() → 즉시 디스크 저장.
  * - 세션 맵 진입 시 클라 컨트롤러가 GetSelectedClasses()를 서버로 push.
  */
-UCLASS()
+UCLASS(BlueprintType)
 class OUTBREAK_API UOBLoadoutSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
@@ -30,6 +30,14 @@ public:
 	// 서버 push용: 소프트 클래스들을 로드해 하드 클래스 배열로 변환.
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	TArray<TSubclassOf<AOBWeaponBase>> GetSelectedClasses() const;
+	
+	// 사망 페널티: 전체 비우기 + 즉시 저장.
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	void ClearLoadout();
+
+	// 빈 로드아웃 여부(스타터킷 지급 판정).
+	UFUNCTION(BlueprintPure, Category = "Loadout")
+	bool IsEmpty() const { return CurrentLoadout.SlotWeapons.IsEmpty(); }
 
 	// 디스크 저장/로드.
 	void SaveToDisk();

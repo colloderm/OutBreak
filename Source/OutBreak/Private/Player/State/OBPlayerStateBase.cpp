@@ -6,7 +6,10 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
+#include "GameFramework/PlayerController.h"
+#include "LoadOut/OBLoadoutSubsystem.h"
 #include "Weapon/OBWeaponBase.h"
+#include "Engine/World.h"
 
 AOBPlayerStateBase::AOBPlayerStateBase()
 {
@@ -137,6 +140,22 @@ void AOBPlayerStateBase::OnRep_Ready()
 void AOBPlayerStateBase::OnRep_ExpeditionStatus()
 {
 	OnExpeditionStatusChanged.Broadcast();
+	
+	// 사망 페널티: 내 PlayerState가 Dead가 되면 로드아웃을 잃는다.
+	// LoadoutSubsystem은 GameInstance(클라 소유)라 소유 클라에서만 처리한다.
+	if (ExpeditionStatus != EOBPlayerExpeditionStatus::Dead) return;
+
+	const UWorld* World = GetWorld();
+	const APlayerController* LocalPC = World ? World->GetFirstPlayerController() : nullptr;
+	if (!LocalPC || LocalPC->PlayerState != this) return;   // 남의 PS면 무시
+
+	if (UGameInstance* GI = World->GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->ClearLoadout();
+		}
+	}
 }
 
 void AOBPlayerStateBase::OnRep_ExtractionProgress()
