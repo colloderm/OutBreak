@@ -26,7 +26,7 @@ protected:
 	UPROPERTY()
 	TOptional<FVector> InvestingLocation = FVector::ZeroVector;
 	
-	friend class FSTTInvestingTask;
+	friend struct FSTTInvestingTask;
 	
 	
 };

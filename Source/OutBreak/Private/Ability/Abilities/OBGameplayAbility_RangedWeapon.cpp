@@ -13,6 +13,7 @@
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
 
@@ -279,6 +280,8 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	QueryParams.AddIgnoredActor(Character);
 	QueryParams.AddIgnoredActor(Weapon);
 	
+	QueryParams.bReturnPhysicalMaterial = true;
+	
 	// 소스 ASC를 먼저 확보(발사 큐는 명중 여부와 무관하게 발생).
 	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
 	
@@ -309,6 +312,20 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		FHitResult Hit;
 		const bool bHit = GetWorld()->LineTraceSingleByChannel(
 			Hit, TraceStart, TraceEnd, OB_TraceChannel_Weapon, QueryParams);
+		
+		AActor* HitActor = Hit.GetActor();
+
+		if (IsValid(HitActor))
+		{
+			UGameplayStatics::ApplyPointDamage(
+				HitActor,
+				WeaponData->BaseDamage,
+				ShotDirection,
+				Hit,
+				nullptr,
+				nullptr,
+				UDamageType::StaticClass());
+		}
 
 #if ENABLE_DRAW_DEBUG
 		if (bDrawDebugTrace)
