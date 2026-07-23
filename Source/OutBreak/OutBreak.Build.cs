@@ -17,24 +17,29 @@ public class OutBreak : ModuleRules
 			"EnhancedInput",
 			"UMG",
 			"Niagara",
+			"AIModule",
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks",
 			"NavigationSystem",
 			"DeveloperSettings",
+			"MotionWarping",
+			"PhysicsCore",
 			"AnimationBudgetAllocator",
+			"Navmesh",
+			"AIModule",
+			"StateTreeModule",
+			"GameplayStateTreeModule"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
-			
 			"Slate",
 			"SlateCore",
 			"ModelViewViewModel",
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
-			"AIModule",
-			"Navmesh"
+			
 		});
 		
 		if (Target.Type == TargetType.Editor)

@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "{48DE5971-4D72-DA37-90DD-D58D5152B32A}",
+	"EngineAssociation": "5.7",
 	"Category": "",
 	"Description": "",
 	"Modules": [
@@ -58,15 +58,19 @@
 			"Enabled": true
 		},
 		{
+			"Name": "MotionWarping",
+			"Enabled": true
+		},
+		{
+			"Name": "GameplayStateTree",
+			"Enabled": true
+		},
+		{
 			"Name": "MotionTrajectory",
 			"Enabled": true
 		},
 		{
 			"Name": "PoseSearch",
-			"Enabled": true
-		},
-		{
-			"Name": "MotionWarping",
 			"Enabled": true
 		},
 		{
