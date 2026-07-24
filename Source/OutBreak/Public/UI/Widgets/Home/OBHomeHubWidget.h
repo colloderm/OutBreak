@@ -28,9 +28,6 @@ protected:
 	void OnLoadoutClicked();
 	
 	UFUNCTION() 
-	void OnShopClicked();
-	
-	UFUNCTION() 
 	void OnBoardClicked();
 	
 	UFUNCTION() 
@@ -48,9 +45,6 @@ protected:
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> BtnLoadout;
-	
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UButton> BtnShop;
 	
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> BtnBoard;
@@ -71,9 +65,6 @@ protected:
 	
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> LoadoutPanel;      // 기존 WBP_Lobby 임베드
-	
-	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UWidget> ShopPanel;         // 껍데기
 	
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> BoardPanel;        // 껍데기

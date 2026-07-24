@@ -77,6 +77,8 @@ protected:
 	
 	void Input_Interact();
 	
+	void Input_TogglePartyUI();
+	
 	//~ Expedition 사망 피드백 ---------------------------------
 	void BindToExpeditionStatus();          // 로컬 PS 상태변경 구독(중복가드)
 	void HandleExpeditionStatusChanged();   // 상태 → 화면 처리
@@ -118,6 +120,16 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> InteractAction;
+	
+	// 파티 UI 토글 입력.
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> PartyToggleAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> PartyWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> PartyWidget;
 	
 	// 사망 시 띄울 위젯(WBP_DeathScreen). 미지정이면 입력잠금만 수행.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")

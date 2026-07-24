@@ -38,6 +38,12 @@ protected:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
+	
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
 	// 단발 1회: 반동(클라) + 트레이스/데미지/큐/몽타주(서버).
 	void FireOneShot();
@@ -64,6 +70,10 @@ protected:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Debug")
 	bool bDrawDebugTrace = false;
+	
+	// 이 속도(cm/s) 이상이면 스프린트로 간주해 발사 차단.
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	float SprintBlockSpeed = 600.f;
 	
 private:
 	// 점사/연사 반복 타이머.

@@ -16,9 +16,6 @@ void UOBHomeHubWidget::NativeConstruct()
 	if (BtnLoadout)    
 		BtnLoadout->OnClicked.AddDynamic(this, &UOBHomeHubWidget::OnLoadoutClicked);
 	
-	if (BtnShop)       
-		BtnShop->OnClicked.AddDynamic(this, &UOBHomeHubWidget::OnShopClicked);
-	
 	if (BtnBoard)      
 		BtnBoard->OnClicked.AddDynamic(this, &UOBHomeHubWidget::OnBoardClicked);
 	
@@ -57,11 +54,6 @@ void UOBHomeHubWidget::OnExpeditionClicked()
 void UOBHomeHubWidget::OnLoadoutClicked()
 {
 	ShowPanel(LoadoutPanel);
-}
-
-void UOBHomeHubWidget::OnShopClicked()
-{
-	ShowPanel(ShopPanel);
 }
 
 void UOBHomeHubWidget::OnBoardClicked()

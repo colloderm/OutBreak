@@ -195,6 +195,11 @@ void AOBPlayerController::SetupInputComponent()
 	{
 		EIC->BindAction(InteractAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_Interact);
 	}
+	
+	if (PartyToggleAction)
+	{
+		EIC->BindAction(PartyToggleAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_TogglePartyUI);
+	}
 }
 
 void AOBPlayerController::Input_Move(const FInputActionValue& Value)
@@ -290,6 +295,31 @@ void AOBPlayerController::Input_Interact()
 {
 	if (AOBInteractableActor* Target = CurrentInteractable.Get())
 		Target->Interact(this);
+}
+
+void AOBPlayerController::Input_TogglePartyUI()
+{
+	if (!IsLocalController() || !PartyWidgetClass) return;
+
+	if (PartyWidget && PartyWidget->IsInViewport())
+	{
+		PartyWidget->RemoveFromParent();
+		PartyWidget = nullptr;
+		
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+	}
+	else
+	{
+		PartyWidget = CreateWidget<UUserWidget>(this, PartyWidgetClass);
+		if (!PartyWidget) return;
+		PartyWidget->AddToViewport();
+		
+		FInputModeGameAndUI Mode;
+		Mode.SetWidgetToFocus(PartyWidget->TakeWidget());
+		SetInputMode(Mode);
+		SetShowMouseCursor(true);
+	}
 }
 
 void AOBPlayerController::BindToExpeditionStatus()

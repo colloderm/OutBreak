@@ -114,6 +114,24 @@ void UOBGameplayAbility_RangedWeapon::EndAbility(
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
+bool UOBGameplayAbility_RangedWeapon::CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo, const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags, FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+		return false;
+
+	// 스프린트(고속 이동) 중에는 발사 불가.
+	if (const AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
+	{
+		if (Char->GetVelocity().SizeSquared2D() > FMath::Square(SprintBlockSpeed))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 void UOBGameplayAbility_RangedWeapon::FireOneShot()
 {
 	AOBWeaponBase* Weapon = GetEquippedWeapon();

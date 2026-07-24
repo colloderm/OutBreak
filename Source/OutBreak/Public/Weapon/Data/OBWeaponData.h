@@ -52,6 +52,10 @@ public:
 	// 무기 카테고리(슬롯/애님 레이어 분류).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	EOBWeaponCategory WeaponCategory = EOBWeaponCategory::AssaultRifle;
+	
+	// 상점 구매 가격. 0이면 비매품/기본 지급.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop", Meta = (ClampMin = "0"))
+	int32 WeaponPrice = 0;
 
 	// 1발당 기본 데미지(데미지 GE가 SetByCaller 등으로 참조 가능).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "0.0"))

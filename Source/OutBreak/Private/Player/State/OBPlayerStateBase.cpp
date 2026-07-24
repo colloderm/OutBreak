@@ -74,6 +74,7 @@ void AOBPlayerStateBase::SetExpeditionStatus(EOBPlayerExpeditionStatus NewStatus
 	
 	ExpeditionStatus = NewStatus;
 	OnExpeditionStatusChanged.Broadcast(); // 리슨 호스트 로컬 갱신
+	ApplyExpeditionStatusToLoadout();   // ← 리슨 호스트/스탠드얼론 커버
 }
 
 void AOBPlayerStateBase::SetTeamId(uint8 NewTeamId)
@@ -140,27 +141,34 @@ void AOBPlayerStateBase::OnRep_Ready()
 void AOBPlayerStateBase::OnRep_ExpeditionStatus()
 {
 	OnExpeditionStatusChanged.Broadcast();
-	
-	// 사망 페널티: 내 PlayerState가 Dead가 되면 로드아웃을 잃는다.
-	// LoadoutSubsystem은 GameInstance(클라 소유)라 소유 클라에서만 처리한다.
-	if (ExpeditionStatus != EOBPlayerExpeditionStatus::Dead) return;
-
-	const UWorld* World = GetWorld();
-	const APlayerController* LocalPC = World ? World->GetFirstPlayerController() : nullptr;
-	if (!LocalPC || LocalPC->PlayerState != this) return;   // 남의 PS면 무시
-
-	if (UGameInstance* GI = World->GetGameInstance())
-	{
-		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
-		{
-			Loadout->ClearLoadout();
-		}
-	}
+	ApplyExpeditionStatusToLoadout();
 }
 
 void AOBPlayerStateBase::OnRep_ExtractionProgress()
 {
 	OnExtractionProgressChanged.Broadcast(); // 클라 HUD 갱신
+}
+
+void AOBPlayerStateBase::ApplyExpeditionStatusToLoadout()
+{
+	const UWorld* World = GetWorld();
+	const APlayerController* LocalPC = World ? World->GetFirstPlayerController() : nullptr;
+	if (!LocalPC || LocalPC->PlayerState != this) return;   // 내 로컬 PS만
+
+	UOBLoadoutSubsystem* Loadout = World->GetGameInstance() ? World->GetGameInstance()->GetSubsystem<UOBLoadoutSubsystem>() : nullptr;
+	if (!Loadout) return;
+
+	switch (ExpeditionStatus)
+	{
+	case EOBPlayerExpeditionStatus::Dead:      
+		Loadout->ClearLoadout();
+		break;
+	case EOBPlayerExpeditionStatus::Extracted: 
+		Loadout->AddCurrency(ExtractReward); 
+		break;
+	default: 
+		break;
+	}
 }
 
 void AOBPlayerStateBase::CopyProperties(APlayerState* NewPlayerState)

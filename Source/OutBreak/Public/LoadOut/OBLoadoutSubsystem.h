@@ -5,7 +5,10 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Loadout/OBLoadoutTypes.h"
+#include "UI/Shop/ShopWidgetTypes.h"
 #include "OBLoadoutSubsystem.generated.h"
+
+class UOBWeaponCatalog;
 
 /**
  * 개인 Loadout의 런타임 소유자(GameInstance 수명 = 세션 내내, 맵 전환에도 생존).
@@ -38,6 +41,29 @@ public:
 	// 빈 로드아웃 여부(스타터킷 지급 판정).
 	UFUNCTION(BlueprintPure, Category = "Loadout")
 	bool IsEmpty() const { return CurrentLoadout.SlotWeapons.IsEmpty(); }
+	
+	// --- 통화 ---
+	UFUNCTION(BlueprintPure, Category = "Currency")
+	int32 GetCurrency() const { return CurrentCurrency; }
+
+	// 재화 증감(음수 가능). 결과가 음수면 실패 반환하고 변경 안 함.
+	UFUNCTION(BlueprintCallable, Category = "Currency")
+	bool TrySpend(int32 Amount);
+
+	UFUNCTION(BlueprintCallable, Category = "Currency")
+	void AddCurrency(int32 Amount);
+	
+	// 무기 카탈로그 + 현재 통화를 상점 뷰데이터로 변환.
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	FShopWindowViewData BuildShopView(UOBWeaponCatalog* Catalog) const;
+	
+	// 헤더
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	bool TryPurchase(UOBWeaponCatalog* Catalog, FName ItemId);
+	
+	// 헤더 public:
+	UFUNCTION(BlueprintPure, Category = "Shop")
+	static int32 GetWeaponPrice(TSubclassOf<AOBWeaponBase> WeaponClass);
 
 	// 디스크 저장/로드.
 	void SaveToDisk();
@@ -50,4 +76,6 @@ private:
 	// SaveGame 슬롯 이름(단일 프로필. 멀티프로필 시 확장).
 	static const FString SlotName;
 	static const int32 UserIndex = 0;
+	
+	int32 CurrentCurrency = 0;
 };

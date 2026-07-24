@@ -111,7 +111,15 @@ protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
 	bool bIsExtracting = false;
 	
+	// 추출 성공 보상(스크랩). 알파: 고정값.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	int32 ExtractReward = 500;
+	
 	// 솔로=true(자기 자신이 리더). 파티 시 팀장만 true → "탐사 시작" 버튼 게이팅.
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Party")
 	bool bIsPartyLeader = true;
+	
+private:
+	// 로드아웃/통화(클라 소유 GameInstance) 반영. OnRep + 서버 세터 양쪽에서 호출.
+	void ApplyExpeditionStatusToLoadout();
 };
