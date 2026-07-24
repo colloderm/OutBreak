@@ -76,6 +76,10 @@ protected:
 	float SprintBlockSpeed = 600.f;
 	
 private:
+	// 소유 캐릭터가 스프린트(고속) 중인지. 발사 게이트 공용.
+	bool IsOwnerSprinting() const;
+	
+private:
 	// 점사/연사 반복 타이머.
 	FTimerHandle FireTimerHandle;
 	// 이번 활성화에서 쏜 발 수.

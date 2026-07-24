@@ -121,14 +121,8 @@ bool UOBGameplayAbility_RangedWeapon::CanActivateAbility(const FGameplayAbilityS
 	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
 		return false;
 
-	// 스프린트(고속 이동) 중에는 발사 불가.
-	if (const AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
-	{
-		if (Char->GetVelocity().SizeSquared2D() > FMath::Square(SprintBlockSpeed))
-		{
-			return false;
-		}
-	}
+		// 스프린트 중에는 발사 시작 불가.
+	if (IsOwnerSprinting()) return false;
 	return true;
 }
 
@@ -235,6 +229,12 @@ float UOBGameplayAbility_RangedWeapon::GetCurrentSpreadAngle() const
 {
 	const AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
 	return Character ? Character->GetCurrentSpreadAngle() : 0.f;
+}
+
+bool UOBGameplayAbility_RangedWeapon::IsOwnerSprinting() const
+{
+	const AOBCharacterBase* Char = GetOBCharacterFromActorInfo();
+	return Char && Char->GetVelocity().SizeSquared2D() > FMath::Square(SprintBlockSpeed);
 }
 
 void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()

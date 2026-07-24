@@ -113,7 +113,7 @@ protected:
 	
 	// 추출 성공 보상(스크랩). 알파: 고정값.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
-	int32 ExtractReward = 500;
+	int32 ExtractReward = 200;
 	
 	// 솔로=true(자기 자신이 리더). 파티 시 팀장만 true → "탐사 시작" 버튼 게이팅.
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Party")

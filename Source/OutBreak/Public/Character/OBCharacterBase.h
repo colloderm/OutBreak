@@ -64,6 +64,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "OB|Combat")
 	float GetCurrentSpreadAngle() const;
 	
+	// 스프린트 카메라 랙 토글. BP 스프린트 시작(true)/종료(false)에서 호출.
+	UFUNCTION(BlueprintCallable, Category = "OB|Camera")
+	void SetSprintCameraLag(bool bSprinting);
+	
 	// 발사 시 집중 효과 펄스(로컬용)
 	void AddFireFocusPulse(float PulseAmount);
 	
@@ -205,4 +209,19 @@ private:
 	float CombatFocusTarget = 0.0f;  // 목표(ADS 기준)
 	float BaseVignette = 0.4f;       // 기본값 캐시
 	float BaseMotionBlur = 0.0f;
+	
+	// 스프린트 중 카메라 랙 속도. 낮을수록 카메라가 더 늘어져 따라와 속도감↑.
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|Sprint")
+	float SprintCameraLagSpeed = 5.f;
+	
+	// 걷기/조깅: 높을수록 랙 적음(거의 즉시)
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|Sprint")
+	float NormalCameraLagSpeed = 30.f; 
+
+	// 스프린트↔평상시 랙 전환 부드러움
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|Sprint")
+	float CameraLagBlendSpeed = 6.f; 
+
+	// Tick 보간 목표(내부 상태)
+	float TargetCameraLagSpeed = 30.f; 
 };

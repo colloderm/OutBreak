@@ -67,20 +67,34 @@ void UOBMatchmakingSubsystem::StartSession()
 		return;
 	}
 	
-	// 알파 IP-direct: MapData 테스트 주소 우선, 없으면 기본 주소.
-	FString Address = SelectedMap->TestServerAddress.IsEmpty() ? DefaultServerAddress : SelectedMap->TestServerAddress;
-
-	// 파티 코드가 있으면 URL 옵션으로 전달 → 서버가 같은 코드끼리 같은 팀 배정.
-	if (!PartyCode.IsEmpty())
+	UGameInstance* GI = GetGameInstance();
+	UWorld* World = GI ? GI->GetWorld() : nullptr;
+	if (!World)
 	{
-		Address += FString::Printf(TEXT("?party=%s"), *PartyCode);
+		SetState(EOBMatchmakingState::Idle);
+		return;
 	}
+	
+	// TestServerAddress 있음 → 데디 접속 / 비어있음 → 로컬 단독 플레이(솔로 반복 테스트)
+	if (!SelectedMap->TestServerAddress.IsEmpty())
+	{
+		FString Address = SelectedMap->TestServerAddress;
+		if (!PartyCode.IsEmpty())
+		{
+			Address += FString::Printf(TEXT("?party=%s"), *PartyCode);
+		}
 
-	UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 데디 접속 → %s"), *Address);
-
-	if (UGameInstance* GI = GetGameInstance())
+		UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 데디 접속 → %s"), *Address);
 		if (APlayerController* PC = GI->GetFirstLocalPlayerController())
-			PC->ClientTravel(Address, TRAVEL_Absolute);   // 비seamless 전체 로드로 서버 접속
+		{
+			PC->ClientTravel(Address, TRAVEL_Absolute);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 로컬 이동 → %s"), *SelectedMap->Level.ToString());
+		UGameplayStatics::OpenLevelBySoftObjectPtr(World, SelectedMap->Level);
+	}
 	
 	SetState(EOBMatchmakingState::Idle);
 }

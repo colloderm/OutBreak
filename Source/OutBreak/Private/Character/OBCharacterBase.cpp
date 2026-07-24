@@ -36,6 +36,8 @@ AOBCharacterBase::AOBCharacterBase()
 	CameraBoom->bUsePawnControlRotation = true;
 	CameraBoom->bDoCollisionTest = true;
 	CameraBoom->ProbeChannel = OB_TraceChannel_CameraProbe;
+	CameraBoom->bEnableCameraLag = true;
+	CameraBoom->CameraLagSpeed = NormalCameraLagSpeed;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
@@ -262,6 +264,12 @@ float AOBCharacterBase::GetCurrentSpreadAngle() const
 	return Spread;
 }
 
+void AOBCharacterBase::SetSprintCameraLag(bool bSprinting)
+{
+	TargetCameraLagSpeed = bSprinting ? SprintCameraLagSpeed : NormalCameraLagSpeed;
+	SetActorTickEnabled(true);
+}
+
 void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
 {
 	// 로컬 전용
@@ -436,6 +444,16 @@ void AOBCharacterBase::Tick(float DeltaSeconds)
 	}
 	CombatFocus = NewFocus;
 	ApplyCombatFocusPostProcess();
+	
+	if (CameraBoom)
+	{
+		const float NewLag = FMath::FInterpTo(CameraBoom->CameraLagSpeed, TargetCameraLagSpeed, DeltaSeconds, CameraLagBlendSpeed);
+		CameraBoom->CameraLagSpeed = NewLag;
+		if (!FMath::IsNearlyEqual(NewLag, TargetCameraLagSpeed, 0.05f))
+		{
+			bStillBlending = true;
+		}
+	}
 	
 	if (!bStillBlending)
 	{
