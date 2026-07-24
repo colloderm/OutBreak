@@ -61,4 +61,8 @@ namespace OBGameplayTags
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Bandage);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Grenade);
 	
+	
+	// AI State Tree
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_StateTree_Event_TargetSighted);
+	
 }

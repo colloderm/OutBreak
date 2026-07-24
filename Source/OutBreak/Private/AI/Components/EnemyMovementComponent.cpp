@@ -12,7 +12,7 @@
 #include "Animation/AnimMontage.h"
 #include "MotionWarpingComponent.h"
 #include "Kismet/KismetMathLibrary.h"
-
+#include "AI/Data/EnemyState.h"
 
 DEFINE_LOG_CATEGORY_STATIC(
 	LogEnemyDropTraversal,
@@ -99,6 +99,14 @@ void UEnemyMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType
 			break;
 		}
 	}
+	
+	
+	/* 현재 임시 주석 한손 Crawling 시에 팔로 몸을 끌고 갈때 이동량을 제한할려고. */
+	// ELocomotionWalkRunState State = Character->GetLocomotionWalkRunState();
+	// if (static_cast<int>(State) > static_cast<int>(ELocomotionWalkRunState::Crawling))
+	// {
+	// 	Character->GetCanMove();
+	// }
 
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 }

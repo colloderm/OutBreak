@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/EnemyState.h"
 #include "GameFramework/Character.h"
 #include "EnemyCharacter.generated.h"
 
@@ -50,6 +51,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Animation Budget|Debug")
 	FString GetAnimationBudgetDebugSummary() const;
 	
+	
+	void GetCanMove();
+
 
 	UPROPERTY(BlueprintAssignable, Category = "Animation Budget")
 	FModularAnimationProxyReducedWorkChanged
@@ -60,6 +64,8 @@ public:
 	{
 		return EnemyAsset;
 	}
+	
+	ELocomotionWalkRunState GetLocomotionWalkRunState() const;
 
 	UMotionWarpingComponent* GetMotionWarpingComponent() const
 	{
@@ -86,6 +92,7 @@ protected:
 		const FDamageEvent& DamageEvent,
 		AController* EventInstigator,
 		AActor* DamageCauser) override;
+	
 	
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))

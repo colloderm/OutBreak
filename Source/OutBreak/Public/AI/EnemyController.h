@@ -18,6 +18,7 @@ enum class EEnemyAlertState : uint8
 {
 	Idle,
 	Suspicious,
+	Chase,
 	Investigating,
 	Combat
 };
@@ -28,13 +29,14 @@ class OUTBREAK_API AEnemyController : public ADetourCrowdAIController
 {
 	GENERATED_BODY()
 
+
 public:
 	// Sets default values for this actor's properties
 	AEnemyController();
 
 	void InitializeComponents();
-
 	
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -65,6 +67,9 @@ private:
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* UpdatedActor, FAIStimulus Stimulus);
 	
+	UFUNCTION()
+	void HandleTargetPerceptionForgotten(AActor* UpdatedActor); 
+	
 	void HandleSightStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus);
 	
 	void HandleHearingStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus);
@@ -75,6 +80,9 @@ private:
 private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<AActor> PerceptionTarget;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	bool bHasPerceptionTarget = false;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
 	FVector LastKnownTargetLocation = FVector::ZeroVector;
@@ -100,12 +108,14 @@ private:
 	TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
 	
 	void InitializeStateTree();
-	/* ==================================================================================== */
 	
 
+public:
+	AActor* GetCurrentTargetActor() const
+	{
+		return PerceptionTarget;
+	}
 	
-	
-	
-	
+	/* ==================================================================================== */
 	
 };

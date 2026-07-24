@@ -230,6 +230,11 @@ float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 	return ActualDamage;
 }
 
+ELocomotionWalkRunState AEnemyCharacter::GetLocomotionWalkRunState() const
+{
+	return PhysicalComponent->EvaluateLocomotionState();
+}
+
 USkeletalMeshComponent*
 AEnemyCharacter::GetChildActorSkeletalMesh()
 {

@@ -15,6 +15,9 @@
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Damage.h"
 
+#include "Ability/Tags/OBGameplayTags.h"
+#include "StateTreeEvents.h"
+#include "Evaluation/IMovieSceneEvaluationHook.h"
 
 
 // Sets default values
@@ -109,6 +112,11 @@ void AEnemyController::BeginPlay()
 	AIPerceptionComponent->OnTargetPerceptionUpdated.AddUniqueDynamic(
 		this,
 		&AEnemyController::HandleTargetPerceptionUpdated);
+	
+	AIPerceptionComponent->OnTargetPerceptionForgotten.AddUniqueDynamic(
+		this,
+		&AEnemyController::HandleTargetPerceptionForgotten);
+	
 }
 
 void AEnemyController::OnPossess(APawn* inPawn)
@@ -169,11 +177,25 @@ void AEnemyController::HandleTargetPerceptionUpdated(AActor* UpdatedActor, FAISt
 	}
 }
 
+void AEnemyController::HandleTargetPerceptionForgotten(AActor* UpdatedActor)
+{
+	if (IsValid(PerceptionTarget))
+	{
+		if (PerceptionTarget == UpdatedActor)
+		{
+			PerceptionTarget = nullptr;
+			bHasPerceptionTarget = false;
+		}
+	}
+	
+}
+
 void AEnemyController::HandleSightStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus)
 {
 	if (Stimulus.WasSuccessfullySensed())
 	{
 		PerceptionTarget = UpdatedActor;
+		bHasPerceptionTarget= true;
 		LastKnownTargetLocation = Stimulus.StimulusLocation;
 		AlertState = EEnemyAlertState::Combat;
 	}
@@ -184,9 +206,11 @@ void AEnemyController::HandleSightStimulus(AActor* UpdatedActor, const FAIStimul
 		
 		if (IsValid(PerceptionTarget))
 		{
-			AlertState = EEnemyAlertState::Investigating;
+			StateTreeComponent->SendStateTreeEvent(
+			FStateTreeEvent(
+				OBGameplayTags::TAG_StateTree_Event_TargetSighted));
+			AlertState = EEnemyAlertState::Chase;
 		}
-		
 	}
 }
 

@@ -55,9 +55,10 @@ public:
 	
 	void ActionPhysical(FHitResult HitResult, float DamageAmount);
 
+	ELocomotionWalkRunState EvaluateLocomotionState() const;
 private:
 	void ActionLimb(UStaticMesh* MeshAsset, FName BoneName, float Damage);
-	ELocomotionWalkRunState EvaluateLocomotionState() const;
+	
 	
 	float Health = 200.f;
 	
