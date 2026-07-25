@@ -7,7 +7,7 @@
 #include "UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.h"
 #include "UI/Widgets/Lobby/LoadoutWidget/LoadoutCardElement.h"
 
-void ULoadoutSelectionView::SetCardInfo(FText& inName, EOBWeaponSlot inType, FString& inDesc)
+void ULoadoutSelectionView::SetCardInfo(FText& inName, EOBWeaponSlot inType, FString& inDesc, UTexture2D* inIcon)
 {
 	ULoadoutCardElement* CardPtr = nullptr;
 	switch (inType)
@@ -33,7 +33,7 @@ void ULoadoutSelectionView::SetCardInfo(FText& inName, EOBWeaponSlot inType, FSt
 				return;
 			}
 	}
-	CardPtr->SetLoadoutCard(inName, inType, inDesc);
+	CardPtr->SetLoadoutCard(inName, inType, inDesc, inIcon);
 }
 
 void ULoadoutSelectionView::SetStatView(FText& inSelectedWeaponName, float inDamage, float inFireRate, float inAccuracy,

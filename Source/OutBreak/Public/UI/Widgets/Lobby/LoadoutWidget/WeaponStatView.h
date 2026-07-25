@@ -13,11 +13,11 @@ class UWeaponStatElement;
 UENUM(BlueprintType)
 enum class EStatTypes : uint8
 {
-	Damage UMETA(DisplayName = "Damage"),
-	FireRate UMETA(DisplayName = "FireRate"),
-	Accuracy UMETA(DisplayName = "Accuracy"),
-	Recoil UMETA(DisplayName = "Recoil"),
-	Mobility UMETA(DisplayName = "Mobility"),
+	Damage		UMETA(DisplayName = "데미지"),
+	FireRate	UMETA(DisplayName = "연사력"),
+	Accuracy	UMETA(DisplayName = "정확도"),
+	Recoil		UMETA(DisplayName = "반동"),
+	Mobility	UMETA(DisplayName = "기동성"),
 };
 /**
  * 

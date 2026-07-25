@@ -34,13 +34,25 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	TArray<TSubclassOf<AOBWeaponBase>> GetSelectedClasses() const;
 	
+	// 창고(미장착 보유) 무기 클래스들(로드 후 하드 클래스). 작업대 리스트용.
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	TArray<TSubclassOf<AOBWeaponBase>> GetOwnedClasses() const;
+
+	// 창고의 무기를 해당 슬롯에 장착(창고→슬롯, 기존 슬롯 무기는 창고로 반환).
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	void EquipFromStash(TSubclassOf<AOBWeaponBase> WeaponClass);
+
+	// 이미 보유(창고) 또는 장착 중인지.
+	UFUNCTION(BlueprintPure, Category = "Loadout")
+	bool IsOwnedOrEquipped(TSubclassOf<AOBWeaponBase> WeaponClass) const;
+	
 	// 사망 페널티: 전체 비우기 + 즉시 저장.
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	void ClearLoadout();
 
 	// 빈 로드아웃 여부(스타터킷 지급 판정).
 	UFUNCTION(BlueprintPure, Category = "Loadout")
-	bool IsEmpty() const { return CurrentLoadout.SlotWeapons.IsEmpty(); }
+	bool IsEmpty() const { return CurrentLoadout.SlotWeapons.IsEmpty() && CurrentLoadout.OwnedWeapons.IsEmpty(); }
 	
 	// --- 통화 ---
 	UFUNCTION(BlueprintPure, Category = "Currency")

@@ -21,4 +21,9 @@ struct FOBLoadout
 	// 슬롯 → 무기 클래스. 슬롯당 1개(덮어쓰기).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Loadout")
 	TMap<EOBWeaponSlot, TSoftClassPtr<AOBWeaponBase>> SlotWeapons;
+	
+	// 보유(미장착) 무기 풀 = 창고. 상점 구매로 추가, 사망에도 유지.
+	// ponytail: Set-of-class(클래스당 1개), 수량 필요하면 TMap<class,count>로.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Loadout")
+	TSet<TSoftClassPtr<AOBWeaponBase>> OwnedWeapons;
 };
