@@ -21,16 +21,11 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 	ACharacter* Character = InstanceData.ControlledPawn;
 
 	if (!IsValid(Character) ||
-		!IsValid(InstanceData.TargetActor) ||
 		!IsValid(InstanceData.AttackMontage))
 	{
 		return EStateTreeRunStatus::Failed;
 	}
-
-	if (!IsTargetInAttackRange(InstanceData))
-	{
-		return EStateTreeRunStatus::Failed;
-	}
+	
 
 	USkeletalMeshComponent* Mesh = Character->GetMesh();
 
@@ -55,13 +50,6 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 		{
 			AIController->StopMovement();
 		}
-
-		if (InstanceData.bSetFocusOnTarget)
-		{
-			AIController->SetFocus(
-				InstanceData.TargetActor,
-				EAIFocusPriority::Gameplay);
-		}
 	}
 
 	const float MontageDuration =
@@ -75,13 +63,6 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 	 */
 	if (MontageDuration <= 0.0f)
 	{
-		if (IsValid(AIController) &&
-			InstanceData.bSetFocusOnTarget)
-		{
-			AIController->ClearFocus(
-				EAIFocusPriority::Gameplay);
-		}
-
 		return EStateTreeRunStatus::Failed;
 	}
 
@@ -104,7 +85,6 @@ EStateTreeRunStatus FSTTPlayMontageTask::Tick(
 	}
 
 	if (!IsValid(InstanceData.ControlledPawn) ||
-		!IsValid(InstanceData.TargetActor) ||
 		!IsValid(InstanceData.AttackMontage))
 	{
 		return EStateTreeRunStatus::Failed;
@@ -117,27 +97,13 @@ EStateTreeRunStatus FSTTPlayMontageTask::Tick(
 	{
 		return EStateTreeRunStatus::Failed;
 	}
-
-	/*
-	 * 공격 중 Target이 사라지거나 너무 멀어졌으면 공격 중단.
-	 *
-	 * 실제 게임에서는 AttackRange보다 조금 큰
-	 * AttackAbortRange를 따로 두는 것이 더 안정적이다.
-	 */
-	if (!IsTargetInAttackRange(InstanceData))
-	{
-		return EStateTreeRunStatus::Failed;
-	}
-
+	
 	if (AnimInstance->Montage_IsPlaying(
 		InstanceData.AttackMontage))
 	{
 		return EStateTreeRunStatus::Running;
 	}
-
-	/*
-	 * Montage 재생이 끝났으므로 Attack State 완료.
-	 */
+	
 	return EStateTreeRunStatus::Succeeded;
 }
 
@@ -174,35 +140,8 @@ void FSTTPlayMontageTask::ExitState(
 		AAIController* AIController =
 			Cast<AAIController>(
 				InstanceData.ControlledPawn->GetController());
-
-		if (IsValid(AIController) &&
-			InstanceData.bSetFocusOnTarget)
-		{
-			AIController->ClearFocus(
-				EAIFocusPriority::Gameplay);
-		}
 	}
 
 	InstanceData.PlayingAnimInstance.Reset();
 	InstanceData.bMontageStarted = false;
-}
-
-bool FSTTPlayMontageTask::IsTargetInAttackRange(
-	const FInstanceDataType& InstanceData) const
-{
-	if (!IsValid(InstanceData.ControlledPawn) ||
-		!IsValid(InstanceData.TargetActor))
-	{
-		return false;
-	}
-
-	const float AttackRangeSquared =
-		FMath::Square(InstanceData.AttackRange);
-
-	const float DistanceSquared =
-		FVector::DistSquared(
-			InstanceData.ControlledPawn->GetActorLocation(),
-			InstanceData.TargetActor->GetActorLocation());
-
-	return DistanceSquared <= AttackRangeSquared;
 }

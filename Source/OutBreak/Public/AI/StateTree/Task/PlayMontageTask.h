@@ -26,30 +26,13 @@ struct OUTBREAK_API FSTTPlayMontageTaskInstanceData
 	TObjectPtr<ACharacter> ControlledPawn = nullptr;
 	
 	/*
-	 * 타겟 대상.
-	 */
-	UPROPERTY(
-		EditAnywhere,
-		Category = "Evaluator")
-	TObjectPtr<AActor> TargetActor = nullptr;
-	
-	/*
 	 * 재생할 공격 Montage.
 	 */
 	UPROPERTY(
 		EditAnywhere,
 		Category = "Parameter")
 	TObjectPtr<UAnimMontage> AttackMontage = nullptr;
-
-	/*
-	 * 공격을 시작할 수 있는 중심점 기준 거리.
-	 */
-	UPROPERTY(
-		EditAnywhere,
-		Category = "Parameter",
-		meta = (ClampMin = "0.0"))
-	float AttackRange = 150.0f;
-
+	
 	UPROPERTY(
 		EditAnywhere,
 		Category = "Parameter",
@@ -69,12 +52,6 @@ struct OUTBREAK_API FSTTPlayMontageTaskInstanceData
 		EditAnywhere,
 		Category = "Parameter")
 	bool bStopMovementOnEnter = true;
-
-	/* Target Focusing? */
-	UPROPERTY(
-		EditAnywhere,
-		Category = "Parameter")
-	bool bSetFocusOnTarget = true;
 
 	/*
 	 * 공격 중 State가 강제로 종료되면 Montage도 중단한다.
@@ -128,10 +105,6 @@ struct OUTBREAK_API FSTTPlayMontageTask : public FStateTreeAITaskBase
 	virtual void ExitState(
 		FStateTreeExecutionContext& Context,
 		const FStateTreeTransitionResult& Transition) const override;
-
-private:
-	bool IsTargetInAttackRange(
-		const FInstanceDataType& InstanceData) const;
 };
 
 

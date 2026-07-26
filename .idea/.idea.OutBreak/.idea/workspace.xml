@@ -21,33 +21,25 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PerceptionTask.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/PlayMontageTask.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/UtlitesTask.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMemoryComponent.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMemoryComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_EnemyController.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_EnemyController.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/BS_Zombie_WalkAndRun.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/BS_Zombie_WalkAndRun.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/ZombieRM_LeftAttack_Charged_02Normal.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/ZombieRM_LeftAttack_Charged_02Normal.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/StateTreeTaskBlueprintBase_New.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/StateTreeTaskBlueprintBase_New.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Animation/ABP_ZombieLoco.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Animation/ABP_ZombieLoco.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/OutBreak.uproject" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.uproject" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/MyClass.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/ST_CheckAttackRange.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/InvestingTask.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/InvestingTask.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Tags/OBGameplayTags.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Tags/OBGameplayTags.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyPhysicalComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyPhysicalComponent.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/MyClass.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PerceptionTask.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PlayMontageTask.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PlayMontageTask.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyState.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyState.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/ST_CheckAttackRange.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/InvestingTask.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/InvestigatingTask.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Tags/OBGameplayTags.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Tags/OBGameplayTags.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/PlayMontageTask.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/PlayMontageTask.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/UtlitesTask.h" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -64,27 +56,19 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Classes/Perception/AIPerceptionComponent.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Core/Public/Containers/Map.h.inl" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Core/Public/Math/UnrealMathUtility.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/CoreUObject/Public/UObject/Class.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/CoreUObject/Public/UObject/ObjectHandle.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Animation/SkeletalMeshActor.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/SkinnedMeshComponent.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/StaticMeshComponent.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/HitResult.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/World.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Private/SkinnedMeshSceneProxyDesc.cpp" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Launch/Private/Windows/LaunchWindows.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="cidr-memory-view://0" root0="FORCE_HIGHLIGHTING" />
+    <setting file="cidr-memory-view://1" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Classes/Perception/AIPerceptionTypes.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/CoreUObject/Public/UObject/Object.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/SceneComponent.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/EngineTypes.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/MyClass.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Data/EnemyState.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Interface/EnemyComponentInterface.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/InvestingTask.cpp" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PerceptionTask.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -104,12 +88,10 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyBaseActorComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/MyClass.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyState.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Interface/EnemyComponentInterface.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Nav/EnemyGenNavLinksProxy.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/PerceptionTask.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" root0="FORCE_HIGHLIGHTING" />
@@ -134,61 +116,61 @@
   <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.0000012071195545" />
-      <entry key="MS500" value="1.065516404719808" />
-      <entry key="S2" value="1.5059266005134644" />
-      <entry key="S5" value="1.761438804745651" />
-      <entry key="S10" value="1.8726260898346376" />
-      <entry key="S30" value="2.2132915598805853" />
-      <entry key="S60" value="5.876602648828521" />
-      <entry key="M2" value="19.260730114332233" />
-      <entry key="M5" value="48.72532179916991" />
-      <entry key="M10" value="72.88127236635022" />
-      <entry key="M15" value="88.85162606347524" />
-      <entry key="M30" value="134.91364449199858" />
-      <entry key="H1" value="255.30812604704863" />
-      <entry key="H2" value="555.426841877283" />
-      <entry key="H4" value="1032.6243239345176" />
-      <entry key="D1" value="1965.412525568325" />
-      <entry key="W1" value="2217.372447937272" />
+      <entry key="MS100" value="1.0000004224868786" />
+      <entry key="MS500" value="1.0819198732025896" />
+      <entry key="S2" value="2.0295529687219362" />
+      <entry key="S5" value="3.4508770402567213" />
+      <entry key="S10" value="5.734616101199642" />
+      <entry key="S30" value="12.880679767833882" />
+      <entry key="S60" value="18.131860432372374" />
+      <entry key="M2" value="22.69406401340339" />
+      <entry key="M5" value="35.90091661333623" />
+      <entry key="M10" value="66.01432635652843" />
+      <entry key="M15" value="93.91744779889855" />
+      <entry key="M30" value="161.00924341118468" />
+      <entry key="H1" value="289.74282519002656" />
+      <entry key="H2" value="586.8529489465674" />
+      <entry key="H4" value="1071.0723242796969" />
+      <entry key="D1" value="2056.759110534065" />
+      <entry key="W1" value="2329.392483346735" />
     </decayedCancelled>
     <decayedSelected>
-      <entry key="MS100" value="0.0" />
-      <entry key="MS500" value="3.427326811396249E-124" />
-      <entry key="S2" value="1.360626357230196E-31" />
-      <entry key="S5" value="4.5029336923787815E-13" />
-      <entry key="S10" value="6.710390221740824E-7" />
-      <entry key="S30" value="0.008759856987305635" />
-      <entry key="S60" value="0.09672768442987852" />
-      <entry key="M2" value="0.3869360246364117" />
-      <entry key="M5" value="1.3982354072916299" />
-      <entry key="M10" value="3.3279959669666495" />
-      <entry key="M15" value="5.226952239734964" />
-      <entry key="M30" value="10.817385673407934" />
-      <entry key="H1" value="23.264166460719107" />
-      <entry key="H2" value="51.94638276017908" />
-      <entry key="H4" value="96.6678142596188" />
-      <entry key="D1" value="183.41308479153875" />
-      <entry key="W1" value="206.77218802943773" />
+      <entry key="MS100" value="5.422854177747823E-41" />
+      <entry key="MS500" value="9.580624139141215E-9" />
+      <entry key="S2" value="0.018464970677318338" />
+      <entry key="S5" value="0.40892036491374945" />
+      <entry key="S10" value="1.320810126210864" />
+      <entry key="S30" value="3.9937192297640287" />
+      <entry key="S60" value="6.203345837715074" />
+      <entry key="M2" value="8.211033244137232" />
+      <entry key="M5" value="11.398623050702328" />
+      <entry key="M10" value="15.742517501596984" />
+      <entry key="M15" value="19.26881924163732" />
+      <entry key="M30" value="27.366867574463015" />
+      <entry key="H1" value="41.21858528651929" />
+      <entry key="H2" value="70.20704389383752" />
+      <entry key="H4" value="115.98209387107565" />
+      <entry key="D1" value="208.03958348126804" />
+      <entry key="W1" value="233.39059853218856" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="4.8292666568308685E-5" />
-      <entry key="MS500" value="0.17429407040204228" />
-      <entry key="S2" value="1.0478809597729275" />
-      <entry key="S5" value="1.5394843069398298" />
-      <entry key="S10" value="1.7537946341932387" />
-      <entry key="S30" value="2.178192145989578" />
-      <entry key="S60" value="5.93749906476849" />
-      <entry key="M2" value="19.604834124037026" />
-      <entry key="M5" value="50.078925861690614" />
-      <entry key="M10" value="76.16759556218592" />
-      <entry key="M15" value="94.0389874134741" />
-      <entry key="M30" value="145.69523318093695" />
-      <entry key="H1" value="278.5368406391966" />
-      <entry key="H2" value="607.3330270226746" />
-      <entry key="H4" value="1129.2534091243328" />
-      <entry key="D1" value="2148.812945751992" />
-      <entry key="W1" value="2424.1425850199635" />
+      <entry key="MS100" value="9.52218009260394E-5" />
+      <entry key="MS500" value="0.19753580900284806" />
+      <entry key="S2" value="1.263513255987446" />
+      <entry key="S5" value="3.0949699436253457" />
+      <entry key="S10" value="6.323723846880861" />
+      <entry key="S30" value="16.26241180421672" />
+      <entry key="S60" value="23.876209854889403" />
+      <entry key="M2" value="30.608741169675554" />
+      <entry key="M5" value="47.14118444265953" />
+      <entry key="M10" value="81.64768805325059" />
+      <entry key="M15" value="113.09557029342957" />
+      <entry key="M30" value="188.3090450056141" />
+      <entry key="H1" value="330.9086578902701" />
+      <entry key="H2" value="657.0113142336494" />
+      <entry key="H4" value="1187.0112252411784" />
+      <entry key="D1" value="2264.784950553977" />
+      <entry key="W1" value="2562.780857592123" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -213,7 +195,7 @@
     &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
     &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
     &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;ZombieSystem&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Temp__Zombie__AI&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
@@ -408,6 +390,9 @@
       <workItem from="1784684694534" duration="21494000" />
       <workItem from="1784768294797" duration="17932000" />
       <workItem from="1784854170255" duration="14452000" />
+      <workItem from="1784911238427" duration="287000" />
+      <workItem from="1785000628406" duration="3658000" />
+      <workItem from="1785037736651" duration="6618000" />
     </task>
     <servers />
   </component>
@@ -436,7 +421,7 @@
         </breakpoint>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
           <url>file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp</url>
-          <line>3</line>
+          <line>6</line>
           <option name="timeStamp" value="5" />
         </line-breakpoint>
       </breakpoints>

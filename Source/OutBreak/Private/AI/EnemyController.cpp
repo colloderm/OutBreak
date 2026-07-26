@@ -5,6 +5,7 @@
 
 #include "Components/StateTreeAIComponent.h"
 #include "Perception/AIPerceptionComponent.h"
+#include "AI/Components/EnemyMemoryComponent.h"
 
 #include "Perception/AISense.h"
 #include "Perception/AISense_Sight.h"
@@ -34,6 +35,7 @@ void AEnemyController::InitializeComponents()
 {
 	InitializeStateTree();
 	InitializeAIPerception();
+	InitializeMemoryComponent();
 }
 
 void AEnemyController::InitializeStateTree()
@@ -106,7 +108,7 @@ void AEnemyController::BeginPlay()
 	                      *GetClass()->GetName(),
 	                      TEXT(__FUNCTION__)))
 	{
-		return;
+		UE_LOG(LogTemp, Fatal, TEXT("%s::%s : AI Perception Component is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 	}
 	
 	AIPerceptionComponent->OnTargetPerceptionUpdated.AddUniqueDynamic(
@@ -140,6 +142,12 @@ void AEnemyController::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 }
 
+void AEnemyController::InitializeMemoryComponent()
+{
+	EnemyMemoryComponent = CreateDefaultSubobject<UEnemyMemoryComponent>(TEXT("MemoryComponet"));
+	
+	
+}
 
 
 void AEnemyController::HandleTargetPerceptionUpdated(AActor* UpdatedActor, FAIStimulus Stimulus)

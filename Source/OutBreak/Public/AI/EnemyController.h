@@ -12,6 +12,7 @@ class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UAISenseConfig_Hearing;
 class UAISenseConfig_Damage;
+class UEnemyMemoryComponent;
 
 UENUM(BlueprintType)
 enum class EEnemyAlertState : uint8
@@ -45,11 +46,43 @@ protected:
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+	
+	// AI Perception using variable
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<AActor> PerceptionTarget;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	bool bHasPerceptionTarget = false;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	FVector LastKnownTargetLocation = FVector::ZeroVector;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	EEnemyAlertState AlertState = EEnemyAlertState::Idle;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	bool bCanSeeTarget = false;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	TOptional<FVector> SelfToHearingDirection = FVector::ZeroVector;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	TOptional<FVector> SlefToDamageDirection = FVector::ZeroVector;
 
 	
-	/* =================================== AI Perception =================================== */
+	
 private:
 	
+	/* ===================================== Components ==================================== */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnemyMemoryComponent> EnemyMemoryComponent;
+	
+	void InitializeMemoryComponent();
+	
+	/* ==================================================================================== */
+	
+	
+	/* =================================== AI Perception =================================== */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAIPerceptionComponent> AIPerceptionComponent;
 	
@@ -76,29 +109,10 @@ private:
 	
 	void HandleDamageStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus);
 	
-	// AI Perception using variable
+
+	
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<AActor> PerceptionTarget;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	bool bHasPerceptionTarget = false;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	FVector LastKnownTargetLocation = FVector::ZeroVector;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	EEnemyAlertState AlertState = EEnemyAlertState::Idle;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	bool bCanSeeTarget = false;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	TOptional<FVector> SelfToHearingDirection = FVector::ZeroVector;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	TOptional<FVector> SlefToDamageDirection = FVector::ZeroVector;
-	
+
 	/* ==================================================================================== */
 	
 	
@@ -117,5 +131,7 @@ public:
 	}
 	
 	/* ==================================================================================== */
+	
+	
 	
 };

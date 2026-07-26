@@ -18,11 +18,11 @@ struct OUTBREAK_API FSTEvaluateEnemyAIContextInstanceData
 {
 	GENERATED_BODY()
 	/*
- * StateTree AI Component Schema의 Actor Context와 바인딩.
- *
- * 실제 실행 시에는 AIController가 제어 중인 Pawn입니다.
- * Schema의 원본 타입에 맞춰 AActor로 받고 내부에서 APawn으로 변환합니다.
- */
+	 * StateTree AI Component Schema의 Actor Context와 바인딩.
+	 *
+	 * 실제 실행 시에는 AIController가 제어 중인 Pawn입니다.
+	 * Schema의 원본 타입에 맞춰 AActor로 받고 내부에서 APawn으로 변환합니다.
+	 */
 	UPROPERTY(
 		EditAnywhere,
 		Category = "Context")
@@ -63,8 +63,8 @@ struct OUTBREAK_API FSTEvaluateEnemyAIContextInstanceData
 	 * 시야에서 잠시 사라져도 ForgetTargetTime 동안 유지됩니다.
 	 */
 	UPROPERTY(
-		VisibleAnywhere,
-		Category = "Output")
+		EditAnywhere,
+		Category = "Parameter")
 	TObjectPtr<AActor> TargetActor = nullptr;
 
 	/*
@@ -140,12 +140,6 @@ struct OUTBREAK_API FSTEvaluateEnemyAIContext
 		return FInstanceDataType::StaticStruct();
 	}
 
-	virtual void TreeStart(
-		FStateTreeExecutionContext& Context) const override;
-
-	virtual void Tick(
-		FStateTreeExecutionContext& Context,
-		float DeltaTime) const override;
 
 private:
 	void UpdateContext(
