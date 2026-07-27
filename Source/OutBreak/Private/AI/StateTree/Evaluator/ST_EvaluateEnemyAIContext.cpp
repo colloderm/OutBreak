@@ -30,8 +30,13 @@ void FSTEvaluateEnemyAIContext::UpdateContext(
 	if (!IsValid(EnemyCharacter))
 	{
 		ClearMemoryState(InstanceData);
+		ClearPhysicalState(InstanceData);
 		return;
 	}
+
+	SynchronizePhysicalState(
+		InstanceData,
+		*EnemyCharacter);
 
 	UEnemyMemoryComponent* MemoryComponent =
 		ResolveMemoryComponent(
@@ -102,6 +107,16 @@ FSTEvaluateEnemyAIContext::ResolveMemoryComponent(
 	return MemoryComponent;
 }
 
+void FSTEvaluateEnemyAIContext::SynchronizePhysicalState(
+	FInstanceDataType& InstanceData,
+	const AEnemyCharacter& EnemyCharacter)
+{
+	InstanceData.LocomotionState =
+		EnemyCharacter.GetLocomotionWalkRunState();
+	InstanceData.MissingArmState =
+		EnemyCharacter.GetMissingArmState();
+}
+
 bool FSTEvaluateEnemyAIContext::SynchronizeMemoryState(
 	FInstanceDataType& InstanceData,
 	const UEnemyMemoryComponent& MemoryComponent)
@@ -112,6 +127,14 @@ bool FSTEvaluateEnemyAIContext::SynchronizeMemoryState(
 		MemoryComponent.GetStimulusType();
 	InstanceData.LastStimulusLocation =
 		MemoryComponent.GetLastStimulusLocation();
+	InstanceData.bHasHearingStimulus =
+		MemoryComponent.HasHearingStimulus();
+	InstanceData.LastHeardLocation =
+		MemoryComponent.GetLastHeardLocation();
+	InstanceData.bHasDamageStimulus =
+		MemoryComponent.HasDamageStimulus();
+	InstanceData.LastDamageDirection =
+		MemoryComponent.GetLastDamageDirection();
 
 	if (!MemoryComponent.HasValidTarget())
 	{
@@ -177,4 +200,17 @@ void FSTEvaluateEnemyAIContext::ClearMemoryState(
 	InstanceData.bHasActionableStimulus = false;
 	InstanceData.StimulusType = EEnemyStimulusType::None;
 	InstanceData.LastStimulusLocation = FVector::ZeroVector;
+	InstanceData.bHasHearingStimulus = false;
+	InstanceData.LastHeardLocation = FVector::ZeroVector;
+	InstanceData.bHasDamageStimulus = false;
+	InstanceData.LastDamageDirection = FVector::ZeroVector;
+}
+
+void FSTEvaluateEnemyAIContext::ClearPhysicalState(
+	FInstanceDataType& InstanceData)
+{
+	InstanceData.LocomotionState =
+		ELocomotionWalkRunState::Dead;
+	InstanceData.MissingArmState =
+		EEnemyMissingArmState::None;
 }

@@ -6,6 +6,7 @@
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "AI/EnemyCharacter.h"
+#include "GameFramework/Controller.h"
 #include "StateTreeExecutionContext.h"
 
 EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
@@ -16,6 +17,7 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 		Context.GetInstanceData(*this);
 
 	InstanceData.bMontageStarted = false;
+	InstanceData.bWaitingForTargetRotation = false;
 	InstanceData.PlayingAnimInstance.Reset();
 
 	AEnemyCharacter* Character = InstanceData.ControlledPawn;
@@ -26,8 +28,6 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 		return EStateTreeRunStatus::Failed;
 	}
 	
-	Character->
-
 	USkeletalMeshComponent* Mesh = Character->GetMesh();
 
 	if (!IsValid(Mesh))
@@ -53,6 +53,34 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 		}
 	}
 
+	InstanceData.PlayingAnimInstance = AnimInstance;
+
+	if (InstanceData.bRotateToTargetBeforePlaying &&
+		IsValid(InstanceData.TargetActor))
+	{
+		InstanceData.bWaitingForTargetRotation = true;
+		if (!RotateTowardTarget(InstanceData, 0.0f))
+		{
+			return EStateTreeRunStatus::Running;
+		}
+
+		InstanceData.bWaitingForTargetRotation = false;
+	}
+
+	return StartMontage(InstanceData);
+}
+
+EStateTreeRunStatus FSTTPlayMontageTask::StartMontage(
+	FInstanceDataType& InstanceData) const
+{
+	AEnemyCharacter* Character = InstanceData.ControlledPawn.Get();
+	if (!IsValid(Character) ||
+		!IsValid(InstanceData.AttackMontage) ||
+		!IsValid(InstanceData.PlayingAnimInstance.Get()))
+	{
+		return EStateTreeRunStatus::Failed;
+	}
+
 	const float MontageDuration =
 		Character->PlayAnimMontage(
 			InstanceData.AttackMontage,
@@ -67,10 +95,63 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 		return EStateTreeRunStatus::Failed;
 	}
 
-	InstanceData.PlayingAnimInstance = AnimInstance;
 	InstanceData.bMontageStarted = true;
 
 	return EStateTreeRunStatus::Running;
+}
+
+bool FSTTPlayMontageTask::RotateTowardTarget(
+	FInstanceDataType& InstanceData,
+	const float DeltaTime) const
+{
+	AEnemyCharacter* Character = InstanceData.ControlledPawn.Get();
+	AActor* TargetActor = InstanceData.TargetActor.Get();
+	if (!IsValid(Character) || !IsValid(TargetActor))
+	{
+		return true;
+	}
+
+	FVector TargetDirection =
+		TargetActor->GetActorLocation() - Character->GetActorLocation();
+	TargetDirection.Z = 0.0f;
+	if (!TargetDirection.Normalize())
+	{
+		return true;
+	}
+
+	const float CurrentYaw = Character->GetActorRotation().Yaw;
+	const float TargetYaw = TargetDirection.Rotation().Yaw;
+	const float Tolerance = FMath::Clamp(
+		InstanceData.TargetFacingTolerance,
+		0.0f,
+		180.0f);
+	const float RemainingYaw =
+		FMath::FindDeltaAngleDegrees(CurrentYaw, TargetYaw);
+
+	float NewYaw = CurrentYaw;
+	if (FMath::Abs(RemainingYaw) <= Tolerance ||
+		InstanceData.TargetRotationSpeed <= 0.0f)
+	{
+		NewYaw = TargetYaw;
+	}
+	else
+	{
+		const float MaxYawStep =
+			InstanceData.TargetRotationSpeed *
+			FMath::Max(0.0f, DeltaTime);
+		NewYaw = FMath::FixedTurn(CurrentYaw, TargetYaw, MaxYawStep);
+	}
+
+	Character->SetActorRotation(FRotator(0.0f, NewYaw, 0.0f));
+	if (AController* Controller = Character->GetController())
+	{
+		FRotator ControlRotation = Controller->GetControlRotation();
+		ControlRotation.Yaw = NewYaw;
+		Controller->SetControlRotation(ControlRotation);
+	}
+
+	return FMath::Abs(
+		FMath::FindDeltaAngleDegrees(NewYaw, TargetYaw)) <= Tolerance;
 }
 
 EStateTreeRunStatus FSTTPlayMontageTask::Tick(
@@ -79,6 +160,25 @@ EStateTreeRunStatus FSTTPlayMontageTask::Tick(
 {
 	FInstanceDataType& InstanceData =
 		Context.GetInstanceData(*this);
+
+	if (InstanceData.bWaitingForTargetRotation)
+	{
+		if (!IsValid(InstanceData.ControlledPawn) ||
+			!IsValid(InstanceData.AttackMontage) ||
+			!IsValid(InstanceData.PlayingAnimInstance.Get()))
+		{
+			return EStateTreeRunStatus::Failed;
+		}
+
+		if (IsValid(InstanceData.TargetActor) &&
+			!RotateTowardTarget(InstanceData, DeltaTime))
+		{
+			return EStateTreeRunStatus::Running;
+		}
+
+		InstanceData.bWaitingForTargetRotation = false;
+		return StartMontage(InstanceData);
+	}
 
 	if (!InstanceData.bMontageStarted)
 	{
@@ -145,4 +245,5 @@ void FSTTPlayMontageTask::ExitState(
 
 	InstanceData.PlayingAnimInstance.Reset();
 	InstanceData.bMontageStarted = false;
+	InstanceData.bWaitingForTargetRotation = false;
 }

@@ -261,6 +261,36 @@ ELocomotionWalkRunState UEnemyPhysicalComponent::EvaluateLocomotionState() const
 	return ELocomotionWalkRunState::Walking;
 }
 
+EEnemyMissingArmState UEnemyPhysicalComponent::GetMissingArmState() const
+{
+	const FLimbData* RightArm =
+		Limbes.Find(FName(TEXT("upperarm_r")));
+	const FLimbData* LeftArm =
+		Limbes.Find(FName(TEXT("upperarm_l")));
+
+	const bool bRightArmMissing =
+		RightArm == nullptr || !RightArm->bIsHas;
+	const bool bLeftArmMissing =
+		LeftArm == nullptr || !LeftArm->bIsHas;
+
+	if (bLeftArmMissing && bRightArmMissing)
+	{
+		return EEnemyMissingArmState::Both;
+	}
+
+	if (bLeftArmMissing)
+	{
+		return EEnemyMissingArmState::Left;
+	}
+
+	if (bRightArmMissing)
+	{
+		return EEnemyMissingArmState::Right;
+	}
+
+	return EEnemyMissingArmState::None;
+}
+
 void UEnemyPhysicalComponent::Action_Dead()
 {
 	ReactTimeline.Stop();

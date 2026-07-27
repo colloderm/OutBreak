@@ -36,6 +36,10 @@ public:
 	bool HasActionableStimulus() const { return StimulusType != EEnemyStimulusType::None; }
 	EEnemyStimulusType GetStimulusType() const { return StimulusType; }
 	const FVector& GetLastStimulusLocation() const { return LastStimulusLocation; }
+	bool HasHearingStimulus() const { return StimulusType == EEnemyStimulusType::Hearing; }
+	const FVector& GetLastHeardLocation() const { return LastHeardLocation; }
+	bool HasDamageStimulus() const { return StimulusType == EEnemyStimulusType::Damage; }
+	const FVector& GetLastDamageDirection() const { return LastDamageDirection; }
 
 	/**
 	 * A single wake-up signal for every meaningful memory update.
@@ -67,8 +71,12 @@ private:
 		AActor* UpdatedActor,
 		const FAIStimulus& Stimulus);
 
+	void ClearStimulusMemory();
 	void BroadcastMemoryUpdated();
 	FVector ResolveStimulusLocation(
+		const AActor& UpdatedActor,
+		const FAIStimulus& Stimulus) const;
+	FVector ResolveDamageDirection(
 		const AActor& UpdatedActor,
 		const FAIStimulus& Stimulus) const;
 	double GetCurrentTimeSeconds() const;
@@ -87,6 +95,13 @@ private:
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "AI|Memory", meta = (AllowPrivateAccess = "true"))
 	FVector LastStimulusLocation = FVector::ZeroVector;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "AI|Memory", meta = (AllowPrivateAccess = "true"))
+	FVector LastHeardLocation = FVector::ZeroVector;
+
+	/** Unit vector from the damage receiver toward the source of the hit. */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "AI|Memory", meta = (AllowPrivateAccess = "true"))
+	FVector LastDamageDirection = FVector::ZeroVector;
 
 	double LastTargetSeenTime = 0.0;
 	double LastStimulusTime = 0.0;

@@ -44,7 +44,8 @@ protected:
 	virtual void EndPlay(
 		const EEndPlayReason::Type EndPlayReason) override;
 	
-	virtual void OnPossess(APawn* inPawn) override;
+	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnUnPossess() override;
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -98,6 +99,7 @@ private:
 	TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
 	
 	void InitializeStateTree();
+	void StopStateTreeLogic(const FString& Reason);
 	
 
 	/* ==================================================================================== */

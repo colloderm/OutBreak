@@ -58,6 +58,9 @@ public:
 	void ActionPhysical(FHitResult HitResult, float DamageAmount);
 
 	ELocomotionWalkRunState EvaluateLocomotionState() const;
+
+	UFUNCTION(BlueprintPure, Category = "Physical|State")
+	EEnemyMissingArmState GetMissingArmState() const;
 private:
 	void ActionLimb(UStaticMesh* MeshAsset, FName BoneName, float Damage);
 	

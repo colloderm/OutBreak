@@ -318,8 +318,8 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 			WeaponData->BaseDamage,
 			ShotDirection,
 			Hit,
-			nullptr,
-			nullptr,
+			Character->GetController(),
+			Character,
 			UDamageType::StaticClass());
 	}
 	

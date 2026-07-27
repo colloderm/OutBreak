@@ -15,6 +15,16 @@ enum class ELocomotionWalkRunState : uint8
 	Dead,
 };
 
+/** Identifies which arm is currently missing from the enemy. */
+UENUM(BlueprintType)
+enum class EEnemyMissingArmState : uint8
+{
+	None,
+	Left,
+	Right,
+	Both,
+};
+
 /**
  * Authoritative action lock state. UEnemyStatusComponent is the only runtime
  * owner allowed to mutate this value.

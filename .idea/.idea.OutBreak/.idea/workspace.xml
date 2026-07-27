@@ -21,21 +21,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemySpawnableComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/CharacterMovementTask.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/RandomLocationGen.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Global/OutBreakGlobal.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemySpawnableComponent.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/CharacterMovementTask.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/RandomLocationGen.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Global/OutBreakGlobal.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_EnemyController.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_EnemyController.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/StateTreeTaskBlueprintBase_New.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/BS_Zombie_WalkAndRun.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/BS_Zombie_WalkAndRun.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI_Advanced.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI_Advanced.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMemoryComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMemoryComponent.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyPhysicalComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyPhysicalComponent.cpp" afterDir="false" />
@@ -43,9 +30,7 @@
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PlayMontageTask.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PlayMontageTask.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Tags/OBGameplayTags.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Tags/OBGameplayTags.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Character/OBCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Character/OBCharacterBase.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMemoryComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMemoryComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyPhysicalComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyPhysicalComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyState.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyState.h" afterDir="false" />
@@ -53,9 +38,6 @@
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/PlayMontageTask.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/PlayMontageTask.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Tags/OBGameplayTags.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Tags/OBGameplayTags.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Character/OBCharacterBase.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Character/OBCharacterBase.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -413,7 +395,7 @@
       <workItem from="1785000628406" duration="3658000" />
       <workItem from="1785037736651" duration="6618000" />
       <workItem from="1785111860550" duration="41000" />
-      <workItem from="1785111946988" duration="18402000" />
+      <workItem from="1785111946988" duration="22955000" />
     </task>
     <servers />
   </component>

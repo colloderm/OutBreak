@@ -53,8 +53,7 @@ void UEnemyMemoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		CurrentTime - LastStimulusTime >=
 		FMath::Max(0.0f, StimulusMemoryDuration))
 	{
-		StimulusType = EEnemyStimulusType::None;
-		LastStimulusLocation = FVector::ZeroVector;
+		ClearStimulusMemory();
 		bMemoryUpdated = true;
 	}
 
@@ -140,8 +139,7 @@ void UEnemyMemoryComponent::UpdateSightMemory(
 
 		if (StimulusType == EEnemyStimulusType::LostSight)
 		{
-			StimulusType = EEnemyStimulusType::None;
-			LastStimulusLocation = FVector::ZeroVector;
+			ClearStimulusMemory();
 		}
 
 		BroadcastMemoryUpdated();
@@ -160,6 +158,8 @@ void UEnemyMemoryComponent::UpdateSightMemory(
 
 	StimulusType = EEnemyStimulusType::LostSight;
 	LastStimulusLocation = LastKnownTargetLocation;
+	LastHeardLocation = FVector::ZeroVector;
+	LastDamageDirection = FVector::ZeroVector;
 	LastStimulusTime = CurrentTime;
 
 	BroadcastMemoryUpdated();
@@ -175,8 +175,10 @@ void UEnemyMemoryComponent::UpdateHearingMemory(
 	}
 
 	StimulusType = EEnemyStimulusType::Hearing;
-	LastStimulusLocation =
+	LastHeardLocation =
 		ResolveStimulusLocation(*UpdatedActor, Stimulus);
+	LastStimulusLocation = LastHeardLocation;
+	LastDamageDirection = FVector::ZeroVector;
 	LastStimulusTime = GetCurrentTimeSeconds();
 
 	BroadcastMemoryUpdated();
@@ -203,9 +205,20 @@ void UEnemyMemoryComponent::UpdateDamageMemory(
 
 	StimulusType = EEnemyStimulusType::Damage;
 	LastStimulusLocation = LastKnownTargetLocation;
+	LastHeardLocation = FVector::ZeroVector;
+	LastDamageDirection =
+		ResolveDamageDirection(*UpdatedActor, Stimulus);
 	LastStimulusTime = CurrentTime;
 
 	BroadcastMemoryUpdated();
+}
+
+void UEnemyMemoryComponent::ClearStimulusMemory()
+{
+	StimulusType = EEnemyStimulusType::None;
+	LastStimulusLocation = FVector::ZeroVector;
+	LastHeardLocation = FVector::ZeroVector;
+	LastDamageDirection = FVector::ZeroVector;
 }
 
 void UEnemyMemoryComponent::BroadcastMemoryUpdated()
@@ -220,6 +233,40 @@ FVector UEnemyMemoryComponent::ResolveStimulusLocation(
 	return FAISystem::IsValidLocation(Stimulus.StimulusLocation)
 		? Stimulus.StimulusLocation
 		: UpdatedActor.GetActorLocation();
+}
+
+FVector UEnemyMemoryComponent::ResolveDamageDirection(
+	const AActor& UpdatedActor,
+	const FAIStimulus& Stimulus) const
+{
+	const FVector DamageSourceLocation =
+		ResolveStimulusLocation(UpdatedActor, Stimulus);
+
+	FVector ReceiverLocation = Stimulus.ReceiverLocation;
+	if (!FAISystem::IsValidLocation(ReceiverLocation))
+	{
+		const AEnemyController* EnemyController =
+			Cast<AEnemyController>(GetOwner());
+		const APawn* ControlledPawn =
+			IsValid(EnemyController)
+				? EnemyController->GetPawn()
+				: nullptr;
+
+		ReceiverLocation = IsValid(ControlledPawn)
+			? ControlledPawn->GetActorLocation()
+			: GetOwner()->GetActorLocation();
+	}
+
+	FVector SourceDirection =
+		(DamageSourceLocation - ReceiverLocation).GetSafeNormal();
+	if (SourceDirection.IsNearlyZero())
+	{
+		SourceDirection =
+			(UpdatedActor.GetActorLocation() - ReceiverLocation)
+			.GetSafeNormal();
+	}
+
+	return SourceDirection;
 }
 
 double UEnemyMemoryComponent::GetCurrentTimeSeconds() const

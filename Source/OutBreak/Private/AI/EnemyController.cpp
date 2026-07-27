@@ -131,12 +131,18 @@ void AEnemyController::InitializeMemoryComponent()
 
 void AEnemyController::Dead()
 {
+	if (bIsDead)
+	{
+		return;
+	}
+
 	bIsDead = true;
 
 	APawn* ControlledPawn = GetPawn();
 	if (IsValid(ControlledPawn))
 	{
 		StopMovement();
+		StopStateTreeLogic(TEXT("Enemy died"));
 		UnPossess();
 	}
 }
@@ -178,6 +184,10 @@ void AEnemyController::BeginPlay()
 void AEnemyController::EndPlay(
 	const EEndPlayReason::Type EndPlayReason)
 {
+	// StateTreeAIComponent requires the possessed Pawn even while stopping.
+	// Stop it before the controller/component teardown can invalidate that context.
+	StopStateTreeLogic(TEXT("Enemy controller EndPlay"));
+
 	if (IsValid(EnemyMemoryComponent))
 	{
 		EnemyMemoryComponent->OnMemoryUpdated.RemoveAll(this);
@@ -191,15 +201,32 @@ void AEnemyController::OnPossess(APawn* InPawn)
 	Super::OnPossess(InPawn);
 
 	if (!ensureAlwaysMsgf(
-		IsValid(StateTreeComponent),
-		TEXT("%s::%s: StateTreeComponent is invalid."),
+		IsValid(StateTreeComponent) &&
+		IsValid(InPawn) &&
+		GetPawn() == InPawn,
+		TEXT(
+			"%s::%s: StateTree cannot start because its component "
+			"or possessed Pawn context is invalid."),
 		*GetClass()->GetName(),
 		TEXT(__FUNCTION__)))
 	{
 		return;
 	}
 
-	StateTreeComponent->StartLogic();
+	if (!StateTreeComponent->IsRunning())
+	{
+		StateTreeComponent->StartLogic();
+	}
+}
+
+void AEnemyController::OnUnPossess()
+{
+	// AAIController clears its Pawn before cleaning up BrainComponent.  That
+	// ordering is too late for StateTreeAIComponent because the Pawn is a
+	// required context object during StopLogic as well as during Tick.
+	StopStateTreeLogic(TEXT("Enemy controller unpossessed"));
+
+	Super::OnUnPossess();
 }
 
 void AEnemyController::Tick(const float DeltaTime)
@@ -235,7 +262,11 @@ void AEnemyController::HandleTargetPerceptionForgotten(
 
 void AEnemyController::HandleMemoryUpdated()
 {
-	if (!IsValid(StateTreeComponent))
+	if (
+		bIsDead ||
+		!IsValid(GetPawn()) ||
+		!IsValid(StateTreeComponent) ||
+		!StateTreeComponent->IsRunning())
 	{
 		return;
 	}
@@ -243,4 +274,14 @@ void AEnemyController::HandleMemoryUpdated()
 	StateTreeComponent->SendStateTreeEvent(
 		FStateTreeEvent(
 			OBGameplayTags::TAG_StateTree_Event_MemoryUpdated));
+}
+
+void AEnemyController::StopStateTreeLogic(const FString& Reason)
+{
+	if (
+		IsValid(StateTreeComponent) &&
+		StateTreeComponent->IsRunning())
+	{
+		StateTreeComponent->StopLogic(Reason);
+	}
 }

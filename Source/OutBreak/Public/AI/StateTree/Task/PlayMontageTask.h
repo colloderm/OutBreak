@@ -54,6 +54,36 @@ struct OUTBREAK_API FSTTPlayMontageTaskInstanceData
 		Category = "Parameter")
 	bool bStopMovementOnEnter = true;
 
+	/** Optional actor to face before the montage starts. */
+	UPROPERTY(
+		EditAnywhere,
+		Category = "Parameter")
+	TObjectPtr<AActor> TargetActor = nullptr;
+
+	/** When enabled, waits until the pawn faces TargetActor before attacking. */
+	UPROPERTY(
+		EditAnywhere,
+		Category = "Parameter")
+	bool bRotateToTargetBeforePlaying = false;
+
+	/** Yaw rotation speed. A value of zero snaps to the target direction. */
+	UPROPERTY(
+		EditAnywhere,
+		Category = "Parameter",
+		meta = (
+			ClampMin = "0.0",
+			EditCondition = "bRotateToTargetBeforePlaying"))
+	float TargetRotationSpeed = 720.0f;
+
+	UPROPERTY(
+		EditAnywhere,
+		Category = "Parameter",
+		meta = (
+			ClampMin = "0.0",
+			ClampMax = "180.0",
+			EditCondition = "bRotateToTargetBeforePlaying"))
+	float TargetFacingTolerance = 2.0f;
+
 	/*
 	 * 공격 중 State가 강제로 종료되면 Montage도 중단한다.
 	 */
@@ -78,6 +108,9 @@ protected:
 
 	UPROPERTY()
 	bool bMontageStarted = false;
+
+	UPROPERTY()
+	bool bWaitingForTargetRotation = false;
 
 	friend struct FSTTPlayMontageTask;
 };
@@ -106,6 +139,14 @@ struct OUTBREAK_API FSTTPlayMontageTask : public FStateTreeAITaskBase
 	virtual void ExitState(
 		FStateTreeExecutionContext& Context,
 		const FStateTreeTransitionResult& Transition) const override;
+
+private:
+	EStateTreeRunStatus StartMontage(
+		FInstanceDataType& InstanceData) const;
+
+	bool RotateTowardTarget(
+		FInstanceDataType& InstanceData,
+		float DeltaTime) const;
 };
 
 

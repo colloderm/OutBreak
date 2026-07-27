@@ -75,6 +75,7 @@ public:
 	}
 	
 	ELocomotionWalkRunState GetLocomotionWalkRunState() const;
+	EEnemyMissingArmState GetMissingArmState() const;
 
 	UMotionWarpingComponent* GetMotionWarpingComponent() const
 	{

@@ -75,6 +75,27 @@ struct OUTBREAK_API FSTEvaluateEnemyAIContextInstanceData
 
 	UPROPERTY(VisibleAnywhere, Category = "Output")
 	FVector LastStimulusLocation = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, Category = "Output")
+	bool bHasHearingStimulus = false;
+
+	UPROPERTY(VisibleAnywhere, Category = "Output")
+	FVector LastHeardLocation = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, Category = "Output")
+	bool bHasDamageStimulus = false;
+
+	/** Unit vector from the damaged enemy toward the source of the hit. */
+	UPROPERTY(VisibleAnywhere, Category = "Output")
+	FVector LastDamageDirection = FVector::ZeroVector;
+
+	UPROPERTY(VisibleAnywhere, Category = "Output")
+	ELocomotionWalkRunState LocomotionState =
+		ELocomotionWalkRunState::Walking;
+
+	UPROPERTY(VisibleAnywhere, Category = "Output")
+	EEnemyMissingArmState MissingArmState =
+		EEnemyMissingArmState::None;
 };
 
 USTRUCT(
@@ -109,6 +130,10 @@ private:
 		FInstanceDataType& InstanceData,
 		AEnemyCharacter* EnemyCharacter);
 
+	static void SynchronizePhysicalState(
+		FInstanceDataType& InstanceData,
+		const AEnemyCharacter& EnemyCharacter);
+
 	static bool SynchronizeMemoryState(
 		FInstanceDataType& InstanceData,
 		const UEnemyMemoryComponent& MemoryComponent);
@@ -122,5 +147,8 @@ private:
 		FInstanceDataType& InstanceData);
 
 	static void ClearMemoryState(
+		FInstanceDataType& InstanceData);
+
+	static void ClearPhysicalState(
 		FInstanceDataType& InstanceData);
 };
