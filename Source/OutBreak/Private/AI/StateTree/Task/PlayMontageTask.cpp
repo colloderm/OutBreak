@@ -5,7 +5,7 @@
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
 #include "Components/SkeletalMeshComponent.h"
-#include "GameFramework/Character.h"
+#include "AI/EnemyCharacter.h"
 #include "StateTreeExecutionContext.h"
 
 EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
@@ -18,7 +18,7 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 	InstanceData.bMontageStarted = false;
 	InstanceData.PlayingAnimInstance.Reset();
 
-	ACharacter* Character = InstanceData.ControlledPawn;
+	AEnemyCharacter* Character = InstanceData.ControlledPawn;
 
 	if (!IsValid(Character) ||
 		!IsValid(InstanceData.AttackMontage))
@@ -26,6 +26,7 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 		return EStateTreeRunStatus::Failed;
 	}
 	
+	Character->
 
 	USkeletalMeshComponent* Mesh = Character->GetMesh();
 

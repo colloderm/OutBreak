@@ -24,6 +24,11 @@
 #include "Character/Animation/OBAnimInstance.h"
 #include "Weapon/Data/OBWeaponData.h"
 
+FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
+{
+	return TeamId;
+}
+
 AOBCharacterBase::AOBCharacterBase()
 {
 	PrimaryActorTick.bCanEverTick = true;

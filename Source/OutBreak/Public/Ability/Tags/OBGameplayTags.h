@@ -64,5 +64,6 @@ namespace OBGameplayTags
 	
 	// AI State Tree
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_StateTree_Event_TargetSighted);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_StateTree_Event_MemoryUpdated);
 	
 }

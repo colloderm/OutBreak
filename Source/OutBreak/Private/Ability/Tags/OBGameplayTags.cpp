@@ -46,5 +46,6 @@ namespace OBGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Item_Grenade,	"Item.Grenade");
 	
 	UE_DEFINE_GAMEPLAY_TAG(TAG_StateTree_Event_TargetSighted, "StateTree>Vent.TargetSighted");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_StateTree_Event_MemoryUpdated, "StateTree.Event.MemoryUpdated");
 	
 }

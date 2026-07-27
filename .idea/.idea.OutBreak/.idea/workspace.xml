@@ -21,25 +21,41 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMemoryComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMemoryComponent.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemySpawnableComponent.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/CharacterMovementTask.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/RandomLocationGen.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Global/OutBreakGlobal.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemySpawnableComponent.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/CharacterMovementTask.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/RandomLocationGen.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Global/OutBreakGlobal.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_Enemy.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_EnemyController.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_EnemyController.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/StateTreeTaskBlueprintBase_New.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/StateTreeTaskBlueprintBase_New.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Animation/ABP_ZombieLoco.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Animation/ABP_ZombieLoco.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/StateTreeTaskBlueprintBase_New.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/BS_Zombie_WalkAndRun.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/BS_Zombie_WalkAndRun.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMemoryComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMemoryComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyPhysicalComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyPhysicalComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PerceptionTask.cpp" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PlayMontageTask.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/PlayMontageTask.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Tags/OBGameplayTags.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Tags/OBGameplayTags.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Character/OBCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Character/OBCharacterBase.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMemoryComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMemoryComponent.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyPhysicalComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyPhysicalComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyState.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyState.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/PlayMontageTask.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/PlayMontageTask.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/UtlitesTask.h" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Tags/OBGameplayTags.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Tags/OBGameplayTags.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Character/OBCharacterBase.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Character/OBCharacterBase.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -56,20 +72,20 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="cidr-memory-view://0" root0="FORCE_HIGHLIGHTING" />
-    <setting file="cidr-memory-view://1" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Classes/Perception/AIPerceptionTypes.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/CoreUObject/Public/UObject/Object.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Components/SceneComponent.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/Engine/EngineTypes.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Private/AIController.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/Controller.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemySpawnableComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Data/EnemyState.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Interface/EnemyComponentInterface.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/CharacterMovementTask.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/InvestingTask.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/RandomLocationGen.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Global/OutBreakGlobal.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/KeyBindableBtn.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -88,10 +104,13 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyBaseActorComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemySpawnableComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyState.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Interface/EnemyComponentInterface.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Nav/EnemyGenNavLinksProxy.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/RandomLocationGen.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/Global/OutBreakGlobal.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" root0="FORCE_HIGHLIGHTING" />
@@ -195,7 +214,7 @@
     &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
     &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
     &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;Temp__Zombie__AI&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;ZombieSystem&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
@@ -393,6 +412,8 @@
       <workItem from="1784911238427" duration="287000" />
       <workItem from="1785000628406" duration="3658000" />
       <workItem from="1785037736651" duration="6618000" />
+      <workItem from="1785111860550" duration="41000" />
+      <workItem from="1785111946988" duration="18402000" />
     </task>
     <servers />
   </component>
@@ -421,8 +442,13 @@
         </breakpoint>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
           <url>file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp</url>
-          <line>6</line>
+          <line>7</line>
           <option name="timeStamp" value="5" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/InvestigatingTask.h</url>
+          <line>4</line>
+          <option name="timeStamp" value="6" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

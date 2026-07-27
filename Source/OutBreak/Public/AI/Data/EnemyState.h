@@ -46,15 +46,3 @@ enum class EEnemyAlertSource : uint8
 	RememberedTarget,
 	Stimulus,
 };
-
-/**
- * Wake-up notification emitted by UEnemyAIMemoryComponent.
- *
- * The notification deliberately does not describe a transition. Consumers
- * must re-read the memory snapshot to decide between Combat, Alert, or Passive.
- */
-UENUM()
-enum class EEnemyMemoryChange : uint8
-{
-	ContextChanged,
-};

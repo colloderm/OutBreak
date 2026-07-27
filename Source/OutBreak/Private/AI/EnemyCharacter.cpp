@@ -12,6 +12,7 @@
 #include "Components/ChildActorComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "MotionWarpingComponent.h"
+#include "AI/EnemyController.h"
 
 #include "AI/Components/EnemyMovementComponent.h"
 #include "AI/Components/EnemyStatusComponent.h"
@@ -21,7 +22,13 @@
 #include "AI/System/ModularSkeletalMeshActor.h"
 
 
+
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
+
+FGenericTeamId AEnemyCharacter::GetGenericTeamId() const
+{
+	return TeamId;
+}
 
 AEnemyCharacter::AEnemyCharacter(
 	const FObjectInitializer& ObjectInitializer)
@@ -36,6 +43,7 @@ AEnemyCharacter::AEnemyCharacter(
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	
 
 	InitializeComponents();
 	/*
@@ -280,7 +288,12 @@ void AEnemyCharacter::StopCharacterMovement()
 
 void AEnemyCharacter::Dead()
 {
-	Destroy();
+	AEnemyController* EnemyContoller = Cast<AEnemyController>(GetController());
+	if (IsValid(EnemyContoller))
+	{
+		EnemyContoller->Dead();
+	}
+	GetMesh()->SetSimulatePhysics(true);
 }
 
 void AEnemyCharacter::SetAnimationSignificance(

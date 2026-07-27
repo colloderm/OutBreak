@@ -1,138 +1,180 @@
 #include "AI/StateTree/Evaluator/ST_EvaluateEnemyAIContext.h"
 
-#include "AI/Components/EnemyStatusComponent.h"
-#include "AI/Data/EnemyAsset.h"
+#include "AI/Components/EnemyMemoryComponent.h"
 #include "AI/EnemyCharacter.h"
 #include "AI/EnemyController.h"
 #include "StateTreeExecutionContext.h"
-//
-// void FSTEvaluateEnemyAIContext::TreeStart(FStateTreeExecutionContext& Context) const
-// {
-// 	UpdateContext(Context);
-// }
-//
-// void FSTEvaluateEnemyAIContext::Tick(
-// 	FStateTreeExecutionContext& Context,
-// 	const float DeltaTime) const
-// {
-// 	UpdateContext(Context);
-// }
-//
-// void FSTEvaluateEnemyAIContext::UpdateContext(FStateTreeExecutionContext& Context) const
-// {
-// 	FInstanceDataType& Data = Context.GetInstanceData(*this);
-// 	AEnemyCharacter* Character = Cast<AEnemyCharacter>(Data.ContextActor.Get());
-// 	AEnemyController* Controller = Cast<AEnemyController>(Data.AIController.Get());
-// 	if (!IsValid(Character) && IsValid(Controller))
-// 	{
-// 		Character = Cast<AEnemyCharacter>(Controller->GetPawn());
-// 	}
-// 	if (!IsValid(Controller) && IsValid(Character))
-// 	{
-// 		Controller = Cast<AEnemyController>(Character->GetController());
-// 	}
-//
-// 	if (!IsValid(Character) || !IsValid(Controller))
-// 	{
-// 		ClearOutputs(Data);
-// 		return;
-// 	}
-//
-// 	ClearOutputs(Data);
-// 	const FVector CharacterLocation = Character->GetActorLocation();
-//
-// 	if (const UEnemyAIMemoryComponent* Memory = Controller->GetMemoryComponent(); IsValid(Memory))
-// 	{
-// 		Data.RememberedTargetActor = Memory->GetTargetActor();
-// 		Data.bHasRememberedTarget = Memory->HasValidTarget();
-// 		Data.bTargetVisible = Memory->IsTargetVisible();
-// 		Data.TargetActor = Data.bTargetVisible ? Memory->GetTargetActor() : nullptr;
-// 		// Compatibility safety: legacy StateTree branches commonly bind this
-// 		// property as the Combat guard, so hidden remembered targets must be false.
-// 		Data.bHasValidTarget = Data.bTargetVisible;
-// 		Data.LastKnownTargetLocation = Memory->GetLastKnownTargetLocation();
-// 		Data.TimeSinceTargetSeen = Memory->GetTimeSinceTargetSeen();
-//
-// 		Data.bHasStimulus = Memory->HasActionableStimulus();
-// 		Data.LastStimulusLocation = Memory->GetLastStimulusLocation();
-// 		Data.StimulusType = Memory->GetStimulusType();
-// 	}
-//
-// 	Data.bShouldEnterCombat = Data.bTargetVisible;
-// 	Data.bShouldEnterAlert = !Data.bTargetVisible &&
-// 		(Data.bHasRememberedTarget || Data.bHasStimulus);
-// 	Data.bShouldEnterPassive = !Data.bShouldEnterCombat && !Data.bShouldEnterAlert;
-// 	if (Data.bShouldEnterAlert)
-// 	{
-// 		if (Data.bHasRememberedTarget)
-// 		{
-// 			Data.AlertLocation = Data.LastKnownTargetLocation;
-// 			Data.bHasAlertLocation = true;
-// 			Data.AlertSource = EEnemyAlertSource::RememberedTarget;
-// 		}
-// 		else if (Data.bHasStimulus)
-// 		{
-// 			Data.AlertLocation = Data.LastStimulusLocation;
-// 			Data.bHasAlertLocation = true;
-// 			Data.AlertSource = EEnemyAlertSource::Stimulus;
-// 		}
-// 	}
-//
-// 	if (Data.bHasRememberedTarget)
-// 	{
-// 		const FVector Offset = Data.LastKnownTargetLocation - CharacterLocation;
-// 		Data.TargetDistance = FVector(Offset.X, Offset.Y, 0.0f).Size();
-// 		Data.TargetHeightDifference = Offset.Z;
-//
-// 		if (const UEnemyAsset* Asset = Character->GetEnemyAsset(); IsValid(Asset))
-// 		{
-// 			const FEnemyCombatSettings& Combat = Asset->GetCombatSettings();
-// 			Data.bTargetInAttackRange = Data.bTargetVisible &&
-// 				Data.TargetDistance <= Combat.AttackRange &&
-// 				FMath::Abs(Data.TargetHeightDifference) <= Combat.MaxAttackHeightDifference;
-// 		}
-// 	}
-//
-// 	if (const UEnemyStatusComponent* Status = Character->GetStatusComponent(); IsValid(Status))
-// 	{
-// 		Data.ActionState = Status->GetActionState();
-// 		Data.bIsDead = Status->IsDead();
-// 		Data.bIsKnockedDown = Data.ActionState == EEnemyActionState::Knockdown;
-// 		Data.bIsStunned = Data.ActionState == EEnemyActionState::Stunned;
-// 	}
-//
-// 	if (const UEnemyTerritoryComponent* Territory = Character->GetTerritoryComponent(); IsValid(Territory))
-// 	{
-// 		Data.HomeLocation = Territory->GetHomeLocation();
-// 		Data.bOutsideTerritory = Territory->IsOutsideTerritory(CharacterLocation);
-// 	}
-// }
-//
-// void FSTEvaluateEnemyAIContext::ClearOutputs(FInstanceDataType& Data)
-// {
-// 	Data.TargetActor = nullptr;
-// 	Data.RememberedTargetActor = nullptr;
-// 	Data.LastKnownTargetLocation = FVector::ZeroVector;
-// 	Data.bHasValidTarget = false;
-// 	Data.bHasRememberedTarget = false;
-// 	Data.bTargetVisible = false;
-// 	Data.bShouldEnterCombat = false;
-// 	Data.bShouldEnterAlert = false;
-// 	Data.bShouldEnterPassive = true;
-// 	Data.bTargetInAttackRange = false;
-// 	Data.TargetDistance = 0.0f;
-// 	Data.TargetHeightDifference = 0.0f;
-// 	Data.TimeSinceTargetSeen = 0.0f;
-// 	Data.bHasStimulus = false;
-// 	Data.LastStimulusLocation = FVector::ZeroVector;
-// 	Data.StimulusType = EEnemyStimulusType::None;
-// 	Data.AlertLocation = FVector::ZeroVector;
-// 	Data.bHasAlertLocation = false;
-// 	Data.AlertSource = EEnemyAlertSource::None;
-// 	Data.ActionState = EEnemyActionState::Active;
-// 	Data.bIsDead = false;
-// 	Data.bIsKnockedDown = false;
-// 	Data.bIsStunned = false;
-// 	Data.HomeLocation = FVector::ZeroVector;
-// 	Data.bOutsideTerritory = false;
-// }
+
+void FSTEvaluateEnemyAIContext::TreeStart(
+	FStateTreeExecutionContext& Context) const
+{
+	UpdateContext(Context);
+}
+
+void FSTEvaluateEnemyAIContext::Tick(
+	FStateTreeExecutionContext& Context,
+	const float /*DeltaTime*/) const
+{
+	UpdateContext(Context);
+}
+
+void FSTEvaluateEnemyAIContext::UpdateContext(
+	FStateTreeExecutionContext& Context) const
+{
+	FInstanceDataType& InstanceData =
+		Context.GetInstanceData(*this);
+
+	AEnemyCharacter* EnemyCharacter =
+		InstanceData.ContextActor.Get();
+
+	if (!IsValid(EnemyCharacter))
+	{
+		ClearMemoryState(InstanceData);
+		return;
+	}
+
+	UEnemyMemoryComponent* MemoryComponent =
+		ResolveMemoryComponent(
+			InstanceData,
+			EnemyCharacter);
+
+	if (!IsValid(MemoryComponent))
+	{
+		ClearMemoryState(InstanceData);
+		return;
+	}
+
+	if (!SynchronizeMemoryState(
+		InstanceData,
+		*MemoryComponent))
+	{
+		return;
+	}
+
+	AActor* TargetActor =
+		InstanceData.TargetActor.Get();
+
+	if (!IsValid(TargetActor))
+	{
+		ClearTargetState(InstanceData);
+		return;
+	}
+
+	UpdateSpatialState(
+		InstanceData,
+		*EnemyCharacter,
+		*TargetActor);
+}
+
+UEnemyMemoryComponent*
+FSTEvaluateEnemyAIContext::ResolveMemoryComponent(
+	FInstanceDataType& InstanceData,
+	AEnemyCharacter* EnemyCharacter)
+{
+	UEnemyMemoryComponent* MemoryComponent =
+		InstanceData.MemoryComponent.Get();
+
+	if (IsValid(MemoryComponent))
+	{
+		return MemoryComponent;
+	}
+
+	AEnemyController* EnemyController =
+		InstanceData.AIController.Get();
+
+	if (!IsValid(EnemyController) && IsValid(EnemyCharacter))
+	{
+		EnemyController =
+			Cast<AEnemyController>(
+				EnemyCharacter->GetController());
+		InstanceData.AIController = EnemyController;
+	}
+
+	if (!IsValid(EnemyController))
+	{
+		return nullptr;
+	}
+
+	MemoryComponent =
+		EnemyController->GetEnemyMemoryComponent();
+	InstanceData.MemoryComponent = MemoryComponent;
+
+	return MemoryComponent;
+}
+
+bool FSTEvaluateEnemyAIContext::SynchronizeMemoryState(
+	FInstanceDataType& InstanceData,
+	const UEnemyMemoryComponent& MemoryComponent)
+{
+	InstanceData.bHasActionableStimulus =
+		MemoryComponent.HasActionableStimulus();
+	InstanceData.StimulusType =
+		MemoryComponent.GetStimulusType();
+	InstanceData.LastStimulusLocation =
+		MemoryComponent.GetLastStimulusLocation();
+
+	if (!MemoryComponent.HasValidTarget())
+	{
+		ClearTargetState(InstanceData);
+		return false;
+	}
+
+	InstanceData.TargetActor =
+		MemoryComponent.GetTargetActor();
+	InstanceData.LastKnownTargetLocation =
+		MemoryComponent.GetLastKnownTargetLocation();
+	InstanceData.bHasValidTarget = true;
+	InstanceData.bTargetVisible =
+		MemoryComponent.IsTargetVisible();
+	InstanceData.TimeSinceTargetSeen =
+		MemoryComponent.GetTimeSinceTargetSeen();
+
+	return true;
+}
+
+void FSTEvaluateEnemyAIContext::UpdateSpatialState(
+	FInstanceDataType& InstanceData,
+	const AEnemyCharacter& EnemyCharacter,
+	const AActor& TargetActor)
+{
+	const FVector EvaluationTargetLocation =
+		InstanceData.bTargetVisible
+			? TargetActor.GetActorLocation()
+			: InstanceData.LastKnownTargetLocation;
+
+	const FVector SelfToTarget =
+		EvaluationTargetLocation -
+		EnemyCharacter.GetActorLocation();
+
+	InstanceData.TargetDistance =
+		SelfToTarget.Size2D();
+	InstanceData.TargetHeightDifference =
+		SelfToTarget.Z;
+	InstanceData.bTargetInAttackRange =
+		InstanceData.bTargetVisible &&
+		InstanceData.TargetDistance <=
+			FMath::Max(0.0f, InstanceData.AttackRange);
+}
+
+void FSTEvaluateEnemyAIContext::ClearTargetState(
+	FInstanceDataType& InstanceData)
+{
+	InstanceData.TargetActor = nullptr;
+	InstanceData.LastKnownTargetLocation = FVector::ZeroVector;
+	InstanceData.bHasValidTarget = false;
+	InstanceData.bTargetVisible = false;
+	InstanceData.bTargetInAttackRange = false;
+	InstanceData.TargetDistance = 0.0f;
+	InstanceData.TargetHeightDifference = 0.0f;
+	InstanceData.TimeSinceTargetSeen = 0.0f;
+}
+
+void FSTEvaluateEnemyAIContext::ClearMemoryState(
+	FInstanceDataType& InstanceData)
+{
+	ClearTargetState(InstanceData);
+	InstanceData.MemoryComponent = nullptr;
+	InstanceData.bHasActionableStimulus = false;
+	InstanceData.StimulusType = EEnemyStimulusType::None;
+	InstanceData.LastStimulusLocation = FVector::ZeroVector;
+}

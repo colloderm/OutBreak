@@ -10,6 +10,8 @@
 
 
 
+
+
 USTRUCT(BlueprintType)
 struct FLimbData
 {
@@ -59,8 +61,7 @@ public:
 private:
 	void ActionLimb(UStaticMesh* MeshAsset, FName BoneName, float Damage);
 	
-	
-	float Health = 200.f;
+	float Health = 175.f;
 	
 	FTimeline ReactTimeline;
 	FName CacheBoneName = NAME_None;

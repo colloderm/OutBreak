@@ -1,34 +1,41 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "AI/EnemyController.h"
 
+#include "AI/Components/EnemyMemoryComponent.h"
+#include "AI/EnemyCharacter.h"
+#include "Ability/Tags/OBGameplayTags.h"
+#include "Character/OBCharacterBase.h"
 #include "Components/StateTreeAIComponent.h"
 #include "Perception/AIPerceptionComponent.h"
-#include "AI/Components/EnemyMemoryComponent.h"
-
-#include "Perception/AISense.h"
 #include "Perception/AISense_Sight.h"
-#include "Perception/AISense_Hearing.h"
-#include "Perception/AISense_Damage.h"
-
-#include "Perception/AISenseConfig_Sight.h"
-#include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Damage.h"
-
-#include "Ability/Tags/OBGameplayTags.h"
+#include "Perception/AISenseConfig_Hearing.h"
+#include "Perception/AISenseConfig_Sight.h"
 #include "StateTreeEvents.h"
-#include "Evaluation/IMovieSceneEvaluationHook.h"
 
-
-// Sets default values
 AEnemyController::AEnemyController()
 {
-	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-	
+
+	SetGenericTeamId(FGenericTeamId(2));
 	InitializeComponents();
-	
+}
+
+ETeamAttitude::Type AEnemyController::GetTeamAttitudeTowards(
+	const AActor& Other) const
+{
+	if (Other.IsA<AEnemyCharacter>())
+	{
+		return ETeamAttitude::Friendly;
+	}
+
+	if (Other.IsA<AOBCharacterBase>())
+	{
+		return ETeamAttitude::Hostile;
+	}
+
+	return ETeamAttitude::Neutral;
 }
 
 void AEnemyController::InitializeComponents()
@@ -40,214 +47,200 @@ void AEnemyController::InitializeComponents()
 
 void AEnemyController::InitializeStateTree()
 {
-	StateTreeComponent = CreateDefaultSubobject<UStateTreeAIComponent>(TEXT("StateTreeComponent"));
-	
-	/* Brain Component로 지정. */
+	StateTreeComponent =
+		CreateDefaultSubobject<UStateTreeAIComponent>(
+			TEXT("StateTreeComponent"));
+
 	BrainComponent = StateTreeComponent;
-	
-	/* Pawn Possess 이후 명시적으로 시작하기 위해 자동 시작을 비활성화. */
 	StateTreeComponent->SetStartLogicAutomatically(false);
 }
 
 void AEnemyController::InitializeAIPerception()
 {
-	AIPerceptionComponent = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("AIPerception"));
-	
+	AIPerceptionComponent =
+		CreateDefaultSubobject<UAIPerceptionComponent>(
+			TEXT("AIPerception"));
+
 	SetPerceptionComponent(*AIPerceptionComponent);
-	
-	/* ================================ Sight Setting ================================ */
-	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
-	
+
+	SightConfig =
+		CreateDefaultSubobject<UAISenseConfig_Sight>(
+			TEXT("SightConfig"));
 	SightConfig->SightRadius = 2500.0f;
-	SightConfig->LoseSightRadius = SightConfig->SightRadius * 2;
-	
-	SightConfig->PeripheralVisionAngleDegrees = 70.f;
-	
-	SightConfig->SetMaxAge(3.f);
-	
+	SightConfig->LoseSightRadius = SightConfig->SightRadius * 2.0f;
+	SightConfig->PeripheralVisionAngleDegrees = 70.0f;
+	SightConfig->SetMaxAge(3.0f);
 	SightConfig->DetectionByAffiliation.bDetectEnemies = true;
-	SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
-	SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
-	/* =============================================================================== */
-	
-	/* ================================ Hearing Setting ================================ */
-	HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("HearingConfig"));
-	
-	HearingConfig->HearingRange = 3500.f;
-	HearingConfig->SetMaxAge(5.f);
-	
+	SightConfig->DetectionByAffiliation.bDetectFriendlies = false;
+	SightConfig->DetectionByAffiliation.bDetectNeutrals = false;
+
+	HearingConfig =
+		CreateDefaultSubobject<UAISenseConfig_Hearing>(
+			TEXT("HearingConfig"));
+	HearingConfig->HearingRange = 3500.0f;
+	HearingConfig->SetMaxAge(5.0f);
 	HearingConfig->DetectionByAffiliation.bDetectEnemies = true;
 	HearingConfig->DetectionByAffiliation.bDetectFriendlies = true;
 	HearingConfig->DetectionByAffiliation.bDetectNeutrals = true;
-	/* =============================================================================== */
-	
-	/* ================================ Damage Setting ================================ */
-	DamageConfig = CreateDefaultSubobject<UAISenseConfig_Damage>(TEXT("DamageConfig"));
-	
-	DamageConfig->SetMaxAge(10.f);
-	/* =============================================================================== */
-	
+
+	DamageConfig =
+		CreateDefaultSubobject<UAISenseConfig_Damage>(
+			TEXT("DamageConfig"));
+	DamageConfig->SetMaxAge(10.0f);
+
 	AIPerceptionComponent->ConfigureSense(*SightConfig);
 	AIPerceptionComponent->ConfigureSense(*HearingConfig);
 	AIPerceptionComponent->ConfigureSense(*DamageConfig);
-	
-	/* 
-	 * 여러 감각이 같은 액터를 감지했을 때 
-	 * 시야에서 얻은 위치를 우선 사용합니다.
-	 */
-	AIPerceptionComponent->SetDominantSense(UAISense_Sight::StaticClass());
+	AIPerceptionComponent->SetDominantSense(
+		UAISense_Sight::StaticClass());
 }
 
-// Called when the game starts or when spawned
-void AEnemyController::BeginPlay()
+void AEnemyController::ApplySightAffiliationFilter()
 {
-	Super::BeginPlay();
-
-	if (!ensureAlwaysMsgf(IsValid(AIPerceptionComponent),
-	                      TEXT("%s::%s: AIPerceptionComponent is invalid or missing."),
-	                      *GetClass()->GetName(),
-	                      TEXT(__FUNCTION__)))
-	{
-		UE_LOG(LogTemp, Fatal, TEXT("%s::%s : AI Perception Component is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-	}
-	
-	AIPerceptionComponent->OnTargetPerceptionUpdated.AddUniqueDynamic(
-		this,
-		&AEnemyController::HandleTargetPerceptionUpdated);
-	
-	AIPerceptionComponent->OnTargetPerceptionForgotten.AddUniqueDynamic(
-		this,
-		&AEnemyController::HandleTargetPerceptionForgotten);
-	
-}
-
-void AEnemyController::OnPossess(APawn* inPawn)
-{
-	Super::OnPossess(inPawn);
-
-	if (!ensureAlwaysMsgf(IsValid(StateTreeComponent),
-	                      TEXT("%s::%s: StateTree Component is invalid."),
-	                      *GetClass()->GetName(),
-	                      TEXT(__FUNCTION__)))
+	if (!IsValid(AIPerceptionComponent))
 	{
 		return;
 	}
-	
-	StateTreeComponent->StartLogic();
-}
 
-// Called every frame
-void AEnemyController::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
+	UAISenseConfig_Sight* ActiveSightConfig =
+		AIPerceptionComponent->GetSenseConfig<UAISenseConfig_Sight>();
+
+	if (!IsValid(ActiveSightConfig))
+	{
+		ActiveSightConfig = SightConfig.Get();
+	}
+
+	if (!IsValid(ActiveSightConfig))
+	{
+		return;
+	}
+
+	ActiveSightConfig->DetectionByAffiliation.bDetectEnemies = true;
+	ActiveSightConfig->DetectionByAffiliation.bDetectFriendlies = false;
+	ActiveSightConfig->DetectionByAffiliation.bDetectNeutrals = false;
+	AIPerceptionComponent->ConfigureSense(*ActiveSightConfig);
 }
 
 void AEnemyController::InitializeMemoryComponent()
 {
-	EnemyMemoryComponent = CreateDefaultSubobject<UEnemyMemoryComponent>(TEXT("MemoryComponet"));
-	
-	
+	// Keep the existing subobject name for Blueprint template compatibility.
+	EnemyMemoryComponent =
+		CreateDefaultSubobject<UEnemyMemoryComponent>(
+			TEXT("MemoryComponet"));
 }
 
-
-void AEnemyController::HandleTargetPerceptionUpdated(AActor* UpdatedActor, FAIStimulus Stimulus)
+void AEnemyController::Dead()
 {
-	if (!IsValid(UpdatedActor))
+	bIsDead = true;
+
+	APawn* ControlledPawn = GetPawn();
+	if (IsValid(ControlledPawn))
+	{
+		StopMovement();
+		UnPossess();
+	}
+}
+
+void AEnemyController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (!ensureAlwaysMsgf(
+		IsValid(AIPerceptionComponent),
+		TEXT("%s::%s: AIPerceptionComponent is invalid or missing."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
 	{
 		return;
 	}
-	
-	/*
-	 * 이 자극이 Sight, Hearing, Damage 중
-	 * 어느 Sense에서 발생했는지 구분합니다.
-	 */
-	const TSubclassOf<UAISense> SenseClass = 
-		UAIPerceptionSystem::GetSenseClassForStimulus(
+
+	ApplySightAffiliationFilter();
+
+	AIPerceptionComponent->OnTargetPerceptionUpdated.AddUniqueDynamic(
+		this,
+		&AEnemyController::HandleTargetPerceptionUpdated);
+	AIPerceptionComponent->OnTargetPerceptionForgotten.AddUniqueDynamic(
+		this,
+		&AEnemyController::HandleTargetPerceptionForgotten);
+
+	if (ensureAlwaysMsgf(
+		IsValid(EnemyMemoryComponent),
+		TEXT("%s::%s: EnemyMemoryComponent is invalid."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
+	{
+		EnemyMemoryComponent->OnMemoryUpdated.AddUObject(
 			this,
-			Stimulus);
-	
-	if (SenseClass == UAISense_Sight::StaticClass())
-	{
-		HandleSightStimulus(UpdatedActor, Stimulus);
-		return;
-	}
-	
-	if (SenseClass == UAISense_Hearing::StaticClass())
-	{
-		HandleHearingStimulus(UpdatedActor, Stimulus);
-		return;
-	}
-	
-	if (SenseClass == UAISense_Damage::StaticClass())
-	{
-		HandleDamageStimulus(UpdatedActor, Stimulus);
-		return;
+			&AEnemyController::HandleMemoryUpdated);
 	}
 }
 
-void AEnemyController::HandleTargetPerceptionForgotten(AActor* UpdatedActor)
+void AEnemyController::EndPlay(
+	const EEndPlayReason::Type EndPlayReason)
 {
-	if (IsValid(PerceptionTarget))
+	if (IsValid(EnemyMemoryComponent))
 	{
-		if (PerceptionTarget == UpdatedActor)
-		{
-			PerceptionTarget = nullptr;
-			bHasPerceptionTarget = false;
-		}
+		EnemyMemoryComponent->OnMemoryUpdated.RemoveAll(this);
 	}
-	
+
+	Super::EndPlay(EndPlayReason);
 }
 
-void AEnemyController::HandleSightStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus)
+void AEnemyController::OnPossess(APawn* InPawn)
 {
-	if (Stimulus.WasSuccessfullySensed())
-	{
-		PerceptionTarget = UpdatedActor;
-		bHasPerceptionTarget= true;
-		LastKnownTargetLocation = Stimulus.StimulusLocation;
-		AlertState = EEnemyAlertState::Combat;
-	}
-	else
-	{
-		bCanSeeTarget = false;
-		LastKnownTargetLocation = Stimulus.StimulusLocation;
-		
-		if (IsValid(PerceptionTarget))
-		{
-			StateTreeComponent->SendStateTreeEvent(
-			FStateTreeEvent(
-				OBGameplayTags::TAG_StateTree_Event_TargetSighted));
-			AlertState = EEnemyAlertState::Chase;
-		}
-	}
-}
+	Super::OnPossess(InPawn);
 
-void AEnemyController::HandleHearingStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus)
-{
-	if (!Stimulus.WasSuccessfullySensed())
+	if (!ensureAlwaysMsgf(
+		IsValid(StateTreeComponent),
+		TEXT("%s::%s: StateTreeComponent is invalid."),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__)))
 	{
 		return;
 	}
-	
-	LastKnownTargetLocation = Stimulus.StimulusLocation;
-	
-	if (!bCanSeeTarget)
-	{
-		AlertState = EEnemyAlertState::Investigating;
-	}
+
+	StateTreeComponent->StartLogic();
 }
 
-void AEnemyController::HandleDamageStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus)
+void AEnemyController::Tick(const float DeltaTime)
 {
-	if (!Stimulus.WasSuccessfullySensed())
+	Super::Tick(DeltaTime);
+}
+
+void AEnemyController::HandleTargetPerceptionUpdated(
+	AActor* UpdatedActor,
+	FAIStimulus Stimulus)
+{
+	if (!IsValid(EnemyMemoryComponent))
 	{
 		return;
 	}
-	
-	PerceptionTarget = UpdatedActor;
-	LastKnownTargetLocation = Stimulus.StimulusLocation;
-	AlertState = EEnemyAlertState::Combat;
+
+	EnemyMemoryComponent->UpdateFromPerception(
+		UpdatedActor,
+		Stimulus);
 }
 
+void AEnemyController::HandleTargetPerceptionForgotten(
+	AActor* UpdatedActor)
+{
+	if (!IsValid(EnemyMemoryComponent))
+	{
+		return;
+	}
 
+	EnemyMemoryComponent->HandlePerceptionForgotten(
+		UpdatedActor);
+}
 
+void AEnemyController::HandleMemoryUpdated()
+{
+	if (!IsValid(StateTreeComponent))
+	{
+		return;
+	}
+
+	StateTreeComponent->SendStateTreeEvent(
+		FStateTreeEvent(
+			OBGameplayTags::TAG_StateTree_Event_MemoryUpdated));
+}

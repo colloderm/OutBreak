@@ -10,6 +10,7 @@
  * 
  */
 
+class AEnemyCharacter;
 class AActor;
 class APawn;
 class UAnimInstance;
@@ -23,7 +24,7 @@ struct OUTBREAK_API FSTTPlayMontageTaskInstanceData
 	UPROPERTY(
 		EditAnywhere,
 		Category = "Context")
-	TObjectPtr<ACharacter> ControlledPawn = nullptr;
+	TObjectPtr<AEnemyCharacter> ControlledPawn = nullptr;
 	
 	/*
 	 * 재생할 공격 Montage.
