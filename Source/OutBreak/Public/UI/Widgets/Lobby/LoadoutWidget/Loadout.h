@@ -7,6 +7,7 @@
 #include "Weapon/Data/OBWeaponTypes.h"
 #include "Loadout.generated.h"
 
+class UOBWeaponCatalog;
 class ULoadoutSelectionList;
 class ULoadoutSelectionView;
 class UOBLoadoutSubsystem;
@@ -41,6 +42,10 @@ public:
 	// 기동성 바 하한. 이 배율이 빈 바, 1.0이 꽉 찬 바.
 	UPROPERTY(EditAnywhere, Category = "Loadout") 
 	float MinMobilityMultiplier = 0.6f;
+	
+	// 스타터 지급 판정용. WBP_Loadout Class Defaults에 DA_WeaponCatalog 지정.
+	UPROPERTY(EditAnywhere, Category = "Loadout")
+	TObjectPtr<UOBWeaponCatalog> WeaponCatalog;
 	
 protected:
 	virtual void NativeConstruct() override;

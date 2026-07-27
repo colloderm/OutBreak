@@ -30,6 +30,7 @@ void AOBShopNPC::OpenShop()
 	ActiveShop->OnShopCloseRequested.AddDynamic(this, &AOBShopNPC::OnShopClosed);
 
 	ActiveShop->AddToViewport();
+	Loadout->GrantStarterIfEmpty(WeaponCatalog);
 	ActiveShop->InitializeShop(Loadout->BuildShopView(WeaponCatalog));
 
 	FInputModeUIOnly Mode;

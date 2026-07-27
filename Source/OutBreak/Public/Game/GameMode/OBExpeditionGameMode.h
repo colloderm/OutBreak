@@ -6,6 +6,7 @@
 #include "OBGameModeBase.h"
 #include "OBExpeditionGameMode.generated.h"
 
+class AOBPlayerStateBase;
 class AOBExtractionZone;
 class UOBExpeditionMapCatalog;
 class AOBExpeditionSpawnZone;
@@ -56,6 +57,14 @@ public:
 	virtual bool ShouldEnterDownedState(AController* C) const override; // 팀 생존자 존재?
 	virtual void NotifyPlayerDowned(AController* C) override;           // 블리드아웃 시작
 	void RevivePlayer(AController* C);
+	
+	bool HasLivingTeammate(AController* C) const;
+	
+	// 해당 팀의 살아있는 멤버(관전 대상 후보). PlayerArray 순서라 순환이 안정적.
+	TArray<AOBPlayerStateBase*> GetLivingTeammates(uint8 TeamId) const;
+
+	// 팀 생존자 구성이 바뀔 때 호출 → 그 팀 사망자들의 관전 대상/전멸 화면 갱신.
+	void UpdateSpectatorsForTeam(uint8 TeamId);
 	
 protected:
 	virtual void StartPlay() override;
@@ -163,7 +172,6 @@ protected:
 private:
 	void FinishDownedPlayer(AController* C);   // 블리드아웃/전멸 → 사망 확정
 	void CheckTeamWipe(uint8 TeamId);          // 팀에 Alive 0명이면 다운자 전원 사망
-	bool HasLivingTeammate(AController* C) const;
 
 private:	
 	FTimerHandle SessionTimerHandle;

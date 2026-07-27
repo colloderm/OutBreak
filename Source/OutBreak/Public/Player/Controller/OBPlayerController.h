@@ -86,6 +86,9 @@ protected:
 	void ShowExtractScreen();
 	void HideDeathScreen();
 	
+	void ShowSpectatorHUD();
+	void HideSpectatorHUD();
+	
 	//~ Expedition 세션 종료(결과 → Home 복귀) --------------------
 	void BindToGameStatePhase();   // GameState 준비 대기 후 페이즈 구독
 	UFUNCTION()
@@ -164,6 +167,13 @@ protected:
 	// 현재 떠 있는 사망 위젯(중복 방지/제거).
 	UPROPERTY()
 	TObjectPtr<UUserWidget> ActiveDeathWidget;
+	
+	// 관전 중 표시할 위젯(WBP_SpectatorHUD).
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	TSubclassOf<UUserWidget> SpectatorHUDWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> ActiveSpectatorWidget;
 
 	// PS 델리게이트 중복 바인딩 방지 플래그.
 	bool bExpeditionStatusBound = false;
@@ -194,6 +204,30 @@ public:
 	// 범위 내 상호작용 대상 등록(액터가 호출).
 	void SetCurrentInteractable(AOBInteractableActor* Interactable);
 	AOBInteractableActor* GetCurrentInteractable() const;
+	
+	//~ Expedition 관전 -------------------------------------------
+	// 서버 → 클라: 관전 시작(팀원 생존).
+	UFUNCTION(Client, Reliable)
+	void ClientBeginSpectate();
+
+	// 서버 → 클라: 팀 전멸 → 관전 종료 + 사망(홈 복귀) 화면.
+	UFUNCTION(Client, Reliable)
+	void ClientTeamWiped();
+
+	// 클라 → 서버: 관전 대상 순환. 후보는 서버가 정하므로 적 팀은 볼 수 없다.
+	UFUNCTION(Server, Reliable)
+	void ServerCycleSpectateTarget(int32 Direction);
+
+	// 관전 HUD 버튼용.
+	UFUNCTION(BlueprintCallable, Category = "Expedition")
+	void SpectateNext() { ServerCycleSpectateTarget(+1); }
+
+	UFUNCTION(BlueprintCallable, Category = "Expedition")
+	void SpectatePrev() { ServerCycleSpectateTarget(-1); }
+
+	// 관전 HUD의 "관전 중: <이름>" 표시용.
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	FString GetSpectateTargetName() const;
 	
 	// 결과창 버튼/자동타이머가 호출 → 데디 종료 후 로컬 Home 로드.
 	UFUNCTION(BlueprintCallable, Category = "Expedition")

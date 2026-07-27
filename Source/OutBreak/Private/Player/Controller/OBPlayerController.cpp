@@ -22,6 +22,7 @@
 #include "Party/OBPartySubsystem.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "TimerManager.h"
+#include "Game/GameMode/OBExpeditionGameMode.h"
 
 void AOBPlayerController::BeginPlay()
 {
@@ -346,7 +347,6 @@ void AOBPlayerController::HandleExpeditionStatusChanged()
 	switch (PS->GetExpeditionStatus())
 	{
 	case EOBPlayerExpeditionStatus::Dead:
-		ShowDeathScreen();
 		break;
 	case EOBPlayerExpeditionStatus::Extracted:
 		ShowExtractScreen();   // 사망화면과 동일 패턴, 위젯만 다름
@@ -362,6 +362,8 @@ void AOBPlayerController::ShowDeathScreen()
 	if (ActiveDeathWidget) return; // 이미 표시 중
 	
 	DisableInput(this); // 로컬 이동/사격 에측 차단(서버는 이미 차단)
+	SetShowMouseCursor(true);
+	SetInputMode(FInputModeUIOnly());
 	
 	if (DeathScreenWidgetClass)
 	{
@@ -398,6 +400,82 @@ void AOBPlayerController::HideDeathScreen()
 	}
 	
 	EnableInput(this);
+}
+
+void AOBPlayerController::ClientBeginSpectate_Implementation()
+{
+	ShowSpectatorHUD();
+}
+
+void AOBPlayerController::ClientTeamWiped_Implementation()
+{
+	HideSpectatorHUD();
+	ShowDeathScreen();   // 여기서만 홈 복귀 버튼이 있는 화면이 뜬다
+}
+
+void AOBPlayerController::ShowSpectatorHUD()
+{
+	if (ActiveSpectatorWidget) return; // 중복 방지
+	
+	// 죽었으니 게임플레이 입력은 잠그고 HUD 버튼만 받는다.
+	DisableInput(this);
+	SetShowMouseCursor(true);
+	SetInputMode(FInputModeGameAndUI());
+	
+	if (SpectatorHUDWidgetClass)
+	{
+		ActiveSpectatorWidget = CreateWidget<UUserWidget>(this, SpectatorHUDWidgetClass);
+		if (ActiveSpectatorWidget)
+		{
+			ActiveSpectatorWidget->AddToViewport(50);
+		}
+	}
+}
+
+void AOBPlayerController::HideSpectatorHUD()
+{
+	if (ActiveSpectatorWidget)
+	{
+		ActiveSpectatorWidget->RemoveFromParent();
+		ActiveSpectatorWidget = nullptr;
+	}
+}
+
+void AOBPlayerController::ServerCycleSpectateTarget_Implementation(int32 Direction)
+{
+	AOBPlayerStateBase* MyPS = GetPlayerState<AOBPlayerStateBase>();
+	AOBExpeditionGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>() : nullptr;
+	if (!MyPS || !GM) return;
+
+	// 살아있는 플레이어의 시점 조작 요청은 무시(클라 RPC = 신뢰 경계).
+	if (MyPS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Dead) return;
+
+	const TArray<AOBPlayerStateBase*> Living = GM->GetLivingTeammates(MyPS->GetTeamId());
+	if (Living.IsEmpty()) return;
+
+	// 조작된 Direction으로 음수 모듈러가 나오면 배열 범위를 벗어난다. 반드시 클램프.
+	const int32 Step = FMath::Clamp(Direction, -1, 1);
+
+	const AActor* Current = GetViewTarget();
+	int32 Index = Living.IndexOfByPredicate(
+		[Current](const AOBPlayerStateBase* P)
+		{
+			return P->GetPawn() == Current;
+		});
+
+	Index = (Index == INDEX_NONE) ? 0 : (Index + Step + Living.Num()) % Living.Num();
+
+	if (APawn* NextPawn = Living[Index]->GetPawn())
+	{
+		SetViewTarget(NextPawn);
+	}
+}
+
+FString AOBPlayerController::GetSpectateTargetName() const
+{
+	const APawn* P = Cast<APawn>(GetViewTarget());
+	const APlayerState* PS = P ? P->GetPlayerState() : nullptr;
+	return PS ? PS->GetPlayerName() : FString();
 }
 
 void AOBPlayerController::BindToGameStatePhase()

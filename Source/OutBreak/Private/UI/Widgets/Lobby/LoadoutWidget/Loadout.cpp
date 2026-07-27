@@ -10,11 +10,17 @@
 #include "LoadOut/OBLoadoutTypes.h"
 #include "Weapon/OBWeaponBase.h"
 #include "Weapon/Data/OBWeaponData.h"
+#include "Weapon/Data/OBWeaponCatalog.h"
 #include "Engine/GameInstance.h"
 
 void ULoadout::NativeConstruct()
 {
 	Super::NativeConstruct();
+	
+	if (UOBLoadoutSubsystem* LS = GetLoadout())
+	{
+		LS->GrantStarterIfEmpty(WeaponCatalog);   // 무일푼 복구
+	}
 	
 	BindCardClicks();
 	RebuildStash();

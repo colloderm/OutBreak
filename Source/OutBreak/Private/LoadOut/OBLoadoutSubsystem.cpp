@@ -40,6 +40,24 @@ void UOBLoadoutSubsystem::ClearLoadout()
 	SaveToDisk();
 }
 
+void UOBLoadoutSubsystem::GrantStarterIfEmpty(UOBWeaponCatalog* Catalog)
+{
+	if (!Catalog || !IsEmpty()) return;
+
+	for (const TSubclassOf<AOBWeaponBase>& WClass : Catalog->StarterWeapons)
+	{
+		if (WClass)
+		{
+			CurrentLoadout.OwnedWeapons.Add(TSoftClassPtr<AOBWeaponBase>(WClass));
+		}
+	}
+
+	if (!CurrentLoadout.OwnedWeapons.IsEmpty())
+	{
+		SaveToDisk();
+	}
+}
+
 TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetSelectedClasses() const
 {
 	TArray<TSubclassOf<AOBWeaponBase>> Out;
