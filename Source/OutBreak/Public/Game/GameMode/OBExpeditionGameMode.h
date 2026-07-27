@@ -58,6 +58,7 @@ public:
 	virtual void NotifyPlayerDowned(AController* C) override;           // 블리드아웃 시작
 	void RevivePlayer(AController* C);
 	
+	void FinishDownedPlayer(AController* C);   // 블리드아웃/전멸/디버그 자살 → 사망 확정
 	bool HasLivingTeammate(AController* C) const;
 	
 	// 해당 팀의 살아있는 멤버(관전 대상 후보). PlayerArray 순서라 순환이 안정적.
@@ -170,7 +171,6 @@ protected:
 	float ReviveHealthPercent = 0.35f;
 	
 private:
-	void FinishDownedPlayer(AController* C);   // 블리드아웃/전멸 → 사망 확정
 	void CheckTeamWipe(uint8 TeamId);          // 팀에 Alive 0명이면 다운자 전원 사망
 
 private:	

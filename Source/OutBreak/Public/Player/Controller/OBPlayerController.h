@@ -151,6 +151,10 @@ protected:
 	// 복귀할 Home 레벨(L_HomeMap).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
 	TSoftObjectPtr<UWorld> HomeLevel;
+	
+	// 사망/탈출 화면을 보여주는 시간. 이 시간이 지나야 결과창으로 넘어간다.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	float ResultDelaySeconds = 3.f;
 
 	// 결과창 후 자동 Home 복귀까지 대기(초). 0이면 버튼으로만.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
@@ -163,6 +167,7 @@ protected:
 	bool bPhaseBound = false;              // 페이즈 중복 바인딩 방지
 	FTimerHandle PhaseBindRetryTimer;      // GameState 대기 재시도
 	FTimerHandle AutoReturnTimer;          // 자동 복귀
+	FTimerHandle ResultDelayTimer;         // 사망/탈출 화면 → 결과창 전환 지연
 
 	// 현재 떠 있는 사망 위젯(중복 방지/제거).
 	UPROPERTY()
@@ -195,6 +200,14 @@ public:
 	// 파티 리더십을 서버 PlayerState에 반영(게이팅용).
 	UFUNCTION(Server, Reliable)
 	void Server_SetPartyLeader(bool bLeader);
+	
+	//~ 디버그 -----------------------------------------------------
+	// 콘솔(`)에 OBSuicide 입력 → 즉시 사망. 사망/관전/전멸 흐름 테스트용.
+	UFUNCTION(Exec)
+	void OBSuicide();
+	
+	UFUNCTION(Server, Reliable)
+	void Server_Suicide();
 	
 	// 상호작용 위젯 오픈/클로즈(커서·UIOnly·이동잠금을 여기서 일괄 처리).
 	UFUNCTION(BlueprintCallable)

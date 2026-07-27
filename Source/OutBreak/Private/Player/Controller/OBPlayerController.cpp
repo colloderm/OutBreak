@@ -323,6 +323,40 @@ void AOBPlayerController::Input_TogglePartyUI()
 	}
 }
 
+void AOBPlayerController::OBSuicide()
+{
+#if !UE_BUILD_SHIPPING
+	Server_Suicide();   // 콘솔은 클라에서 실행 → 판정은 서버에서
+#endif
+}
+
+void AOBPlayerController::Server_Suicide_Implementation()
+{
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	AOBExpeditionGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>() : nullptr;
+	if (!PS || !GM) return;
+
+	// 다운 상태 → 블리드아웃 포기.
+	if (PS->GetExpeditionStatus() == EOBPlayerExpeditionStatus::Downed)
+	{
+		GM->FinishDownedPlayer(this);
+		return;
+	}
+
+	if (PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive) return;
+
+	if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(GetPawn()))
+	{
+		Char->HandleDeath();   // 기존 경로: 팀 생존자가 있으면 Downed가 된다
+	}
+
+	// 디버그 자살은 다운에서 멈추지 않고 사망까지 확정(관전 흐름을 바로 보기 위함).
+	if (PS->GetExpeditionStatus() == EOBPlayerExpeditionStatus::Downed)
+	{
+		GM->FinishDownedPlayer(this);
+	}
+}
+
 void AOBPlayerController::BindToExpeditionStatus()
 {
 	if (bExpeditionStatusBound) return;
@@ -359,7 +393,7 @@ void AOBPlayerController::HandleExpeditionStatusChanged()
 
 void AOBPlayerController::ShowDeathScreen()
 {
-	if (ActiveDeathWidget) return; // 이미 표시 중
+	if (ActiveDeathWidget || ActiveResultWidget) return;   // 결과창이 이미 떴으면 되돌아가지 않는다
 	
 	DisableInput(this); // 로컬 이동/사격 에측 차단(서버는 이미 차단)
 	SetShowMouseCursor(true);
@@ -377,7 +411,7 @@ void AOBPlayerController::ShowDeathScreen()
 
 void AOBPlayerController::ShowExtractScreen()
 {
-	if (ActiveDeathWidget) return;
+	if (ActiveDeathWidget || ActiveResultWidget) return;
 	
 	DisableInput(this);
 	
@@ -503,7 +537,15 @@ void AOBPlayerController::BindToGameStatePhase()
 void AOBPlayerController::HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase)
 {
 	if (!IsLocalController()) return;
-	if (NewPhase == EOBExpeditionPhase::Ended)
+	if (NewPhase != EOBExpeditionPhase::Ended) return;
+
+	// 종료 판정은 사망/탈출과 같은 프레임에 온다. 바로 띄우면 사망화면이 1프레임 만에 지워진다.
+	if (ResultDelaySeconds > 0.f)
+	{
+		GetWorldTimerManager().SetTimer(
+			ResultDelayTimer, this, &AOBPlayerController::ShowResultScreen, ResultDelaySeconds, false);
+	}
+	else
 	{
 		ShowResultScreen();
 	}

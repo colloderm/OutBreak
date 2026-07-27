@@ -213,6 +213,7 @@ void AOBExpeditionGameMode::EndExpedition(EOBExpeditionEndReason Reason)
 	if (AOBExpeditionGameState* GS = GetExpeditionGameState())
 	{
 		// 종료 시점에 아직 탈출 못 한 인원(Alive/Downed)은 실패(Dead)로 확정
+		TSet<uint8> TouchedTeams;
 		if (GameState)
 		{
 			for (APlayerState* PS : GameState->PlayerArray)
@@ -223,16 +224,20 @@ void AOBExpeditionGameMode::EndExpedition(EOBExpeditionEndReason Reason)
 					if (S == EOBPlayerExpeditionStatus::Alive || S == EOBPlayerExpeditionStatus::Downed)
 					{
 						OBPS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Dead);
+						TouchedTeams.Add(OBPS->GetTeamId());
 					}
 				}
 			}
 		}
 		
+		// 시간초과로 죽은 인원도 사망화면을 받아야 한다(관전 정리 + ClientTeamWiped).
+		for (const uint8 Team : TouchedTeams)
+		{
+			UpdateSpectatorsForTeam(Team);
+		}
+		
 		GS->SetPhase(EOBExpeditionPhase::Ended);
 	}
-
-	// TODO(Step 8): 팀별 승/패 산정, 결과 위젯 표시, 잠시 후 로비/Home으로 ServerTravel.
-	UE_LOG(LogTemp, Log, TEXT("[Expedition] Ended. Reason=%d"), (int32)Reason);
 }
 
 void AOBExpeditionGameMode::CheckEndConditions()
