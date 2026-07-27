@@ -35,7 +35,7 @@ public:
 	TObjectPtr<UWeaponStatView> WeaponStatView;
 	
 	
-	void SetCardInfo(FText& inName, EOBWeaponSlot inType, FString& inDesc, UTexture2D* inIcon);
+	void SetCardInfo(FText& inName, EOBWeaponSlot inSlot, FText& inCategory, FText& inDesc, UTexture2D* inIcon);
 	void SetStatView(FText& inSelectedWeaponName,
 		float inDamage, float inFireRate, float inAccuracy, float inRecoil, float inMobility, FText& inAmmoInfo);
 	

@@ -12,24 +12,6 @@
 #include "Weapon/Data/OBWeaponData.h"
 #include "Engine/GameInstance.h"
 
-namespace
-{
-	FText SlotToCategory(EOBWeaponSlot Slot)
-	{
-		switch (Slot)
-		{
-		case EOBWeaponSlot::Primary: 
-			return FText::FromString(TEXT("주무기"));
-		case EOBWeaponSlot::Secondary: 
-			return FText::FromString(TEXT("보조무기"));
-		case EOBWeaponSlot::Melee: 
-			return FText::FromString(TEXT("근접"));
-		default: 
-			return FText::GetEmpty();
-		}
-	}
-}
-
 void ULoadout::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -116,7 +98,7 @@ void ULoadout::RebuildStash()
 		if (!Data) continue;
 
 		FText Name = Data->DisplayName;
-		FText Cat  = SlotToCategory(Data->WeaponSlot);
+		FText Cat  = UEnum::GetDisplayValueAsText(Data->WeaponCategory);
 		if (UWeaponElement* Elem = LoadoutSelectionList->AddWeaponElement(PC, WClass, Data->WeaponIcon, Name, Cat))
 		{
 			Elem->OnClicked.AddDynamic(this, &ULoadout::HandleWeaponClicked);
@@ -134,7 +116,8 @@ void ULoadout::RebuildSlots()
 	auto FillSlot = [&](EOBWeaponSlot WeaponSlot)
 	{
 		FText Name = FText::FromString(TEXT("미선택"));
-		FString Desc;
+		FText Category = FText::GetEmpty();
+		FText Desc = FText::GetEmpty();
 		UTexture2D* Icon = nullptr;
 		if (const TSoftClassPtr<AOBWeaponBase>* Soft = LO.SlotWeapons.Find(WeaponSlot))
 		{
@@ -144,12 +127,14 @@ void ULoadout::RebuildSlots()
 				const UOBWeaponData* Data = CDO ? CDO->GetWeaponData() : nullptr;
 				if (Data) 
 				{ 
-					Name = Data->DisplayName; 
-					Icon = Data->WeaponIcon; 
+					Name	 = Data->DisplayName; 
+					Category = UEnum::GetDisplayValueAsText(Data->WeaponCategory); 
+					Desc     = Data->Description; 
+					Icon	= Data->WeaponIcon; 
 				}
 			}
 		}
-		LoadoutSelectionView->SetCardInfo(Name, WeaponSlot, Desc, Icon);
+		LoadoutSelectionView->SetCardInfo(Name, WeaponSlot, Category, Desc, Icon);
 	};
 
 	FillSlot(EOBWeaponSlot::Primary);
@@ -181,9 +166,10 @@ void ULoadout::ShowStats(TSubclassOf<AOBWeaponBase> WeaponClass)
 	FText Name = D->DisplayName;
 	const float Damage   = Norm(D->BaseDamage, MaxDamage);
 	const float FireRate = Norm(D->RoundsPerMinute, MaxRPM);
-	const float Accuracy = FMath::Clamp(1.f - (D->BaseSpreadDegrees / MaxSpread), 0.f, 1.f);
+	const float Accuracy = MaxSpread / (MaxSpread + FMath::Max(D->BaseSpreadDegrees, 0.f));
 	const float Recoil   = Norm(D->VerticalRecoil + D->HorizontalRecoil, MaxRecoil);
-	const float Mobility = 0.5f;   // WeaponData에 이동 스탯 추가 시 교체
+	const float Mobility = FMath::GetMappedRangeValueClamped(
+		FVector2f(MinMobilityMultiplier, 1.f), FVector2f(0.f, 1.f), D->MobilityMultiplier);
 	FText Ammo = FText::FromString(FString::Printf(TEXT("%d / %d"), D->MagazineSize, D->MaxReserveAmmo));
 
 	LoadoutSelectionView->SetStatView(Name, Damage, FireRate, Accuracy, Recoil, Mobility, Ammo);

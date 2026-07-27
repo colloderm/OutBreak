@@ -162,7 +162,7 @@ void UOBGameplayAbility_RangedWeapon::FireOneShot()
 						Data->HorizontalRecoil * RecoilMult,
 						Data->RecoilRecoverySpeed,
 						Data->FireCameraShake,
-						RecoilMult);
+						Data->FireCameraShakeScale * RecoilMult);
 					
 					Char->AddFireFocusPulse(Data->FireFocusPulse);  // 화면 집중 펄스
 				}

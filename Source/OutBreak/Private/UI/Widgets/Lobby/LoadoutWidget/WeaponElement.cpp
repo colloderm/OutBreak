@@ -56,14 +56,11 @@ void UWeaponElement::NativeConstruct()
 
 FReply UWeaponElement::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[WeaponElement] Clicked=%s"), *GetNameSafe(WeaponClass));
-	
 	OnClicked.Broadcast(WeaponClass);
 	return FReply::Handled();
 }
 
 void UWeaponElement::HandleButtonClicked()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[WeaponElement] BtnClicked=%s"), *GetNameSafe(WeaponClass));
 	OnClicked.Broadcast(WeaponClass);
 }

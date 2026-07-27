@@ -8,29 +8,31 @@
 #include "Components/Image.h"
 #include "Engine/Texture2D.h"
 
-void ULoadoutCardElement::SetLoadoutCard(FText& inWeaponName, EOBWeaponSlot inType, FString& inDesc, UTexture2D* inIcon)
+void ULoadoutCardElement::SetLoadoutCard(FText& inWeaponName, EOBWeaponSlot inSlot, FText& inCategory, FText& inDesc, UTexture2D* inIcon)
 {
+	CardSlot = inSlot;
 	SetWeaponName(inWeaponName);
-	SetWeaponType(inType);
+	SetCategory(inCategory);
 	SetWeaponDesc(inDesc);
 	SetIcon(inIcon);
 }
 
 void ULoadoutCardElement::SetWeaponName(FText& inWeaponName)
 {
-	TXT_WeaponName->SetText(inWeaponName);
+	if (TXT_WeaponName)
+		TXT_WeaponName->SetText(inWeaponName);
 }
 
-void ULoadoutCardElement::SetWeaponType(EOBWeaponSlot inType)
+void ULoadoutCardElement::SetCategory(FText& inCategory)
 {
-	CardSlot = inType;
-	const FText DisplayName = UEnum::GetDisplayValueAsText(inType);
-	TXT_WeaponType->SetText(DisplayName);
+	if (TXT_WeaponType) 
+		TXT_WeaponType->SetText(inCategory);
 }
 
-void ULoadoutCardElement::SetWeaponDesc(FString& inDesc)
+void ULoadoutCardElement::SetWeaponDesc(FText& inDesc)
 {
-	TXT_WeaponDesc->SetText(FText::FromString(inDesc));
+	if (TXT_WeaponDesc) 
+		TXT_WeaponDesc->SetText(inDesc);
 }
 
 void ULoadoutCardElement::SetIcon(UTexture2D* inIcon)
@@ -49,7 +51,6 @@ void ULoadoutCardElement::SetIcon(UTexture2D* inIcon)
 
 FReply ULoadoutCardElement::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
 {
-	UE_LOG(LogTemp, Warning, TEXT("[LoadoutCard] Clicked slot=%d"), (int32)CardSlot);
 	OnClicked.Broadcast(CardSlot);
 	
 	return FReply::Handled();
@@ -57,7 +58,6 @@ FReply ULoadoutCardElement::NativeOnMouseButtonDown(const FGeometry& InGeometry,
 
 void ULoadoutCardElement::HandleButtonClicked()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[LoadoutCard] BtnClicked slot=%d"), (int32)CardSlot);
 	OnClicked.Broadcast(CardSlot);
 }
 

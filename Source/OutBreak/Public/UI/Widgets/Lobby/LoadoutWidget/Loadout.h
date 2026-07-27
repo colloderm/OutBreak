@@ -32,10 +32,15 @@ public:
 	float MaxRPM = 1000.f;
 	
 	UPROPERTY(EditAnywhere, Category = "Loadout") 
-	float MaxRecoil = 3.f;
+	float MaxRecoil = 7.f;
 	
+	// 정확도 바가 50%가 되는 스프레드 값(감쇠 곡선 기준점). 낮출수록 스프레드 차이에 민감.
 	UPROPERTY(EditAnywhere, Category = "Loadout") 
 	float MaxSpread = 5.f;
+	
+	// 기동성 바 하한. 이 배율이 빈 바, 1.0이 꽉 찬 바.
+	UPROPERTY(EditAnywhere, Category = "Loadout") 
+	float MinMobilityMultiplier = 0.6f;
 	
 protected:
 	virtual void NativeConstruct() override;

@@ -30,6 +30,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
 	FText DisplayName;
 	
+	// 무기 소개글(로드아웃/상점 상세 설명).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display", Meta = (MultiLine = "true"))
+	FText Description;
+	
 	// 로비 무기 버튼 아이콘
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
 	TObjectPtr<UTexture2D> WeaponIcon;
@@ -64,6 +68,10 @@ public:
 	// 유효 사거리(cm). 히트스캔 트레이스 최대 거리.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "0.0"))
 	float Range = 10000.0f;
+	
+	// 기동성. 장착 중 이동속도 배율. 1.0=페널티 없음, 낮을수록 무거운 무기.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "0.1", ClampMax = "1.0"))
+	float MobilityMultiplier = 1.0f;
 
 	// --- GAS 연동 ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|GAS")
@@ -100,10 +108,6 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation",
 		Meta = (EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
 	TObjectPtr<UAnimMontage> ReloadMontage;
-	
-	// 무기 장착 시 링크할 카테고리 포즈 레이어(Linked Anim Layer).
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
-	TSubclassOf<UAnimInstance> EquippedAnimLayer;
 	
 	// ===== 원거리 전용 (WeaponType == Ranged 일 때만 표시) =====
 	
@@ -168,6 +172,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil",
 		Meta = (EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
 	TSubclassOf<UCameraShakeBase> FireCameraShake;
+	
+	// 발사 쉐이크 강도 배율. 쉐이크 BP는 공용 1개 쓰고 무기별로 이 값만 조절.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil", Meta = (ClampMin = "0.0",
+		EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
+	float FireCameraShakeScale = 1.0f;
 	
 	// ADS 4종
 	

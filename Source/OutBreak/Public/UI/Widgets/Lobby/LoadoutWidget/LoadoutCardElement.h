@@ -36,21 +36,21 @@ public:
 	FOnLoadoutCardClicked OnClicked;
 	
 public:
-	void SetLoadoutCard(FText& inWeaponName, EOBWeaponSlot inType, FString& inDesc, UTexture2D* inIcon);	
+	void SetLoadoutCard(FText& inWeaponName, EOBWeaponSlot inSlot, FText& inCategory, FText& inDesc, UTexture2D* inIcon);
 	
 protected:
 	virtual void NativeConstruct() override;
-	void SetWeaponName(FText& inWeaponName);
-	void SetWeaponType(EOBWeaponSlot inType);
-	void SetWeaponDesc(FString& inDesc);
-	
-	void SetIcon(UTexture2D* inIcon);
-	
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	
+	UFUNCTION()
+	void HandleButtonClicked();
+	
+	void SetWeaponName(FText& inWeaponName);
+	void SetCategory(FText& inCategory);
+	void SetWeaponDesc(FText& inDesc);
+	void SetIcon(UTexture2D* inIcon);
 	
 protected:
 	EOBWeaponSlot CardSlot = EOBWeaponSlot::Primary;
 	
-	UFUNCTION()
-	void HandleButtonClicked();
 };

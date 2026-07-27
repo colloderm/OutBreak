@@ -150,9 +150,27 @@ FShopWindowViewData UOBLoadoutSubsystem::BuildShopView(UOBWeaponCatalog* Catalog
 			Item.ItemId = FName(*WClass->GetName());
 			Item.CategoryId = TEXT("Weapons");
 			Item.DisplayName = Data->DisplayName;
-			Item.MetaText = UEnum::GetDisplayValueAsText(Data->WeaponSlot);
+			Item.MetaText = UEnum::GetDisplayValueAsText(Data->WeaponCategory);
+			Item.Description = Data->Description;
 			Item.Price = Data->WeaponPrice;
 			Item.StockQuantity = 1;
+			
+			// 상세 스탯(인스펙터 VBX_ItemStatList)
+			auto AddStat = [&Item](const TCHAR* Id, const TCHAR* Label, FText Value, int32 Order)
+			{
+				FShopItemStatViewData Stat;
+				Stat.StatId = FName(Id);
+				Stat.DisplayName = FText::FromString(Label);
+				Stat.DisplayValue = MoveTemp(Value);
+				Stat.SortOrder = Order;
+				Item.Stats.Add(Stat);
+			};
+			AddStat(TEXT("Damage"),   TEXT("데미지"), FText::AsNumber(Data->BaseDamage), 0);
+			AddStat(TEXT("RPM"),      TEXT("연사력"), FText::AsNumber(Data->RoundsPerMinute), 1);
+			AddStat(TEXT("Spread"),   TEXT("탄퍼짐"), FText::FromString(FString::Printf(TEXT("%.2f°"), Data->BaseSpreadDegrees)), 2);
+			AddStat(TEXT("Recoil"),   TEXT("반동"),   FText::FromString(FString::Printf(TEXT("%.1f"), Data->VerticalRecoil)), 3);
+			AddStat(TEXT("Magazine"), TEXT("탄창"),   FText::AsNumber(Data->MagazineSize), 4);
+			AddStat(TEXT("Mobility"), TEXT("기동성"), FText::FromString(FString::Printf(TEXT("x%.2f"), Data->MobilityMultiplier)), 5);
 
 			// 아이콘(리스트 + 상세 미리보기)
 			if (Data->WeaponIcon)
