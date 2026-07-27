@@ -73,11 +73,12 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 			if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter))
 			{
 				Data->AbilitySet->GiveToAbilitySystem(ASC, &GrantedAbilityHandles, NewWeapon);
-				
-				OnWeaponChanged.Broadcast(CurrentWeapon);
 			}
 		}
 	}
+	
+	// AbilitySet 유무와 무관하게 항상 알린다(HUD·이동속도 구독자가 있음).
+	OnWeaponChanged.Broadcast(CurrentWeapon);
 }
 
 void UOBEquipmentComponent::UnequipWeapon()

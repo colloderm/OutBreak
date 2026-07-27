@@ -8,6 +8,7 @@
 #include "GameplayTagContainer.h"
 #include "OBCharacterBase.generated.h"
 
+class AOBWeaponBase;
 class UOBInventoryComponent;
 DECLARE_MULTICAST_DELEGATE(FOBOnAbilitySystemInitialized);
 
@@ -127,6 +128,9 @@ protected:
 	UFUNCTION()
 	void OnRep_isAiming();
 	void UpdateAimingState();
+	
+	// 무기 교체 → 기동성(MaxWalkSpeed) 재계산. 서버·클라 모두에서 호출된다.
+	void HandleWeaponChanged(AOBWeaponBase* NewWeapon);
 	
 	// 발사 시 집중 효과를 카메라 적용
 	void ApplyCombatFocusPostProcess();

@@ -515,8 +515,11 @@ void AOBExpeditionGameMode::UpdateSpectatorsForTeam(uint8 TeamId)
 
 		if (!bStillValid)
 		{
-			PC->ClientBeginSpectate();               // 중복 가드 내장
-			PC->SetViewTarget(Living[0]->GetPawn()); // 서버에서 호출해야 렐러번시까지 따라옴
+			if (APawn* TargetPawn = Living[0]->GetPawn())
+			{
+				PC->ClientBeginSpectate();     // 중복 가드 내장
+				PC->SetViewTarget(TargetPawn); // 서버에서 호출해야 렐러번시까지 따라옴
+			}
 		}
 	}
 }

@@ -501,8 +501,16 @@ void AOBPlayerController::ServerCycleSpectateTarget_Implementation(int32 Directi
 
 	if (APawn* NextPawn = Living[Index]->GetPawn())
 	{
-		SetViewTarget(NextPawn);
+		SetSpectateViewTarget(NextPawn);
 	}
+}
+
+void AOBPlayerController::SetSpectateViewTarget(AActor* NewTarget)
+{
+	if (!NewTarget || !HasAuthority()) return;
+
+	SetViewTarget(NewTarget);         // 서버: 네트워크 렐러번시가 관전 대상을 따라오게 한다
+	ClientSetViewTarget(NewTarget);   // 클라: 실제 카메라 전환(위 호출은 복제 안 됨)
 }
 
 FString AOBPlayerController::GetSpectateTargetName() const

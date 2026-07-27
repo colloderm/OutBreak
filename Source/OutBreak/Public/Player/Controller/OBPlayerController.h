@@ -230,6 +230,9 @@ public:
 	// 클라 → 서버: 관전 대상 순환. 후보는 서버가 정하므로 적 팀은 볼 수 없다.
 	UFUNCTION(Server, Reliable)
 	void ServerCycleSpectateTarget(int32 Direction);
+	
+	// 관전 시점 전환. 서버 SetViewTarget은 복제되지 않으므로 클라 통지를 반드시 같이 보낸다.
+	void SetSpectateViewTarget(AActor* NewTarget);
 
 	// 관전 HUD 버튼용.
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
