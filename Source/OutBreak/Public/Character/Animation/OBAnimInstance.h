@@ -31,10 +31,6 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "State", Meta = (AllowPrivateAccess = "true"))
 	bool bIsAiming = false;
 	
-	// 현재 무기 홀드 스타일 태그 → Chooser 입력.
-	UPROPERTY(BlueprintReadOnly, Category = "Weapon", Meta = (AllowPrivateAccess = "true"))
-	FGameplayTag HoldStyleTag;
-	
 	// 현재 무기의 상체 오버레이 로코모션(없으면 null). AnimGraph의 BlendSpace Player 입력.
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon", Meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UBlendSpace> CurrentOverlayLocomotion;
@@ -123,13 +119,6 @@ private:
 	// IK 알파 블렌드 속도.
 	UPROPERTY(EditDefaultsOnly, Category = "IK")
 	float LeftHandIKBlendSpeed = 12.f;
-	
-	// 스프린트 진입/이탈 속도. 밴드가 조깅~스프린트 정상 속도 사이에 오도록 설정할 것.
-	UPROPERTY(EditDefaultsOnly, Category = "Overlay")
-	float SprintEnterSpeed = 620.f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "Overlay")
-	float SprintExitSpeed = 570.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "IK")
 	FName WeaponLeftHandSocket = TEXT("LeftHandGrip");

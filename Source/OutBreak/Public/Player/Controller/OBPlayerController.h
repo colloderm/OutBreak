@@ -79,12 +79,17 @@ protected:
 	
 	void Input_Interact();
 	
+	void Input_TogglePartyUI();
+	
 	//~ Expedition 사망 피드백 ---------------------------------
 	void BindToExpeditionStatus();          // 로컬 PS 상태변경 구독(중복가드)
 	void HandleExpeditionStatusChanged();   // 상태 → 화면 처리
 	void ShowDeathScreen();
 	void ShowExtractScreen();
 	void HideDeathScreen();
+	
+	void ShowSpectatorHUD();
+	void HideSpectatorHUD();
 	
 	//~ Expedition 세션 종료(결과 → Home 복귀) --------------------
 	void BindToGameStatePhase();   // GameState 준비 대기 후 페이즈 구독
@@ -121,6 +126,16 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> InteractAction;
 	
+	// 파티 UI 토글 입력.
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> PartyToggleAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> PartyWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> PartyWidget;
+	
 	// 사망 시 띄울 위젯(WBP_DeathScreen). 미지정이면 입력잠금만 수행.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
 	TSubclassOf<UUserWidget> DeathScreenWidgetClass;
@@ -138,6 +153,10 @@ protected:
 	// 복귀할 Home 레벨(L_HomeMap).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
 	TSoftObjectPtr<UWorld> HomeLevel;
+	
+	// 사망/탈출 화면을 보여주는 시간. 이 시간이 지나야 결과창으로 넘어간다.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	float ResultDelaySeconds = 3.f;
 
 	// 결과창 후 자동 Home 복귀까지 대기(초). 0이면 버튼으로만.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
@@ -150,10 +169,18 @@ protected:
 	bool bPhaseBound = false;              // 페이즈 중복 바인딩 방지
 	FTimerHandle PhaseBindRetryTimer;      // GameState 대기 재시도
 	FTimerHandle AutoReturnTimer;          // 자동 복귀
+	FTimerHandle ResultDelayTimer;         // 사망/탈출 화면 → 결과창 전환 지연
 
 	// 현재 떠 있는 사망 위젯(중복 방지/제거).
 	UPROPERTY()
 	TObjectPtr<UUserWidget> ActiveDeathWidget;
+	
+	// 관전 중 표시할 위젯(WBP_SpectatorHUD).
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	TSubclassOf<UUserWidget> SpectatorHUDWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> ActiveSpectatorWidget;
 
 	// PS 델리게이트 중복 바인딩 방지 플래그.
 	bool bExpeditionStatusBound = false;
@@ -176,13 +203,49 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_SetPartyLeader(bool bLeader);
 	
+	//~ 디버그 -----------------------------------------------------
+	// 콘솔(`)에 OBSuicide 입력 → 즉시 사망. 사망/관전/전멸 흐름 테스트용.
+	UFUNCTION(Exec)
+	void OBSuicide();
+	
+	UFUNCTION(Server, Reliable)
+	void Server_Suicide();
+	
 	// 상호작용 위젯 오픈/클로즈(커서·UIOnly·이동잠금을 여기서 일괄 처리).
-	void OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass);
+	UFUNCTION(BlueprintCallable)
+	UUserWidget* OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass);
 	void CloseInteractionWidget();
 
 	// 범위 내 상호작용 대상 등록(액터가 호출).
 	void SetCurrentInteractable(AOBInteractableActor* Interactable);
 	AOBInteractableActor* GetCurrentInteractable() const;
+	
+	//~ Expedition 관전 -------------------------------------------
+	// 서버 → 클라: 관전 시작(팀원 생존).
+	UFUNCTION(Client, Reliable)
+	void ClientBeginSpectate();
+
+	// 서버 → 클라: 팀 전멸 → 관전 종료 + 사망(홈 복귀) 화면.
+	UFUNCTION(Client, Reliable)
+	void ClientTeamWiped();
+
+	// 클라 → 서버: 관전 대상 순환. 후보는 서버가 정하므로 적 팀은 볼 수 없다.
+	UFUNCTION(Server, Reliable)
+	void ServerCycleSpectateTarget(int32 Direction);
+	
+	// 관전 시점 전환. 서버 SetViewTarget은 복제되지 않으므로 클라 통지를 반드시 같이 보낸다.
+	void SetSpectateViewTarget(AActor* NewTarget);
+
+	// 관전 HUD 버튼용.
+	UFUNCTION(BlueprintCallable, Category = "Expedition")
+	void SpectateNext() { ServerCycleSpectateTarget(+1); }
+
+	UFUNCTION(BlueprintCallable, Category = "Expedition")
+	void SpectatePrev() { ServerCycleSpectateTarget(-1); }
+
+	// 관전 HUD의 "관전 중: <이름>" 표시용.
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	FString GetSpectateTargetName() const;
 	
 	// 결과창 버튼/자동타이머가 호출 → 데디 종료 후 로컬 Home 로드.
 	UFUNCTION(BlueprintCallable, Category = "Expedition")

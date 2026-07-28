@@ -6,7 +6,10 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
+#include "GameFramework/PlayerController.h"
+#include "LoadOut/OBLoadoutSubsystem.h"
 #include "Weapon/OBWeaponBase.h"
+#include "Engine/World.h"
 
 AOBPlayerStateBase::AOBPlayerStateBase()
 {
@@ -71,6 +74,7 @@ void AOBPlayerStateBase::SetExpeditionStatus(EOBPlayerExpeditionStatus NewStatus
 	
 	ExpeditionStatus = NewStatus;
 	OnExpeditionStatusChanged.Broadcast(); // 리슨 호스트 로컬 갱신
+	ApplyExpeditionStatusToLoadout();   // ← 리슨 호스트/스탠드얼론 커버
 }
 
 void AOBPlayerStateBase::SetTeamId(uint8 NewTeamId)
@@ -137,11 +141,34 @@ void AOBPlayerStateBase::OnRep_Ready()
 void AOBPlayerStateBase::OnRep_ExpeditionStatus()
 {
 	OnExpeditionStatusChanged.Broadcast();
+	ApplyExpeditionStatusToLoadout();
 }
 
 void AOBPlayerStateBase::OnRep_ExtractionProgress()
 {
 	OnExtractionProgressChanged.Broadcast(); // 클라 HUD 갱신
+}
+
+void AOBPlayerStateBase::ApplyExpeditionStatusToLoadout()
+{
+	const UWorld* World = GetWorld();
+	const APlayerController* LocalPC = World ? World->GetFirstPlayerController() : nullptr;
+	if (!LocalPC || LocalPC->PlayerState != this) return;   // 내 로컬 PS만
+
+	UOBLoadoutSubsystem* Loadout = World->GetGameInstance() ? World->GetGameInstance()->GetSubsystem<UOBLoadoutSubsystem>() : nullptr;
+	if (!Loadout) return;
+
+	switch (ExpeditionStatus)
+	{
+	case EOBPlayerExpeditionStatus::Dead:      
+		Loadout->ClearLoadout();
+		break;
+	case EOBPlayerExpeditionStatus::Extracted: 
+		Loadout->AddCurrency(ExtractReward); 
+		break;
+	default: 
+		break;
+	}
 }
 
 void AOBPlayerStateBase::CopyProperties(APlayerState* NewPlayerState)

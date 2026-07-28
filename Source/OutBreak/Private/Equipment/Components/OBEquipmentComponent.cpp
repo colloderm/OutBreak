@@ -73,11 +73,12 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 			if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter))
 			{
 				Data->AbilitySet->GiveToAbilitySystem(ASC, &GrantedAbilityHandles, NewWeapon);
-				
-				OnWeaponChanged.Broadcast(CurrentWeapon);
 			}
 		}
 	}
+	
+	// AbilitySet 유무와 무관하게 항상 알린다(HUD·이동속도 구독자가 있음).
+	OnWeaponChanged.Broadcast(CurrentWeapon);
 }
 
 void UOBEquipmentComponent::UnequipWeapon()
@@ -177,18 +178,7 @@ void UOBEquipmentComponent::ApplyCosmeticEquip()
 	UOBWeaponData* Data = CurrentWeapon->GetWeaponData();
 	if (!Data) return;
 
-	// 1) 카테고리 포즈 레이어 교체(이전 레이어 해제 후 신규 링크).
-	if (LinkedAnimLayer)
-	{
-		Anim->UnlinkAnimClassLayers(LinkedAnimLayer);
-	}
-	LinkedAnimLayer = Data->EquippedAnimLayer;
-	if (LinkedAnimLayer)
-	{
-		Anim->LinkAnimClassLayers(LinkedAnimLayer);
-	}
-
-	// 2) 꺼내기(draw) 몽타주.
+	// 꺼내기(draw) 몽타주.
 	if (Data->EquipMontage)
 	{
 		Anim->Montage_Play(Data->EquipMontage);
@@ -203,10 +193,4 @@ void UOBEquipmentComponent::RemoveCosmeticEquip()
 	USkeletalMeshComponent* MontageMesh = Char->GetMontageMesh();
 	UAnimInstance* Anim = MontageMesh ? MontageMesh->GetAnimInstance() : nullptr;
 	if (!Anim) return;
-
-	if (LinkedAnimLayer)
-	{
-		Anim->UnlinkAnimClassLayers(LinkedAnimLayer);
-		LinkedAnimLayer = nullptr;
-	}
 }

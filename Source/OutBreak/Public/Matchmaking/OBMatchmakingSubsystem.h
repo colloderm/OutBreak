@@ -64,9 +64,6 @@ private:
 
 	FTimerHandle SearchTimer;
 	
-	// 알파 기본 접속 주소(MapData.TestServerAddress가 비었을 때).
-	FString DefaultServerAddress = TEXT("127.0.0.1:7777");
-	
 	// 세션 진입 URL에 실을 파티 코드(?party=). 비어있으면 솔로.
 	FString PartyCode;
 };

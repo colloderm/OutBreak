@@ -7,11 +7,13 @@
 #include "LoadOut/OBLoadoutTypes.h"
 #include "LoadoutCardElement.generated.h"
 
-
+class UImage;
+class UTexture2D;
 class UTextBlock;
-/**
- * 
- */
+class AOBWeaponBase;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLoadoutCardClicked, EOBWeaponSlot, Slot);
+
 UCLASS()
 class OUTBREAK_API ULoadoutCardElement : public UUserWidget
 {
@@ -27,15 +29,28 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta =(BindWidget))
 	TObjectPtr<UTextBlock> TXT_WeaponDesc;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta =(BindWidgetOptional))
+	TObjectPtr<UImage> IMG_WeaponIcon;
 	
+	UPROPERTY(BlueprintAssignable, Category = "Loadout")
+	FOnLoadoutCardClicked OnClicked;
 	
-	void SetLoadoutCard(FText& inWeaponName, EOBWeaponSlot inType, FString& inDesc);
+public:
+	void SetLoadoutCard(FText& inWeaponName, EOBWeaponSlot inSlot, FText& inCategory, FText& inDesc, UTexture2D* inIcon);
 	
 protected:
 	virtual void NativeConstruct() override;
-	void SetWeaponName(FText& inWeaponName);
-	void SetWeaponType(EOBWeaponSlot inType);
-	void SetWeaponDesc(FString& inDesc);
+	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	
+	UFUNCTION()
+	void HandleButtonClicked();
+	
+	void SetWeaponName(FText& inWeaponName);
+	void SetCategory(FText& inCategory);
+	void SetWeaponDesc(FText& inDesc);
+	void SetIcon(UTexture2D* inIcon);
+	
+protected:
+	EOBWeaponSlot CardSlot = EOBWeaponSlot::Primary;
 	
 };

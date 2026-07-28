@@ -9,6 +9,7 @@
 #include "GenericTeamAgentInterface.h"
 #include "OBCharacterBase.generated.h"
 
+class AOBWeaponBase;
 class UOBInventoryComponent;
 DECLARE_MULTICAST_DELEGATE(FOBOnAbilitySystemInitialized);
 
@@ -67,6 +68,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "OB|Combat")
 	bool IsRecentlyFired() const { return bRecentlyFired; }
 	
+	// 현재 탄퍼짐 각도(도). 발사 트레이스와 크로스헤어가 같은 값을 쓴다.
+	UFUNCTION(BlueprintPure, Category = "OB|Combat")
+	float GetCurrentSpreadAngle() const;
+	
+	// 스프린트 카메라 랙 토글. BP 스프린트 시작(true)/종료(false)에서 호출.
+	UFUNCTION(BlueprintCallable, Category = "OB|Camera")
+	void SetSprintCameraLag(bool bSprinting);
+	
 	// 발사 시 집중 효과 펄스(로컬용)
 	void AddFireFocusPulse(float PulseAmount);
 	
@@ -87,9 +96,6 @@ public:
 	// 전투 지향(조준/발사) 상태가 바뀔 때만 BP에 통지. GASP 입력 상태 동기화용.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Combat")
 	void OnCombatOrientationChanged(bool bCombat);
-	
-	UFUNCTION(BlueprintPure, Category = "Weapon")
-	FGameplayTag GetHoldStyleTag() const;
 	
 public:
 	/*
@@ -129,6 +135,9 @@ protected:
 	UFUNCTION()
 	void OnRep_isAiming();
 	void UpdateAimingState();
+	
+	// 무기 교체 → 기동성(MaxWalkSpeed) 재계산. 서버·클라 모두에서 호출된다.
+	void HandleWeaponChanged(AOBWeaponBase* NewWeapon);
 	
 	// 발사 시 집중 효과를 카메라 적용
 	void ApplyCombatFocusPostProcess();
@@ -211,4 +220,19 @@ private:
 	float CombatFocusTarget = 0.0f;  // 목표(ADS 기준)
 	float BaseVignette = 0.4f;       // 기본값 캐시
 	float BaseMotionBlur = 0.0f;
+	
+	// 스프린트 중 카메라 랙 속도. 낮을수록 카메라가 더 늘어져 따라와 속도감↑.
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|Sprint")
+	float SprintCameraLagSpeed = 5.f;
+	
+	// 걷기/조깅: 높을수록 랙 적음(거의 즉시)
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|Sprint")
+	float NormalCameraLagSpeed = 30.f; 
+
+	// 스프린트↔평상시 랙 전환 부드러움
+	UPROPERTY(EditDefaultsOnly, Category = "Camera|Sprint")
+	float CameraLagBlendSpeed = 6.f; 
+
+	// Tick 보간 목표(내부 상태)
+	float TargetCameraLagSpeed = 30.f; 
 };

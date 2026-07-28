@@ -41,6 +41,8 @@ AOBCharacterBase::AOBCharacterBase()
 	CameraBoom->bUsePawnControlRotation = true;
 	CameraBoom->bDoCollisionTest = true;
 	CameraBoom->ProbeChannel = OB_TraceChannel_CameraProbe;
+	CameraBoom->bEnableCameraLag = true;
+	CameraBoom->CameraLagSpeed = NormalCameraLagSpeed;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
@@ -75,6 +77,13 @@ void AOBCharacterBase::BeginPlay()
 	{
 		DefaultWalkSpeed = MoveComp->MaxWalkSpeed;
 	}
+	
+	if (EquipmentComponent)
+	{
+		EquipmentComponent->OnWeaponChanged.AddUObject(this, &AOBCharacterBase::HandleWeaponChanged);
+		HandleWeaponChanged(EquipmentComponent->GetCurrentWeapon()); // 이미 장착 중이면 즉시 반영
+	}
+	
 	if (FollowCamera)
 	{
 		DefaultCameraFOV = FollowCamera->FieldOfView;
@@ -232,8 +241,10 @@ void AOBCharacterBase::UpdateAimingState()
 	// 이동 감속(모든 머신: 복제된 bIsAiming + 공유 WeaponData)
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
 	{
-		const float Mult = (bIsAiming && Data) ? Data->ADSSpeedMultiplier : 1.0f;
-		MoveComp->MaxWalkSpeed = DefaultWalkSpeed * Mult;
+		// 기동성(무기 무게)과 ADS 감속은 곱해서 누적된다. 맨손 = 배율 1.0(최고속).
+		const float Mobility = Data ? Data->MobilityMultiplier : 1.0f;
+		const float AimMult  = (bIsAiming && Data) ? Data->ADSSpeedMultiplier : 1.0f;
+		MoveComp->MaxWalkSpeed = DefaultWalkSpeed * Mobility * AimMult;
 	}
 	
 	// 카메라 FOV 블렌드(조준하는 본인만)
@@ -249,6 +260,34 @@ void AOBCharacterBase::UpdateAimingState()
 	}
 	
 	UpdateCombatOrientation();   // 조준 변화 시 지향 갱신
+}
+
+void AOBCharacterBase::HandleWeaponChanged(AOBWeaponBase* NewWeapon)
+{
+	// 속도·FOV·지향 갱신 로직이 전부 여기 모여 있으므로 그대로 재사용.
+	UpdateAimingState();
+}
+
+float AOBCharacterBase::GetCurrentSpreadAngle() const
+{
+	const UOBEquipmentComponent* Equip = FindComponentByClass<UOBEquipmentComponent>();
+	const AOBWeaponBase* Weapon = Equip ? Equip->GetCurrentWeapon() : nullptr;
+	const UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
+	if (!Data) return 0.f;
+	
+	float Spread = Data->BaseSpreadDegrees;
+	if (bIsAiming)
+		Spread *= Data->ADSSpeedMultiplier;
+	if (GetVelocity().SizeSquared2D() > FMath::Square(10.f))
+		Spread *= Data->MovingSpreadMultiplier;
+	
+	return Spread;
+}
+
+void AOBCharacterBase::SetSprintCameraLag(bool bSprinting)
+{
+	TargetCameraLagSpeed = bSprinting ? SprintCameraLagSpeed : NormalCameraLagSpeed;
+	SetActorTickEnabled(true);
 }
 
 void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
@@ -358,16 +397,6 @@ void AOBCharacterBase::FinishDeathFromDowned()
 	StartDeath(); // 래그돌
 }
 
-FGameplayTag AOBCharacterBase::GetHoldStyleTag() const
-{
-	if (EquipmentComponent)
-		if (AOBWeaponBase* W = EquipmentComponent->GetCurrentWeapon())
-			if (UOBWeaponData* Data = W->GetWeaponData())
-				return Data->HoldStyleTag;
-	
-	return FGameplayTag(); // 무장 안 함 = 빈 태그(=Unarmed)
-}
-
 void AOBCharacterBase::ApplyCombatFocusPostProcess()
 {
 	if (!FollowCamera) return;
@@ -399,7 +428,6 @@ void AOBCharacterBase::UpdateCombatOrientation()
 	{
 		MoveComp->bOrientRotationToMovement = !bCombat;   // 평소엔 이동 방향
 	}
-	bUseControllerRotationYaw = bCombat;
 	
 	// GASP 애님 측 회전 모드도 같이 전환. 이걸 빼면 캡슐만 돌고 몸통은 천천히 따라온다.
 	if (bCombat != bLastCombatOrientation)
@@ -436,6 +464,16 @@ void AOBCharacterBase::Tick(float DeltaSeconds)
 	}
 	CombatFocus = NewFocus;
 	ApplyCombatFocusPostProcess();
+	
+	if (CameraBoom)
+	{
+		const float NewLag = FMath::FInterpTo(CameraBoom->CameraLagSpeed, TargetCameraLagSpeed, DeltaSeconds, CameraLagBlendSpeed);
+		CameraBoom->CameraLagSpeed = NewLag;
+		if (!FMath::IsNearlyEqual(NewLag, TargetCameraLagSpeed, 0.05f))
+		{
+			bStillBlending = true;
+		}
+	}
 	
 	if (!bStillBlending)
 	{

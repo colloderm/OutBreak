@@ -18,6 +18,7 @@
 #include "Character/OBCharacterBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "Player/Controller/OBPlayerController.h"
 
 AOBExpeditionGameMode::AOBExpeditionGameMode()
 {
@@ -212,6 +213,7 @@ void AOBExpeditionGameMode::EndExpedition(EOBExpeditionEndReason Reason)
 	if (AOBExpeditionGameState* GS = GetExpeditionGameState())
 	{
 		// 종료 시점에 아직 탈출 못 한 인원(Alive/Downed)은 실패(Dead)로 확정
+		TSet<uint8> TouchedTeams;
 		if (GameState)
 		{
 			for (APlayerState* PS : GameState->PlayerArray)
@@ -222,16 +224,20 @@ void AOBExpeditionGameMode::EndExpedition(EOBExpeditionEndReason Reason)
 					if (S == EOBPlayerExpeditionStatus::Alive || S == EOBPlayerExpeditionStatus::Downed)
 					{
 						OBPS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Dead);
+						TouchedTeams.Add(OBPS->GetTeamId());
 					}
 				}
 			}
 		}
 		
+		// 시간초과로 죽은 인원도 사망화면을 받아야 한다(관전 정리 + ClientTeamWiped).
+		for (const uint8 Team : TouchedTeams)
+		{
+			UpdateSpectatorsForTeam(Team);
+		}
+		
 		GS->SetPhase(EOBExpeditionPhase::Ended);
 	}
-
-	// TODO(Step 8): 팀별 승/패 산정, 결과 위젯 표시, 잠시 후 로비/Home으로 ServerTravel.
-	UE_LOG(LogTemp, Log, TEXT("[Expedition] Ended. Reason=%d"), (int32)Reason);
 }
 
 void AOBExpeditionGameMode::CheckEndConditions()
@@ -450,21 +456,72 @@ bool AOBExpeditionGameMode::ShouldEnterDownedState(AController* C) const
 	return HasLivingTeammate(C);
 }
 
-bool AOBExpeditionGameMode::HasLivingTeammate(AController* C) const
+TArray<AOBPlayerStateBase*> AOBExpeditionGameMode::GetLivingTeammates(uint8 TeamId) const
 {
-	if (!C || !GameState) return false;
-	const AOBPlayerStateBase* Me = C->GetPlayerState<AOBPlayerStateBase>();
-	if (!Me) return false;
-	const uint8 Team = Me->GetTeamId();
-	
+	TArray<AOBPlayerStateBase*> Out;
+	if (!GameState) return Out;
+
 	for (APlayerState* PS : GameState->PlayerArray)
 	{
-		const AOBPlayerStateBase* OBPS = Cast<AOBPlayerStateBase>(PS);
-		if (!OBPS || OBPS == Me) continue;
-		if (OBPS->GetTeamId() == Team && OBPS->GetExpeditionStatus() == EOBPlayerExpeditionStatus::Alive) return true;
+		AOBPlayerStateBase* OBPS = Cast<AOBPlayerStateBase>(PS);
+		if (OBPS && OBPS->GetTeamId() == TeamId
+			&& OBPS->GetExpeditionStatus() == EOBPlayerExpeditionStatus::Alive)
+		{
+			Out.Add(OBPS);
+		}
+	}
+	
+	return Out;
+}
+
+bool AOBExpeditionGameMode::HasLivingTeammate(AController* C) const
+{
+	const AOBPlayerStateBase* Me = C ? C->GetPlayerState<AOBPlayerStateBase>() : nullptr;
+	if (!Me) return false;
+
+	for (const AOBPlayerStateBase* PS : GetLivingTeammates(Me->GetTeamId()))
+	{
+		if (PS != Me) return true;   // 나 자신 제외
 	}
 	
 	return false;
+}
+
+void AOBExpeditionGameMode::UpdateSpectatorsForTeam(uint8 TeamId)
+{
+	if (!GameState) return;
+
+	const TArray<AOBPlayerStateBase*> Living = GetLivingTeammates(TeamId);
+
+	for (APlayerState* PS : GameState->PlayerArray)
+	{
+		AOBPlayerStateBase* OBPS = Cast<AOBPlayerStateBase>(PS);
+		if (!OBPS || OBPS->GetTeamId() != TeamId) continue;
+		if (OBPS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Dead) continue;
+
+		AOBPlayerController* PC = Cast<AOBPlayerController>(OBPS->GetOwningController());
+		if (!PC) continue;
+
+		if (Living.IsEmpty())
+		{
+			PC->ClientTeamWiped();   // 관전 종료 → 홈 복귀 화면
+			continue;
+		}
+
+		// 보던 대상이 더는 생존자가 아니면 첫 생존자로 자동 전환.
+		const AActor* Current = PC->GetViewTarget();
+		const bool bStillValid = Living.ContainsByPredicate(
+			[Current](const AOBPlayerStateBase* P) { return P->GetPawn() == Current; });
+
+		if (!bStillValid)
+		{
+			if (APawn* TargetPawn = Living[0]->GetPawn())
+			{
+				PC->ClientBeginSpectate();     // 중복 가드 내장
+				PC->SetViewTarget(TargetPawn); // 서버에서 호출해야 렐러번시까지 따라옴
+			}
+		}
+	}
 }
 
 void AOBExpeditionGameMode::NotifyPlayerDowned(AController* C)
@@ -527,6 +584,7 @@ void AOBExpeditionGameMode::FinishDownedPlayer(AController* C)
 			Char->FinishDeathFromDowned();
 	
 	CheckTeamWipe(Team);
+	UpdateSpectatorsForTeam(Team);   // 관전 대상이 죽었을 수 있음
 	CheckEndConditions();
 }
 
@@ -629,18 +687,14 @@ void AOBExpeditionGameMode::RequestRespawn(AController* Controller, APawn* DeadP
 	// - 여기서 개인 상태를 Dead로 확정하고, 세션 종료 조건을 다시 검사한다.
 	if (!Controller) return;
 
+	uint8 Team = 0;
 	if (AOBPlayerStateBase* PS = Controller->GetPlayerState<AOBPlayerStateBase>())
 	{
-		// TODO(Step 6): 다운/부활 도입 시 → 여기서 Alive를 우선 Downed로 두고,
-		//   블리드아웃 만료 또는 팀 전멸 시점에 Dead로 확정하도록 분기 예정.
-		//   현재(Step 4)는 다운 단계 없이 즉시 Dead.
 		PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Dead);
+		Team = PS->GetTeamId();
 	}
 
-	// 죽은 폰: 서버측 이동/충돌 정지는 Character::StartDeath가 이미 처리.
-	// (관전/시체 정리는 Step 6/8에서 결정 — 여기선 그대로 둔다)
-
-	// 살아있는(또는 다운) 플레이어가 남았는지 재평가 → 없으면 세션 종료.
+	UpdateSpectatorsForTeam(Team);   // 방금 죽은 본인 = 관전 시작 or 전멸
 	CheckEndConditions();
 }
 
@@ -654,6 +708,8 @@ void AOBExpeditionGameMode::NotifyPlayerExtracted(AController* Controller)
 
 	PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Extracted);
 	PS->SetExtractionProgress(0.f, false);
+	
+	UpdateSpectatorsForTeam(PS->GetTeamId());   // 탈출자는 관전 대상에서 빠짐
 
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] Player extracted: %s"), *PS->GetPlayerName());
 

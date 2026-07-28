@@ -35,13 +35,13 @@ void UOBAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 void UOBAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
-	HoldStyleTag = FGameplayTag();
 	CurrentOverlayLocomotion = nullptr;
 	GroundSpeed = 0.f;
 	LocomotionDirection = 0.f;
 	CurrentAimOffset = nullptr;
 	CurrentADSPose = nullptr;
 	CurrentSprintPose = nullptr;
+	bool bFalling = false;
 
 	if (OwningCharacter)
 	{
@@ -49,7 +49,6 @@ void UOBAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 			if (AOBWeaponBase* W = Equip->GetCurrentWeapon())
 				if (UOBWeaponData* Data = W->GetWeaponData())
 				{
-					HoldStyleTag             = Data->HoldStyleTag;   // (디버그용, 남겨둠)
 					CurrentOverlayLocomotion = Data->OverlayLocomotion;
 					CurrentAimOffset         = Data->AimOffset;
 					CurrentADSPose           = Data->ADSPose;
@@ -74,7 +73,8 @@ void UOBAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		// 공중에서는 상체 오버레이를 정지 포즈로 고정(팔 좌우 흔들림 제거).
 		if (const UCharacterMovementComponent* Move = OwningCharacter->GetCharacterMovement())
 		{
-			if (Move->IsFalling())
+			bFalling = Move->IsFalling();
+			if (bFalling)
 			{
 				GroundSpeed = 0.f;
 				LocomotionDirection = 0.f;
@@ -87,7 +87,7 @@ void UOBAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bUseADSPose = CurrentADSPose && OwningCharacter && OwningCharacter->IsAiming();
 	bInCombat = OwningCharacter && (OwningCharacter->IsAiming() || OwningCharacter->IsRecentlyFired());
 	
-	const bool bSprinting = bIsSprintingFromGait;	
+	const bool bSprinting = bIsSprintingFromGait && !bFalling;
 	if (bSprinting && CurrentSprintPose)  OverlayPoseIndex = 2;
 	else if (bUseADSPose)                 OverlayPoseIndex = 1;
 	else                                  OverlayPoseIndex = 0;

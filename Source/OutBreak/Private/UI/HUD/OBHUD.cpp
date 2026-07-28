@@ -35,6 +35,13 @@ void AOBHUD::BeginPlay()
 		SessionTimerWidget = CreateWidget<UUserWidget>(PC, SessionTimerWidgetClass);
 		if (SessionTimerWidget) SessionTimerWidget->AddToViewport();
 	}
+	
+	// 크로스헤어(화면 중앙). 상시 존재, 표시 여부는 위젯 바인딩이 판단.
+	if (CrosshairWidgetClass)
+	{
+		CrosshairWidget = CreateWidget<UUserWidget>(PC, CrosshairWidgetClass);
+		if (CrosshairWidget) CrosshairWidget->AddToViewport();
+	}
 }
 
 void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)

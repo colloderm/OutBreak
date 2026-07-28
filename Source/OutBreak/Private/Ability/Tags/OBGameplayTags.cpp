@@ -35,13 +35,6 @@ namespace OBGameplayTags
 	
 	UE_DEFINE_GAMEPLAY_TAG(Melee, "Melee");
 	
-	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Unarmed,    "Weapon.HoldStyle.Unarmed");
-	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Rifle,		"Weapon.HoldStyle.Rifle");
-	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Pistol,		"Weapon.HoldStyle.Pistol");
-	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Melee,		"Weapon.HoldStyle.Melee");
-	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Heal,		"Weapon.HoldStyle.Heal");
-	UE_DEFINE_GAMEPLAY_TAG(Weapon_HoldStyle_Grenade,	"Weapon.HoldStyle.Grenade");
-	
 	UE_DEFINE_GAMEPLAY_TAG(Item_Bandage,	"Item.Bandage");
 	UE_DEFINE_GAMEPLAY_TAG(Item_Grenade,	"Item.Grenade");
 	

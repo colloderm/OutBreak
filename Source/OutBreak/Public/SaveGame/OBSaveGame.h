@@ -19,6 +19,9 @@ class OUTBREAK_API UOBSaveGame : public USaveGame
 public:
 	UPROPERTY(SaveGame)
 	FOBLoadout Loadout;
+	
+	UPROPERTY(SaveGame)
+	int32 Currency = 0;
 
-	// (이후) FOBStash Stash;  /  int32 Currency; 등 확장.
+	// (이후) FOBStash Stash; 등 확장.
 };

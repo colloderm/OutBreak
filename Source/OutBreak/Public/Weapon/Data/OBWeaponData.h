@@ -30,6 +30,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
 	FText DisplayName;
 	
+	// 무기 소개글(로드아웃/상점 상세 설명).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display", Meta = (MultiLine = "true"))
+	FText Description;
+	
 	// 로비 무기 버튼 아이콘
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
 	TObjectPtr<UTexture2D> WeaponIcon;
@@ -52,6 +56,10 @@ public:
 	// 무기 카테고리(슬롯/애님 레이어 분류).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	EOBWeaponCategory WeaponCategory = EOBWeaponCategory::AssaultRifle;
+	
+	// 상점 구매 가격. 0이면 비매품/기본 지급.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop", Meta = (ClampMin = "0"))
+	int32 WeaponPrice = 0;
 
 	// 1발당 기본 데미지(데미지 GE가 SetByCaller 등으로 참조 가능).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "0.0"))
@@ -60,6 +68,10 @@ public:
 	// 유효 사거리(cm). 히트스캔 트레이스 최대 거리.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "0.0"))
 	float Range = 10000.0f;
+	
+	// 기동성. 장착 중 이동속도 배율. 1.0=페널티 없음, 낮을수록 무거운 무기.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "0.1", ClampMax = "1.0"))
+	float MobilityMultiplier = 1.0f;
 
 	// --- GAS 연동 ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|GAS")
@@ -97,14 +109,6 @@ public:
 		Meta = (EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
 	TObjectPtr<UAnimMontage> ReloadMontage;
 	
-	// 무기 장착 시 링크할 카테고리 포즈 레이어(Linked Anim Layer).
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Animation")
-	TSubclassOf<UAnimInstance> EquippedAnimLayer;
-	
-	// 무기 홀드 스타일(애님 Chooser 입력). Weapon.HoldStyle.* 태그로 관리.
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation", Meta = (Categories = "Weapon.HoldStyle"))
-	FGameplayTag HoldStyleTag;
-	
 	// ===== 원거리 전용 (WeaponType == Ranged 일 때만 표시) =====
 	
 	// 탄약 타입
@@ -137,6 +141,11 @@ public:
 		EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
 	int32 BurstCount = 3;
 	
+	// 1회 발사당 탄자 수(샷건 산탄). 1이면 단일 탄.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "1",
+		EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
+	int32 PelletsPerShot = 1;
+	
 	// 발사음(무기별).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Audio",
 		Meta = (EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
@@ -163,6 +172,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil",
 		Meta = (EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
 	TSubclassOf<UCameraShakeBase> FireCameraShake;
+	
+	// 발사 쉐이크 강도 배율. 쉐이크 BP는 공용 1개 쓰고 무기별로 이 값만 조절.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Recoil", Meta = (ClampMin = "0.0",
+		EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
+	float FireCameraShakeScale = 1.0f;
 	
 	// ADS 4종
 	

@@ -49,10 +49,6 @@ protected:
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentWeapon)
 	TObjectPtr<AOBWeaponBase> CurrentWeapon;
-	
-	// 현재 링크된 포즈 레이어(머신별·비복제, 해제 추적용).
-	UPROPERTY(Transient)
-	TSubclassOf<UAnimInstance> LinkedAnimLayer;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment")
 	FName AttachSocketName = TEXT("hand_r_Socket");
