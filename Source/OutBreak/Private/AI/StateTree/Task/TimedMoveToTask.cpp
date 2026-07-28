@@ -133,7 +133,6 @@ AAIController* FSTTTimedMoveToTask::ResolveController(
 		? Cast<AAIController>(ControlledPawn->GetController())
 		: nullptr;
 }
-
 void FSTTTimedMoveToTask::StopMovement(
 	FInstanceDataType& InstanceData)
 {

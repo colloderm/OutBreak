@@ -39,6 +39,7 @@ public class OutBreak : ModuleRules
 			"ModelViewViewModel",
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
+			"PropertyBindingUtils",
 			
 		});
 		

@@ -114,6 +114,21 @@ float UEnemyMemoryComponent::GetTimeSinceTargetSeen() const
 		FMath::Max(0.0, GetCurrentTimeSeconds() - LastTargetSeenTime));
 }
 
+bool UEnemyMemoryComponent::ConsumeStimulus(
+	const EEnemyStimulusType ExpectedType)
+{
+	if (ExpectedType == EEnemyStimulusType::None ||
+		StimulusType != ExpectedType)
+	{
+		return false;
+	}
+
+	ClearStimulusMemory();
+	LastStimulusTime = 0.0;
+	BroadcastMemoryUpdated();
+	return true;
+}
+
 void UEnemyMemoryComponent::UpdateSightMemory(
 	AActor* UpdatedActor,
 	const FAIStimulus& Stimulus)

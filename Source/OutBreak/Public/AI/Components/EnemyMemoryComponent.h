@@ -42,6 +42,13 @@ public:
 	const FVector& GetLastDamageDirection() const { return LastDamageDirection; }
 
 	/**
+	 * Clears the current stimulus only when it still matches ExpectedType.
+	 * This prevents a stale consumer from clearing a newer stimulus.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "AI|Memory")
+	bool ConsumeStimulus(EEnemyStimulusType ExpectedType);
+
+	/**
 	 * A single wake-up signal for every meaningful memory update.
 	 * Consumers must read the complete snapshot instead of inferring state from
 	 * the notification itself.
