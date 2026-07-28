@@ -74,7 +74,8 @@ Plugins/**/Intermediate/*
 # Cache files for the editor to use
 DerivedDataCache/*
 
-.idea/*
+# JetBrains Rider / IntelliJ IDEA
+/.idea/
 
 # Dev B ignore
 Content/Infected/Infected_Female/Character_Poses
