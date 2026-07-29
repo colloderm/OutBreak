@@ -71,7 +71,8 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Debug")
 	bool bDrawDebugTrace = false;
 	
-	// 이 속도(cm/s) 이상이면 스프린트로 간주해 발사 차단.
+	// 스프린트 판정 기준 속도(cm/s). 배율 적용 전 원본 기준이며,
+	// 실제 임계값은 이 값 × CMC SpeedMultiplier. 달리기(gait) 최고속과 스프린트 최고속 사이에 둘 것.
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	float SprintBlockSpeed = 600.f;
 	

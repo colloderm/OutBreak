@@ -22,9 +22,12 @@
 #include "Weapon/OBWeaponBase.h"
 #include "DrawDebugHelpers.h"
 #include "Character/Animation/OBAnimInstance.h"
+#include "Character/Components/OBCharacterMovementComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
 
-AOBCharacterBase::AOBCharacterBase()
+AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer.SetDefaultSubobjectClass<UOBCharacterMovementComponent>(
+		ACharacter::CharacterMovementComponentName))
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = false;
@@ -67,11 +70,6 @@ AOBCharacterBase::AOBCharacterBase()
 void AOBCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
-
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
-	{
-		DefaultWalkSpeed = MoveComp->MaxWalkSpeed;
-	}
 	
 	if (EquipmentComponent)
 	{
@@ -234,12 +232,12 @@ void AOBCharacterBase::UpdateAimingState()
 	}
 	
 	// 이동 감속(모든 머신: 복제된 bIsAiming + 공유 WeaponData)
-	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	if (UOBCharacterMovementComponent* MoveComp = Cast<UOBCharacterMovementComponent>(GetCharacterMovement()))
 	{
-		// 기동성(무기 무게)과 ADS 감속은 곱해서 누적된다. 맨손 = 배율 1.0(최고속).
+		// 기동성(무기 무게) × ADS 감속. 맨손 = 1.0(최고속).
 		const float Mobility = Data ? Data->MobilityMultiplier : 1.0f;
 		const float AimMult  = (bIsAiming && Data) ? Data->ADSSpeedMultiplier : 1.0f;
-		MoveComp->MaxWalkSpeed = DefaultWalkSpeed * Mobility * AimMult;
+		MoveComp->SetSpeedMultipliers(Mobility, AimMult);
 	}
 	
 	// 카메라 FOV 블렌드(조준하는 본인만)

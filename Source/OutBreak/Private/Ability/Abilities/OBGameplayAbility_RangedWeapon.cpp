@@ -13,6 +13,7 @@
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
+#include "Character/Components/OBCharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
@@ -234,7 +235,14 @@ float UOBGameplayAbility_RangedWeapon::GetCurrentSpreadAngle() const
 bool UOBGameplayAbility_RangedWeapon::IsOwnerSprinting() const
 {
 	const AOBCharacterBase* Char = GetOBCharacterFromActorInfo();
-	return Char && Char->GetVelocity().SizeSquared2D() > FMath::Square(SprintBlockSpeed);
+	if (!Char) return false;
+	
+	// 기동성과 ADS가 최고속도를 통째로 내리므로 임계값도 같은 배율로 내린다.
+	// 그래야 무기·조준 조합과 무관하게 "스프린트 게이트"에서만 걸린다.
+	const UOBCharacterMovementComponent* Move = Cast<UOBCharacterMovementComponent>(Char->GetCharacterMovement());
+	const float Scale = Move ? Move->GetEffectiveSpeedMultiplier() : 1.f;
+
+	return Char->GetVelocity().SizeSquared2D() > FMath::Square(SprintBlockSpeed * Scale);
 }
 
 void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
