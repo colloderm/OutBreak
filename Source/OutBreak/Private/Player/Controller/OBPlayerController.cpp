@@ -9,12 +9,27 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputAction.h"
+#include "Blueprint/UserWidget.h"
 #include "LyraInspired/Input/OBInputConfig.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Inventory/Components/OBInventoryComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Game/GameMode/OBLobbyGameMode.h"
+#include "Game/GameState/OBExpeditionGameState.h"
+#include "Interaction/OBInteractableActor.h"
+#include "Kismet/GameplayStatics.h"
+#include "LoadOut/OBLoadoutSubsystem.h"
+#include "Party/OBPartySubsystem.h"
 #include "Weapon/Data/OBWeaponData.h"
+#include "TimerManager.h"
+#include "Game/GameMode/OBExpeditionGameMode.h"
+
+
+
+AOBPlayerController::AOBPlayerController()
+{
+
+}
 
 void AOBPlayerController::BeginPlay()
 {
@@ -28,8 +43,49 @@ void AOBPlayerController::BeginPlay()
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, InputMappingPriority);
 		}
+		
+		if (IsLocalController() && ExtractionProgressWidgetClass)
+		{
+			UUserWidget* W = CreateWidget<UUserWidget>(this, ExtractionProgressWidgetClass);
+			// 상시 존재, Visibility 바인딩이 알아서 숨김
+			if (W)
+			{
+				W->AddToViewport(10);
+			}
+			
+			BindToGameStatePhase(); // 세션 종료(결과창)
+		}
 	}
+	
+	// GameInstance에 저장된 Loadout을 서버로 push(비seamless travel이라 PS가 새로 생성되므로 필요).
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			const TArray<TSubclassOf<AOBWeaponBase>> Classes = Loadout->GetSelectedClasses();
+			if (Classes.Num() > 0)
+			{
+				Server_ApplyLoadout(Classes);
+			}
+		}
+		
+		if (UOBPartySubsystem* Party = GI->GetSubsystem<UOBPartySubsystem>())
+		{
+			Server_SetPartyLeader(Party->IsLocalLeader());
+		}
+	}
+	
+	BindToExpeditionStatus();
 }
+
+void AOBPlayerController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+
+	BindToExpeditionStatus();
+}
+
+
 
 void AOBPlayerController::ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale)
 {
@@ -132,7 +188,7 @@ void AOBPlayerController::SetupInputComponent()
 	
 	if (SlotPrimaryAction)
 	{
-		EIC->BindAction(SlotPrimaryAction,   ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Primary);
+		EIC->BindAction(SlotPrimaryAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Primary);
 	}
 	
 	if (SlotSecondaryAction)
@@ -142,7 +198,17 @@ void AOBPlayerController::SetupInputComponent()
 	
 	if (SlotMeleeAction)
 	{
-		EIC->BindAction(SlotMeleeAction,     ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Melee);
+		EIC->BindAction(SlotMeleeAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Melee);
+	}
+	
+	if (InteractAction)
+	{
+		EIC->BindAction(InteractAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_Interact);
+	}
+	
+	if (PartyToggleAction)
+	{
+		EIC->BindAction(PartyToggleAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_TogglePartyUI);
 	}
 }
 
@@ -223,17 +289,393 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 	}
 }
 
-void AOBPlayerController::AcknowledgePossession(class APawn* P)
+void AOBPlayerController::AcknowledgePossession(APawn* P)
 {
 	Super::AcknowledgePossession(P);
 	
-	// 소유 클라에서 폰을 잡으면 게임 입력 강제(로비 UI 모드 잔재 제거).
 	if (IsLocalController())
 	{
 		FInputModeGameOnly Mode;
 		SetInputMode(Mode);
 		SetShowMouseCursor(false);
 	}
+}
+
+void AOBPlayerController::Input_Interact()
+{
+	if (AOBInteractableActor* Target = CurrentInteractable.Get())
+		Target->Interact(this);
+}
+
+void AOBPlayerController::Input_TogglePartyUI()
+{
+	if (!IsLocalController() || !PartyWidgetClass) return;
+
+	if (PartyWidget && PartyWidget->IsInViewport())
+	{
+		PartyWidget->RemoveFromParent();
+		PartyWidget = nullptr;
+		
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+	}
+	else
+	{
+		PartyWidget = CreateWidget<UUserWidget>(this, PartyWidgetClass);
+		if (!PartyWidget) return;
+		PartyWidget->AddToViewport();
+		
+		FInputModeGameAndUI Mode;
+		Mode.SetWidgetToFocus(PartyWidget->TakeWidget());
+		SetInputMode(Mode);
+		SetShowMouseCursor(true);
+	}
+}
+
+void AOBPlayerController::OBSuicide()
+{
+#if !UE_BUILD_SHIPPING
+	Server_Suicide();   // 콘솔은 클라에서 실행 → 판정은 서버에서
+#endif
+}
+
+void AOBPlayerController::Server_Suicide_Implementation()
+{
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	AOBExpeditionGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>() : nullptr;
+	if (!PS || !GM) return;
+
+	// 다운 상태 → 블리드아웃 포기.
+	if (PS->GetExpeditionStatus() == EOBPlayerExpeditionStatus::Downed)
+	{
+		GM->FinishDownedPlayer(this);
+		return;
+	}
+
+	if (PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive) return;
+
+	if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(GetPawn()))
+	{
+		Char->HandleDeath();   // 기존 경로: 팀 생존자가 있으면 Downed가 된다
+	}
+
+	// 디버그 자살은 다운에서 멈추지 않고 사망까지 확정(관전 흐름을 바로 보기 위함).
+	if (PS->GetExpeditionStatus() == EOBPlayerExpeditionStatus::Downed)
+	{
+		GM->FinishDownedPlayer(this);
+	}
+}
+
+void AOBPlayerController::BindToExpeditionStatus()
+{
+	if (bExpeditionStatusBound) return;
+	
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	if (!PS) return; // 아직 PS 없음 → OnRep_PlayerState에서 재시도됨
+	
+	// 비다이나믹 멀티캐스트 → AddUObject 바인딩.
+	PS->OnExpeditionStatusChanged.AddUObject(this, &AOBPlayerController::HandleExpeditionStatusChanged);
+	bExpeditionStatusBound = true;
+	
+	HandleExpeditionStatusChanged(); // 바인딩 시점 현재 상태 1회 동기화
+}
+
+void AOBPlayerController::HandleExpeditionStatusChanged()
+{
+	if (!IsLocalController()) return; // 화면 연출은 소유 클라에서만
+	
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	if (!PS) return;
+
+	switch (PS->GetExpeditionStatus())
+	{
+	case EOBPlayerExpeditionStatus::Dead:
+		break;
+	case EOBPlayerExpeditionStatus::Extracted:
+		ShowExtractScreen();   // 사망화면과 동일 패턴, 위젯만 다름
+		break;
+	default:
+		HideDeathScreen(); // 현재는 리스폰 없음(Alive 복귀 시 대비)
+		break;
+	}
+}
+
+void AOBPlayerController::ShowDeathScreen()
+{
+	if (ActiveDeathWidget || ActiveResultWidget) return;   // 결과창이 이미 떴으면 되돌아가지 않는다
+	
+	DisableInput(this); // 로컬 이동/사격 에측 차단(서버는 이미 차단)
+	SetShowMouseCursor(true);
+	SetInputMode(FInputModeUIOnly());
+	
+	if (DeathScreenWidgetClass)
+	{
+		ActiveDeathWidget = CreateWidget<UUserWidget>(this, DeathScreenWidgetClass);
+		if (ActiveDeathWidget)
+		{
+			ActiveDeathWidget->AddToViewport(50); // HUD 위에
+		}
+	}
+}
+
+void AOBPlayerController::ShowExtractScreen()
+{
+	if (ActiveDeathWidget || ActiveResultWidget) return;
+	
+	DisableInput(this);
+	
+	if (ExtractScreenWidgetClass)
+	{
+		ActiveDeathWidget = CreateWidget<UUserWidget>(this, ExtractScreenWidgetClass);
+		if (ActiveDeathWidget)
+		{
+			ActiveDeathWidget->AddToViewport(50);
+		}
+	}
+}
+
+void AOBPlayerController::HideDeathScreen()
+{
+	if (ActiveDeathWidget)
+	{
+		ActiveDeathWidget->RemoveFromParent();
+		ActiveDeathWidget = nullptr;
+	}
+	
+	EnableInput(this);
+}
+
+void AOBPlayerController::ClientBeginSpectate_Implementation()
+{
+	ShowSpectatorHUD();
+}
+
+void AOBPlayerController::ClientTeamWiped_Implementation()
+{
+	HideSpectatorHUD();
+	ShowDeathScreen();   // 여기서만 홈 복귀 버튼이 있는 화면이 뜬다
+}
+
+void AOBPlayerController::ShowSpectatorHUD()
+{
+	if (ActiveSpectatorWidget) return; // 중복 방지
+	
+	// 죽었으니 게임플레이 입력은 잠그고 HUD 버튼만 받는다.
+	DisableInput(this);
+	SetShowMouseCursor(true);
+	SetInputMode(FInputModeGameAndUI());
+	
+	if (SpectatorHUDWidgetClass)
+	{
+		ActiveSpectatorWidget = CreateWidget<UUserWidget>(this, SpectatorHUDWidgetClass);
+		if (ActiveSpectatorWidget)
+		{
+			ActiveSpectatorWidget->AddToViewport(50);
+		}
+	}
+}
+
+void AOBPlayerController::HideSpectatorHUD()
+{
+	if (ActiveSpectatorWidget)
+	{
+		ActiveSpectatorWidget->RemoveFromParent();
+		ActiveSpectatorWidget = nullptr;
+	}
+}
+
+void AOBPlayerController::ServerCycleSpectateTarget_Implementation(int32 Direction)
+{
+	AOBPlayerStateBase* MyPS = GetPlayerState<AOBPlayerStateBase>();
+	AOBExpeditionGameMode* GM = GetWorld() ? GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>() : nullptr;
+	if (!MyPS || !GM) return;
+
+	// 살아있는 플레이어의 시점 조작 요청은 무시(클라 RPC = 신뢰 경계).
+	if (MyPS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Dead) return;
+
+	const TArray<AOBPlayerStateBase*> Living = GM->GetLivingTeammates(MyPS->GetTeamId());
+	if (Living.IsEmpty()) return;
+
+	// 조작된 Direction으로 음수 모듈러가 나오면 배열 범위를 벗어난다. 반드시 클램프.
+	const int32 Step = FMath::Clamp(Direction, -1, 1);
+
+	const AActor* Current = GetViewTarget();
+	int32 Index = Living.IndexOfByPredicate(
+		[Current](const AOBPlayerStateBase* P)
+		{
+			return P->GetPawn() == Current;
+		});
+
+	Index = (Index == INDEX_NONE) ? 0 : (Index + Step + Living.Num()) % Living.Num();
+
+	if (APawn* NextPawn = Living[Index]->GetPawn())
+	{
+		SetSpectateViewTarget(NextPawn);
+	}
+}
+
+void AOBPlayerController::SetSpectateViewTarget(AActor* NewTarget)
+{
+	if (!NewTarget || !HasAuthority()) return;
+
+	SetViewTarget(NewTarget);         // 서버: 네트워크 렐러번시가 관전 대상을 따라오게 한다
+	ClientSetViewTarget(NewTarget);   // 클라: 실제 카메라 전환(위 호출은 복제 안 됨)
+}
+
+FString AOBPlayerController::GetSpectateTargetName() const
+{
+	const APawn* P = Cast<APawn>(GetViewTarget());
+	const APlayerState* PS = P ? P->GetPlayerState() : nullptr;
+	return PS ? PS->GetPlayerName() : FString();
+}
+
+void AOBPlayerController::BindToGameStatePhase()
+{
+	if (bPhaseBound) return;
+	
+	AOBExpeditionGameState* GS = GetWorld() ? GetWorld()->GetGameState<AOBExpeditionGameState>() : nullptr;
+	if (!GS)
+	{
+		// GameState 아직 복제 전 -> 잠시 후 재시도
+		GetWorldTimerManager().SetTimer(PhaseBindRetryTimer, this, &AOBPlayerController::BindToGameStatePhase, 0.25f, false);
+		return;
+	}
+	
+	GS->OnPhaseChanged.AddDynamic(this, &AOBPlayerController::HandleExpeditionPhaseChanged);
+	bPhaseBound = true;
+	
+	// 늦게 붙어 이미 Ended면 즉시 반영
+	if (GS->GetPhase() == EOBExpeditionPhase::Ended)
+	{
+		HandleExpeditionPhaseChanged(EOBExpeditionPhase::Ended);
+	}
+}
+
+void AOBPlayerController::HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase)
+{
+	if (!IsLocalController()) return;
+	if (NewPhase != EOBExpeditionPhase::Ended) return;
+
+	// 종료 판정은 사망/탈출과 같은 프레임에 온다. 바로 띄우면 사망화면이 1프레임 만에 지워진다.
+	if (ResultDelaySeconds > 0.f)
+	{
+		GetWorldTimerManager().SetTimer(
+			ResultDelayTimer, this, &AOBPlayerController::ShowResultScreen, ResultDelaySeconds, false);
+	}
+	else
+	{
+		ShowResultScreen();
+	}
+}
+
+void AOBPlayerController::ShowResultScreen()
+{
+	if (ActiveResultWidget) return;
+	
+	HideDeathScreen(); // 사망/탈출 화면 있으면 결과창으로 대체
+	
+	// 입력 잠금 + UI 모드 + 커서
+	DisableInput(this);
+	SetShowMouseCursor(true);
+	SetInputMode(FInputModeUIOnly());
+	
+	if (ResultWidgetClass)
+	{
+		ActiveResultWidget = CreateWidget<UUserWidget>(this, ResultWidgetClass);
+		if (ActiveResultWidget)
+		{
+			ActiveResultWidget->AddToViewport(100); // 최상단
+		}
+	}
+	
+	// 자동 복귀(버튼 안 눌러도)
+	if (AutoReturnSeconds > 0.f)
+	{
+		GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AOBPlayerController::ReturnToHome, AutoReturnSeconds, false);
+	}
+}
+
+void AOBPlayerController::ReturnToHome()
+{
+	GetWorldTimerManager().ClearTimer(AutoReturnTimer);
+	
+	if (HomeLevel.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Expedition] HomeLevel 미지정 → 복귀 불가"));
+		return;
+	}
+	
+	// 데디 접속 종료 후 각 클라가 로컬 Home 로드(개별 복귀).
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, HomeLevel);
+}
+
+int32 AOBPlayerController::GetReturnCountdown() const
+{
+	// 자동복귀 타이머의 남은 시간(비활성이면 -1) → 0 이상 올림값.
+	const float Remaining = GetWorldTimerManager().GetTimerRemaining(AutoReturnTimer);
+	return Remaining > 0.f ? FMath::CeilToInt(Remaining) : 0;
+}
+
+void AOBPlayerController::SetCurrentInteractable(AOBInteractableActor* Interactable)
+{
+	CurrentInteractable = Interactable;
+	// (선택) 여기서 "E 눌러 상호작용" 프롬프트 위젯 토글 가능 — 지금은 생략.
+}
+
+AOBInteractableActor* AOBPlayerController::GetCurrentInteractable() const
+{
+	return CurrentInteractable.Get();
+}
+
+UUserWidget* AOBPlayerController::OpenInteractionWidget(TSubclassOf<UUserWidget> WidgetClass)
+{
+	if (!IsLocalController() || !WidgetClass || ActiveInteractionWidget) return nullptr;
+
+	ActiveInteractionWidget = CreateWidget<UUserWidget>(this, WidgetClass);
+	if (!ActiveInteractionWidget) return nullptr;
+	
+	ActiveInteractionWidget->SetIsFocusable(true);
+	ActiveInteractionWidget->AddToViewport();
+
+	FInputModeUIOnly Mode;
+	Mode.SetWidgetToFocus(ActiveInteractionWidget->TakeWidget());
+	SetInputMode(Mode);
+	SetShowMouseCursor(true);
+
+	// 이동/시점 잠금(UI 연 플레이어만 영향).
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
+	
+	return ActiveInteractionWidget;   // NPC가 바인딩·초기화용으로 사용
+}
+
+void AOBPlayerController::CloseInteractionWidget()
+{
+	if (ActiveInteractionWidget)
+	{
+		ActiveInteractionWidget->RemoveFromParent();
+		ActiveInteractionWidget = nullptr;
+	}
+
+	FInputModeGameOnly Mode;
+	SetInputMode(Mode);
+	SetShowMouseCursor(false);
+
+	// 잠금 해제(Open의 true와 1:1 균형).
+	SetIgnoreMoveInput(false);
+	SetIgnoreLookInput(false);
+}
+
+void AOBPlayerController::Server_SetPartyLeader_Implementation(bool bLeader)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetPartyLeader(bLeader);
+}
+
+void AOBPlayerController::Server_ApplyLoadout_Implementation(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+		PS->SetSelectedWeaponsBulk(Weapons);
 }
 
 void AOBPlayerController::Server_SetWeaponSlot_Implementation(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)

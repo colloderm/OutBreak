@@ -10,6 +10,7 @@
 #include "UI/ViewModels/OBAmmoViewModel.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Inventory/Components/OBInventoryComponent.h"
+#include "UI/HUD/OBConsumableWidget.h"
 #include "View/MVVMView.h"
 
 void AOBHUD::BeginPlay()
@@ -27,6 +28,20 @@ void AOBHUD::BeginPlay()
 	{
 		HandlePawnChanged(nullptr, CurrentPawn);
 	}
+	
+	// 세션 타이머(12시 방향). 상시 존재, Visibility 바인딩이 InProgress 때만 표시.
+	if (SessionTimerWidgetClass)
+	{
+		SessionTimerWidget = CreateWidget<UUserWidget>(PC, SessionTimerWidgetClass);
+		if (SessionTimerWidget) SessionTimerWidget->AddToViewport();
+	}
+	
+	// 크로스헤어(화면 중앙). 상시 존재, 표시 여부는 위젯 바인딩이 판단.
+	if (CrosshairWidgetClass)
+	{
+		CrosshairWidget = CreateWidget<UUserWidget>(PC, CrosshairWidgetClass);
+		if (CrosshairWidget) CrosshairWidget->AddToViewport();
+	}
 }
 
 void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)
@@ -35,6 +50,7 @@ void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)
 	{
 		TryInitHealthWidget(Character);
 		BindAmmoToCharacter(Character);
+		BindConsumablesToCharacter(Character);
 	}
 }
 
@@ -118,4 +134,22 @@ void AOBHUD::HandleWeaponChanged(AOBWeaponBase* NewWeapon)
 	{
 		AmmoViewModel->SetWeapon(NewWeapon);
 	}
+}
+
+void AOBHUD::BindConsumablesToCharacter(AOBCharacterBase* Character)
+{
+	if (!Character || !ConsumableWidgetClass) return;
+	
+	UOBInventoryComponent* Inventory = Character->FindComponentByClass<UOBInventoryComponent>();
+	if (!Inventory) return;
+	
+	if (!ConsumableWidget)
+	{
+		ConsumableWidget = CreateWidget<UOBConsumableWidget>(GetOwningPlayerController(), ConsumableWidgetClass);
+		if (ConsumableWidget)
+			ConsumableWidget->AddToViewport();
+	}
+	
+	if (ConsumableWidget)
+		ConsumableWidget->SetInventory(Inventory); // 리스폰 시 재 바인딩
 }

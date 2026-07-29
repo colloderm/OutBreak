@@ -17,4 +17,8 @@ class OUTBREAK_API UOBWeaponCatalog : public UPrimaryDataAsset
 public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "catalog")
 	TArray<TSubclassOf<AOBWeaponBase>> AvailableWeapons;
+	
+	// 무일푼 소프트락 방지용 무료 지급 무기. 창고+슬롯이 모두 비었을 때만 지급.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "catalog")
+	TArray<TSubclassOf<AOBWeaponBase>> StarterWeapons;
 };

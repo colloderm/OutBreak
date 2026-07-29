@@ -38,6 +38,12 @@ protected:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
+	
+	virtual bool CanActivateAbility(const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
 	// 단발 1회: 반동(클라) + 트레이스/데미지/큐/몽타주(서버).
 	void FireOneShot();
@@ -64,6 +70,15 @@ protected:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Debug")
 	bool bDrawDebugTrace = false;
+	
+	// 스프린트 판정 기준 속도(cm/s). 배율 적용 전 원본 기준이며,
+	// 실제 임계값은 이 값 × CMC SpeedMultiplier. 달리기(gait) 최고속과 스프린트 최고속 사이에 둘 것.
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	float SprintBlockSpeed = 600.f;
+	
+private:
+	// 소유 캐릭터가 스프린트(고속) 중인지. 발사 게이트 공용.
+	bool IsOwnerSprinting() const;
 	
 private:
 	// 점사/연사 반복 타이머.

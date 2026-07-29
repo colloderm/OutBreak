@@ -58,6 +58,10 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 	// 서버는 OnRep이 호출되지 않으므로 여기서 직접 부착(리슨 서버 포함).
 	AttachWeaponToOwner();
 	
+	// [수정] 장착 즉시 탄약 초기화(WeaponData 기준) → CurrentAmmo 세팅 + OnRep_Ammo 복제.
+	//        이게 없으면 첫 장전이 한 박자 밀림(속성 미세팅/복제 타이밍).
+	NewWeapon->InitializeAmmo();
+	
 	// 레이어 링크 + draw 몽타주(서버 로컬)
 	ApplyCosmeticEquip();
 	
@@ -69,17 +73,12 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 			if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter))
 			{
 				Data->AbilitySet->GiveToAbilitySystem(ASC, &GrantedAbilityHandles, NewWeapon);
-				
-				OnWeaponChanged.Broadcast(CurrentWeapon);
 			}
 		}
 	}
 	
-
-	// [확장] 장착 시 발사 Ability 부여:
-	// UOBAbilitySet이 Ability 부여를 지원하면 여기서 PlayerState ASC에 적용한다.
-	// (현재 미지원 → AbilitySet 확장 단계에서 활성화)
-	// if (UOBAbilitySet* Set = WeaponData->GetAbilitySet()) { Set->GiveToAbilitySystem(ASC, NewWeapon); }
+	// AbilitySet 유무와 무관하게 항상 알린다(HUD·이동속도 구독자가 있음).
+	OnWeaponChanged.Broadcast(CurrentWeapon);
 }
 
 void UOBEquipmentComponent::UnequipWeapon()
@@ -138,9 +137,32 @@ void UOBEquipmentComponent::AttachWeaponToOwner()
 
 	ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner());
 	if (!OwnerCharacter || !OwnerCharacter->GetMesh()) return;
-	auto ChildMesh = Cast<USkeletalMeshComponent>(OwnerCharacter->GetMesh()->GetChildComponent(0));
+
+	// 총은 "보이는 손"에 있어야 하므로 시각용 자식 메시에 부착한다.
+	// 메인(소스) 메시에 붙이면 리타겟 비율 차이만큼 총이 손에서 벗어난다.
+	// ponytail: 첫 자식 스켈레탈 메시를 시각용으로 간주. 자식 메시가 2개 이상 되면 이름/태그 지정으로 승급.
+	USkeletalMeshComponent* TargetMesh = OwnerCharacter->GetMesh();
+	TArray<USceneComponent*> Children;
+	OwnerCharacter->GetMesh()->GetChildrenComponents(false, Children);
+	for (USceneComponent* C : Children)
+	{
+		if (USkeletalMeshComponent* SK = Cast<USkeletalMeshComponent>(C)) { TargetMesh = SK; break; }
+	}
+
+	// 무기별 소켓(비어 있으면 컴포넌트 기본값).
+	const UOBWeaponData* Data = CurrentWeapon->GetWeaponData();
+	const FName SocketToUse = (Data && !Data->AttachSocket.IsNone()) ? Data->AttachSocket : AttachSocketName;
+
+	// 소켓이 없으면 컴포넌트 원점(발밑)에 붙어 총이 바닥에 떨어진다. 조용히 실패하지 않도록 경고.
+	if (!TargetMesh->DoesSocketExist(SocketToUse))
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Equip] 소켓 '%s' 이(가) %s 에 없습니다. 무기가 컴포넌트 원점에 붙습니다."),
+			*SocketToUse.ToString(), *TargetMesh->GetName());
+	}
+
 	const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
-	CurrentWeapon->AttachToComponent(ChildMesh, AttachRules, AttachSocketName);
+	CurrentWeapon->AttachToComponent(TargetMesh, AttachRules, SocketToUse);
 }
 
 void UOBEquipmentComponent::ApplyCosmeticEquip()
@@ -156,18 +178,7 @@ void UOBEquipmentComponent::ApplyCosmeticEquip()
 	UOBWeaponData* Data = CurrentWeapon->GetWeaponData();
 	if (!Data) return;
 
-	// 1) 카테고리 포즈 레이어 교체(이전 레이어 해제 후 신규 링크).
-	if (LinkedAnimLayer)
-	{
-		Anim->UnlinkAnimClassLayers(LinkedAnimLayer);
-	}
-	LinkedAnimLayer = Data->EquippedAnimLayer;
-	if (LinkedAnimLayer)
-	{
-		Anim->LinkAnimClassLayers(LinkedAnimLayer);
-	}
-
-	// 2) 꺼내기(draw) 몽타주.
+	// 꺼내기(draw) 몽타주.
 	if (Data->EquipMontage)
 	{
 		Anim->Montage_Play(Data->EquipMontage);
@@ -182,10 +193,4 @@ void UOBEquipmentComponent::RemoveCosmeticEquip()
 	USkeletalMeshComponent* MontageMesh = Char->GetMontageMesh();
 	UAnimInstance* Anim = MontageMesh ? MontageMesh->GetAnimInstance() : nullptr;
 	if (!Anim) return;
-
-	if (LinkedAnimLayer)
-	{
-		Anim->UnlinkAnimClassLayers(LinkedAnimLayer);
-		LinkedAnimLayer = nullptr;
-	}
 }

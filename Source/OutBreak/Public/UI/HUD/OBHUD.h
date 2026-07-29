@@ -6,6 +6,7 @@
 #include "GameFramework/HUD.h"
 #include "OBHUD.generated.h"
 
+class UOBConsumableWidget;
 class UOBAmmoViewModel;
 class AOBWeaponBase;
 class UUserWidget;
@@ -36,8 +37,11 @@ protected:
 	void InitHealthWidget(AOBCharacterBase* Character);
 	
 	void BindAmmoToCharacter(AOBCharacterBase* Character);
+	
 	// 무기 교체 시 VM 재바인딩.
 	void HandleWeaponChanged(AOBWeaponBase* NewWeapon);
+	
+	void BindConsumablesToCharacter(AOBCharacterBase* Character);
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -57,4 +61,22 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UOBAmmoViewModel> AmmoViewModel;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "HUD")
+	TSubclassOf<UOBConsumableWidget> ConsumableWidgetClass;
+	
+	UPROPERTY()
+	TObjectPtr<UOBConsumableWidget> ConsumableWidget;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> SessionTimerWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> SessionTimerWidget;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> CrosshairWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UUserWidget> CrosshairWidget;
 };

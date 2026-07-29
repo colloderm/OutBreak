@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
+#include "Game/Expedition/OBExpeditionTypes.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "OBPlayerStateBase.generated.h"
 
@@ -33,10 +34,41 @@ public:
 
 	const TArray<TSubclassOf<AOBWeaponBase>>& GetSelectedWeapons() const { return SelectedWeapons; }
 	bool IsReady() const { return bReady; }
+	
+	EOBPlayerExpeditionStatus GetExpeditionStatus() const { return ExpeditionStatus; }
+	bool IsAliveInExpedition() const { return ExpeditionStatus == EOBPlayerExpeditionStatus::Alive; }
+	uint8 GetTeamId() const { return TeamId; }
 
+	void SetExpeditionStatus(EOBPlayerExpeditionStatus NewStatus);
+	void SetTeamId(uint8 NewTeamId);
+	
+	float GetExtractionProgress() const { return ExtractionProgress; }
+	bool IsExtracting() const { return bIsExtracting; }
+	// 서버: 탈출 진행도 갱신(ExtractionZone이 매 틱 호출).
+	void SetExtractionProgress(float InProgress01, bool bInExtracting);
+	
+	bool IsPartyLeader() const { return bIsPartyLeader; }
+	void SetPartyLeader(bool bInLeader);
+	
+	// 클라가 GameInstance Loadout을 한 번에 밀어넣을 때 사용(세션 진입 시).
+	void SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeaponBase>>& InWeapons);
+	
+	// 프렌들리 파이어 판정: 두 액터가 모두 플레이어이고 같은 팀(TeamId>0)이면 true.
+	// - AI/적(플레이어 아님)은 항상 false → 정상 피해.
+	static bool AreSameTeam(const AActor* A, const AActor* B);
+	
+public:
 	// 로비 UI 갱신.
 	DECLARE_MULTICAST_DELEGATE(FOBOnLobbyStateChanged);
 	FOBOnLobbyStateChanged OnLobbyStateChanged;
+	
+	// 결과/HUD 갱신 알림.
+	DECLARE_MULTICAST_DELEGATE(FOBOnExpeditionStatusChanged);
+	FOBOnExpeditionStatusChanged OnExpeditionStatusChanged;
+	
+	// HUD 탈출 진행바 갱신.
+	DECLARE_MULTICAST_DELEGATE(FOBOnExtractionProgressChanged);
+	FOBOnExtractionProgressChanged OnExtractionProgressChanged;
 	
 protected:
 	UFUNCTION() 
@@ -44,6 +76,12 @@ protected:
 	
 	UFUNCTION() 
 	void OnRep_Ready();
+	
+	UFUNCTION() 
+	void OnRep_ExpeditionStatus();
+	
+	UFUNCTION()
+	void OnRep_ExtractionProgress();
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ability", Meta = (AllowPrivateAccess = "true"))
@@ -57,4 +95,31 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_Ready, BlueprintReadOnly, Category = "Lobby")
 	bool bReady = false;
+	
+	UPROPERTY(ReplicatedUsing = OnRep_ExpeditionStatus, BlueprintReadOnly, Category = "Expedition")
+	EOBPlayerExpeditionStatus ExpeditionStatus = EOBPlayerExpeditionStatus::Alive;
+
+	// 솔로=고유값 / 파티=공유값. GameMode가 진입 시 부여.
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	uint8 TeamId = 0;
+	
+	// 탈출 진행도(0~1). 소유 클라에만 복제(HUD용).
+	UPROPERTY(ReplicatedUsing = OnRep_ExtractionProgress, BlueprintReadOnly, Category = "Expedition")
+	float ExtractionProgress = 0.f;
+
+	// 현재 탈출 홀드 중인지(HUD 표시 토글). 소유 클라에만 복제.
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	bool bIsExtracting = false;
+	
+	// 추출 성공 보상(스크랩). 알파: 고정값.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	int32 ExtractReward = 200;
+	
+	// 솔로=true(자기 자신이 리더). 파티 시 팀장만 true → "탐사 시작" 버튼 게이팅.
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Party")
+	bool bIsPartyLeader = true;
+	
+private:
+	// 로드아웃/통화(클라 소유 GameInstance) 반영. OnRep + 서버 세터 양쪽에서 호출.
+	void ApplyExpeditionStatusToLoadout();
 };

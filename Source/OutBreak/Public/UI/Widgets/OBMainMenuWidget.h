@@ -4,11 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Interfaces/OnlineSessionInterface.h"
 #include "OBMainMenuWidget.generated.h"
 
 class UButton;
-class UOBSessionSubsystem;
 
 UCLASS()
 class OUTBREAK_API UOBMainMenuWidget : public UUserWidget
@@ -24,31 +22,17 @@ protected:
 	virtual bool Initialize() override;
 	virtual void NativeDestruct() override;
 
-	// 버튼 콜백.
-	UFUNCTION() void OnHostClicked();
-	UFUNCTION() void OnJoinClicked();
+	UFUNCTION()
+	void OnStartClicked();
 
-	// 세션 서브시스템 결과 콜백.
-	void HandleCreateSessionComplete(bool bWasSuccessful);
-	void HandleFindSessionsComplete(const TArray<FOnlineSessionSearchResult>& Results, bool bWasSuccessful);
-	void HandleJoinSessionComplete(EOnJoinSessionCompleteResult::Type Result);
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "OB|Menu")
-	TSoftObjectPtr<UWorld> LobbyLevel;
+	// 개인 Home 레벨(에디터에서 L_Home 지정).
+	UPROPERTY(EditAnywhere, Category = "Flow")
+	TSoftObjectPtr<UWorld> HomeLevel;
 	
-	// WBP의 버튼(이름 일치 필요).
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UButton> HostButton;
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UButton> JoinButton;
+	TObjectPtr<UButton> StartButton;
 
 private:
 	void MenuTearDown();
-
-	UPROPERTY()
-	TObjectPtr<UOBSessionSubsystem> SessionSubsystem;
-
-	int32 NumPublicConnections = 4;
-	FString MatchType = TEXT("Coop");
-	FString LobbyMap;
+	
 };

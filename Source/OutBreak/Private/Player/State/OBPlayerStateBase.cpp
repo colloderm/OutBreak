@@ -6,7 +6,10 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
+#include "GameFramework/PlayerController.h"
+#include "LoadOut/OBLoadoutSubsystem.h"
 #include "Weapon/OBWeaponBase.h"
+#include "Engine/World.h"
 
 AOBPlayerStateBase::AOBPlayerStateBase()
 {
@@ -30,6 +33,11 @@ void AOBPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	
 	DOREPLIFETIME(AOBPlayerStateBase, SelectedWeapons);
 	DOREPLIFETIME(AOBPlayerStateBase, bReady);
+	DOREPLIFETIME(AOBPlayerStateBase, ExpeditionStatus);
+	DOREPLIFETIME(AOBPlayerStateBase, TeamId);
+	DOREPLIFETIME(AOBPlayerStateBase, bIsPartyLeader);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, ExtractionProgress, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, bIsExtracting,      COND_OwnerOnly);
 }
 
 void AOBPlayerStateBase::SetWeaponForSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
@@ -60,6 +68,66 @@ void AOBPlayerStateBase::SetReady(bool bInReady)
 	OnLobbyStateChanged.Broadcast();
 }
 
+void AOBPlayerStateBase::SetExpeditionStatus(EOBPlayerExpeditionStatus NewStatus)
+{
+	if (!HasAuthority() || ExpeditionStatus == NewStatus) return;
+	
+	ExpeditionStatus = NewStatus;
+	OnExpeditionStatusChanged.Broadcast(); // 리슨 호스트 로컬 갱신
+	ApplyExpeditionStatusToLoadout();   // ← 리슨 호스트/스탠드얼론 커버
+}
+
+void AOBPlayerStateBase::SetTeamId(uint8 NewTeamId)
+{
+	if (!HasAuthority()) return;
+	
+	TeamId = NewTeamId;
+}
+
+void AOBPlayerStateBase::SetExtractionProgress(float InProgress01, bool bInExtracting)
+{
+	if (!HasAuthority()) return;
+
+	ExtractionProgress = InProgress01;
+	bIsExtracting = bInExtracting;
+	OnExtractionProgressChanged.Broadcast(); // 리슨 호스트 로컬 즉시 갱신
+}
+
+void AOBPlayerStateBase::SetPartyLeader(bool bInLeader)
+{
+	if (!HasAuthority()) return;
+	
+	bIsPartyLeader = bInLeader;
+	OnLobbyStateChanged.Broadcast();
+}
+
+void AOBPlayerStateBase::SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeaponBase>>& InWeapons)
+{
+	if (!HasAuthority()) return;
+
+	SelectedWeapons = InWeapons;   // 통째 교체(슬롯 유효성은 클라 Loadout이 이미 보장)
+	OnLobbyStateChanged.Broadcast();
+}
+
+bool AOBPlayerStateBase::AreSameTeam(const AActor* A, const AActor* B)
+{
+	auto GetTeam = [](const AActor* Actor, uint8& OutTeam) -> bool 
+	{
+		const APawn* Pawn = Cast<APawn>(Actor);
+		if (!Pawn) return false;
+		if (const AOBPlayerStateBase* PS = Pawn->GetPlayerState<AOBPlayerStateBase>())
+		{
+			OutTeam = PS->GetTeamId();
+			return true;
+		}
+		return false; // 컨트롤러/PS 없음(AI 등) -> 팀 없음
+	};
+	
+	uint8 TA = 0, TB = 0;
+	if (!GetTeam(A,TA) || !GetTeam(B,TB)) return false; // 한쪽이라도 플레이어 아님
+	return TA != 0 && TA == TB; // 0 미배정 제외, 같은 팀만 true
+}
+
 void AOBPlayerStateBase::OnRep_SelectedWeapons()
 {
 	OnLobbyStateChanged.Broadcast();
@@ -68,6 +136,39 @@ void AOBPlayerStateBase::OnRep_SelectedWeapons()
 void AOBPlayerStateBase::OnRep_Ready()
 {
 	OnLobbyStateChanged.Broadcast();
+}
+
+void AOBPlayerStateBase::OnRep_ExpeditionStatus()
+{
+	OnExpeditionStatusChanged.Broadcast();
+	ApplyExpeditionStatusToLoadout();
+}
+
+void AOBPlayerStateBase::OnRep_ExtractionProgress()
+{
+	OnExtractionProgressChanged.Broadcast(); // 클라 HUD 갱신
+}
+
+void AOBPlayerStateBase::ApplyExpeditionStatusToLoadout()
+{
+	const UWorld* World = GetWorld();
+	const APlayerController* LocalPC = World ? World->GetFirstPlayerController() : nullptr;
+	if (!LocalPC || LocalPC->PlayerState != this) return;   // 내 로컬 PS만
+
+	UOBLoadoutSubsystem* Loadout = World->GetGameInstance() ? World->GetGameInstance()->GetSubsystem<UOBLoadoutSubsystem>() : nullptr;
+	if (!Loadout) return;
+
+	switch (ExpeditionStatus)
+	{
+	case EOBPlayerExpeditionStatus::Dead:      
+		Loadout->ClearLoadout();
+		break;
+	case EOBPlayerExpeditionStatus::Extracted: 
+		Loadout->AddCurrency(ExtractReward); 
+		break;
+	default: 
+		break;
+	}
 }
 
 void AOBPlayerStateBase::CopyProperties(APlayerState* NewPlayerState)

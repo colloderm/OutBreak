@@ -114,7 +114,13 @@ void AOBGrenadeProjectile::Explode()
 		}
 	}
 	
-	Destroy();
+	SetActorEnableCollision(false);
+	SetActorHiddenInGame(true);
+	if (ProjectileMovement)
+	{
+		ProjectileMovement->StopMovementImmediately();
+	}
+	SetLifeSpan(2.0f);
 }
 
 void AOBGrenadeProjectile::Multicast_OnExploded_Implementation(FVector Location)
