@@ -22,7 +22,6 @@
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Maps/OutBreak_Exterior.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Maps/OutBreak_Exterior.umap" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -386,7 +385,7 @@
       <workItem from="1785111860550" duration="41000" />
       <workItem from="1785111946988" duration="22955000" />
       <workItem from="1785199241584" duration="6392000" />
-      <workItem from="1785284554650" duration="8946000" />
+      <workItem from="1785284554650" duration="12259000" />
     </task>
     <servers />
   </component>
