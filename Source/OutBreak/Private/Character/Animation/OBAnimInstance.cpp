@@ -35,6 +35,7 @@ void UOBAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 void UOBAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
+	
 	CurrentOverlayLocomotion = nullptr;
 	GroundSpeed = 0.f;
 	LocomotionDirection = 0.f;
@@ -85,16 +86,32 @@ void UOBAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	bHasOverlay = CurrentOverlayLocomotion != nullptr;
 	bHasWeaponAimOffset = CurrentAimOffset != nullptr;
 	bUseADSPose = CurrentADSPose && OwningCharacter && OwningCharacter->IsAiming();
+	const bool bAiming = OwningCharacter && OwningCharacter->IsAiming();
 	bInCombat = OwningCharacter && (OwningCharacter->IsAiming() || OwningCharacter->IsRecentlyFired());
 	
-	const bool bSprinting = bIsSprintingFromGait && !bFalling;
-	if (bSprinting && CurrentSprintPose)  OverlayPoseIndex = 2;
-	else if (bUseADSPose)                 OverlayPoseIndex = 1;
-	else                                  OverlayPoseIndex = 0;
+	// 진입은 즉시, 해제만 지연. Gait가 Run↔Sprint를 오가도 상체가 한 방향으로만 반응한다.
+	if (bIsSprintingFromGait && !bFalling)
+	{
+		SprintOffDelayRemaining = SprintReleaseDelay;
+	}
+	else
+	{
+		SprintOffDelayRemaining = FMath::Max(0.f, SprintOffDelayRemaining - DeltaSeconds);
+	}
+	const bool bSprinting = SprintOffDelayRemaining > 0.f;
 
-	// 스프린트인데 전용 포즈가 없으면(권총 등) 오버레이·IK 모두 해제.
-	OverlayAlpha = (bHasOverlay && (!bSprinting || CurrentSprintPose)) ? 1.f : 0.f;
-	AimOffsetAlpha = (bHasWeaponAimOffset && !bSprinting) ? 1.f : 0.f;
+	if (bUseADSPose)							OverlayPoseIndex = 1;
+	else if (bSprinting && CurrentSprintPose)	OverlayPoseIndex = 2;
+	else										OverlayPoseIndex = 0;
+
+	// 스프린트인데 전용 포즈가 없으면(권총 등) 오버레이·IK 해제. 단 조준 중이면 유지 —
+	const float TargetOverlayAlpha   = (bHasOverlay && (bAiming || !bSprinting || CurrentSprintPose)) ? 1.f : 0.f;
+	// 조준 중이면 스프린트여도 조준 오프셋을 켜서 상체가 시야를 따라가게 한다.
+	const float TargetAimOffsetAlpha = (bHasWeaponAimOffset && (bAiming || !bSprinting)) ? 1.f : 0.f;
+
+	// 0/1 스냅은 경계에서 팝으로 보인다. 왼손 IK와 같은 방식으로 보간.
+	OverlayAlpha   = FMath::FInterpTo(OverlayAlpha,   TargetOverlayAlpha,   DeltaSeconds, OverlayBlendSpeed);
+	AimOffsetAlpha = FMath::FInterpTo(AimOffsetAlpha, TargetAimOffsetAlpha, DeltaSeconds, OverlayBlendSpeed);
 
 	// 무기 소켓 읽기는 게임 스레드에서(스레드 안전 업데이트에서 하면 위험).
 	UpdateLeftHandIK(DeltaSeconds);

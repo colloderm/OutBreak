@@ -92,13 +92,23 @@ protected:
 	UPROPERTY(BlueprintReadWrite, Category = "Overlay", Meta = (AllowPrivateAccess = "true"))
 	bool bIsSprintingFromGait = false;
 	
+	// 스프린트 해제 지연(초). Gait가 경계에서 떨려도 오버레이가 깜빡이지 않게 한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Overlay")
+	float SprintReleaseDelay = 0.15f;
+
+	// 오버레이/조준오프셋 알파 블렌드 속도.
+	UPROPERTY(EditDefaultsOnly, Category = "Overlay")
+	float OverlayBlendSpeed = 10.f;
+	
 private:	
 	void UpdateLeftHandIK(float DeltaSeconds);
 	
 	bool ShouldDisableLeftHandIK() const; 
 	
 private:
-
+	// 스프린트 해제까지 남은 유예 시간.
+	float SprintOffDelayRemaining = 0.f;
+	
 	UPROPERTY()
 	TObjectPtr<AOBCharacterBase> OwningCharacter;
 	

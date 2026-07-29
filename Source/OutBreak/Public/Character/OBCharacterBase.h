@@ -34,7 +34,7 @@ private:
 	
 public:
 	// Sets default values for this character's properties
-	AOBCharacterBase();
+	AOBCharacterBase(const FObjectInitializer& ObjectInitializer);
 
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	
@@ -211,7 +211,6 @@ protected:
 	bool bLastCombatOrientation = false;
 	
 private:
-	float DefaultWalkSpeed = 600.f;
 	float DefaultCameraFOV = 90.f;
 	float TargetCameraFOV = 90.f;
 	float CameraBlendSpeed = 12.f;
