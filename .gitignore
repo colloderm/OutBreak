@@ -93,8 +93,8 @@ Content/Infected/Systems
 Content/Infected.zip
 Content/Infected/Textures
 Content/PostABundle
-Content/__ExternalActors__
-Content/__ExternalObjects__
+Content/__ExternalActors__/PostABundle
+Content/__ExternalObjects__/PostABundle
 Content/Abandoned_Mall
 
 /Output/
