@@ -185,6 +185,7 @@ void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName,
 
 				FTransform SpawnTransform = ProxyMesh->GetSocketTransform(BoneName);
 				AStaticMeshActor* MeshPart = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), SpawnTransform, SpawnParams);
+				MeshPart->SetLifeSpan(10.f);
 				UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(MeshPart->GetRootComponent());
 				MeshComp->SetMobility(EComponentMobility::Movable);
 				MeshComp->SetStaticMesh(MeshAsset);
