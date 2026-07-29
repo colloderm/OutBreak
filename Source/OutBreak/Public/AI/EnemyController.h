@@ -30,7 +30,7 @@ public:
 
 	void InitializeComponents();
 
-	void Dead();
+	void Dead(float CleanupDelay);
 
 	UFUNCTION(BlueprintPure, Category = "AI|Memory")
 	UEnemyMemoryComponent* GetEnemyMemoryComponent() const

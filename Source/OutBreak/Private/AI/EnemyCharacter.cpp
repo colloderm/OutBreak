@@ -327,14 +327,30 @@ void AEnemyCharacter::StopCharacterMovement()
 
 void AEnemyCharacter::Dead()
 {
-	AEnemyController* EnemyContoller = Cast<AEnemyController>(GetController());
-	if (IsValid(EnemyContoller))
+	if (bIsDead)
 	{
-		EnemyContoller->Dead();
+		return;
 	}
+
+	bIsDead = true;
+
+	AEnemyController* EnemyController =
+		Cast<AEnemyController>(GetController());
+	if (IsValid(EnemyController))
+	{
+		EnemyController->Dead(DeathCleanupDelay);
+	}
+
+	StopCharacterMovement();
 	GetMesh()->SetSimulatePhysics(true);
-	
-	
+
+	if (DeathCleanupDelay <= 0.0f)
+	{
+		Destroy();
+		return;
+	}
+
+	SetLifeSpan(DeathCleanupDelay);
 }
 
 void AEnemyCharacter::SetAnimationSignificance(

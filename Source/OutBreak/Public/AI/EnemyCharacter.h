@@ -107,6 +107,21 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
+
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Death",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float DeathCleanupDelay = 5.0f;
+
+	UPROPERTY(
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Transient,
+		Category = "Death",
+		meta = (AllowPrivateAccess = "true"))
+	bool bIsDead = false;
 	
 	/* ================================================== Components ============================================= */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))
