@@ -61,7 +61,7 @@ struct OUTBREAK_API FCharacterMovementModify
 		 * 이 Task는 State 완료를 결정하지 않고,
 		 * State가 활성화된 동안 속도만 수정합니다.
 		 */
-		bConsideredForCompletion = false;
+		// bConsideredForCompletion = false;
 
 		/*
 		 * 매 Tick 처리할 내용이 없습니다.

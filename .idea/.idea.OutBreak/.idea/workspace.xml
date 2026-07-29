@@ -21,20 +21,26 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Animation/Notify/AttackNotifyState.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Animation/Notify/AttackNotifyState.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Characters/Heroes/Mannequin/Meshes/SK_Mannequin.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Characters/Heroes/Mannequin/Meshes/SK_Mannequin.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_GenNavLink.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_GenNavLink1.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/DevB/BP_GenNavLink2.uasset" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/BP_TestCharacter.uasset" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI_Advanced.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI_Advanced.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Materials/MI_Water.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Materials/MI_Water.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Materials/M_Water.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Materials/M_Water.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Materials/M_WaterLODRiver.uasset" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Materials/M_WaterRiver.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Materials/M_WaterRiver.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Materials/Water_FarMesh.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Materials/Water_FarMesh.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/OutBreak.uproject" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.uproject" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/OutBreak.Build.cs" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/OutBreak.Build.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMemoryComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMemoryComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/TimedMoveToTask.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/TimedMoveToTask.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMemoryComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMemoryComponent.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/TimedMoveToTask.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/TimedMoveToTask.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/Crawl/AS_NAAT_Zombie_Attack_LH_Crawl_Montage.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/Crawl/AS_NAAT_Zombie_Attack_LH_Crawl_Montage.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/Crawl/AS_NAAT_Zombie_Attack_RH_Crawl_Montage.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/Crawl/AS_NAAT_Zombie_Attack_RH_Crawl_Montage.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/ZombieIP_LeftAttack_01Normal_Montage.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/ZombieIP_LeftAttack_01Normal_Montage.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/ZombieIP_RightAttack_01Normal_Montage.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/ZombieAsset/Anim/ZombieIP_RightAttack_01Normal_Montage.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Maps/OutBreak_Exterior.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Maps/OutBreak_Exterior.umap" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.sln.DotSettings.user" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/RandomLocationGen.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/RandomLocationGen.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/CharacterMovementTask.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/CharacterMovementTask.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,6 +59,7 @@
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Private/AIController.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/Controller.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Animation/Notify/AttackNotifyState.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemySpawnableComponent.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -81,6 +88,7 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Lobby/LoadoutWidget/WeaponStatView.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Animation/Notify/AttackNotifyState.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyBaseActorComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemySpawnableComponent.h" root0="FORCE_HIGHLIGHTING" />
@@ -395,6 +403,7 @@
       <workItem from="1785111860550" duration="41000" />
       <workItem from="1785111946988" duration="22955000" />
       <workItem from="1785199241584" duration="6392000" />
+      <workItem from="1785284554650" duration="4288000" />
     </task>
     <servers />
   </component>

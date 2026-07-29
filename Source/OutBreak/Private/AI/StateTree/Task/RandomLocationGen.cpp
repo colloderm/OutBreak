@@ -10,7 +10,6 @@ FRandomLocationGen::FRandomLocationGen()
 {
 	// 위치는 EnterState에서 한 번만 생성하므로 Tick이 필요하지 않습니다.
 	bShouldCallTick = false;
-	bConsideredForCompletion = false;
 	
 }
 

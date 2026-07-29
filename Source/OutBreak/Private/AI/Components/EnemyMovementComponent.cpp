@@ -3,12 +3,9 @@
 
 #include "AI/Components/EnemyMovementComponent.h"
 
-#include "InputBehavior.h"
 #include "AI/EnemyCharacter.h"
-#include "AnimationBudgetAllocator/Public/SkeletalMeshComponentBudgeted.h"
 #include "Chaos/Deformable/Utilities.h"
 #include "Components/CapsuleComponent.h"
-#include "AI/EnemyCharacter.h"
 #include "Animation/AnimMontage.h"
 #include "MotionWarpingComponent.h"
 #include "Kismet/KismetMathLibrary.h"

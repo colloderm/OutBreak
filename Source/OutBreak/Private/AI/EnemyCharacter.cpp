@@ -333,6 +333,8 @@ void AEnemyCharacter::Dead()
 		EnemyContoller->Dead();
 	}
 	GetMesh()->SetSimulatePhysics(true);
+	
+	
 }
 
 void AEnemyCharacter::SetAnimationSignificance(
