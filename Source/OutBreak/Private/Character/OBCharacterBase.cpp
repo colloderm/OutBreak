@@ -25,6 +25,11 @@
 #include "Character/Components/OBCharacterMovementComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
 
+FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
+{
+    return TeamId;
+}
+
 AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer.SetDefaultSubobjectClass<UOBCharacterMovementComponent>(
 		ACharacter::CharacterMovementComponentName))
