@@ -136,9 +136,10 @@ void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, A
 
 		// 월드 파티션은 컨트롤러(뷰 타깃)를 스트리밍 소스로 쓴다. 폰이 없는 지금은
 		// 컨트롤러 자신이 소스라, 먼저 옮겨야 스폰 지점 셀부터 로딩이 시작된다.
+		// AController는 SetActorLocation을 숨겨놨으므로 전용 API를 쓴다.
 		if (NewPlayer)
 		{
-			NewPlayer->SetActorLocation(T.GetLocation());
+			NewPlayer->SetInitialLocationAndRotation(T.GetLocation(), T.Rotator());
 		}
 
 		RestartPlayerAtTransform(NewPlayer, T);

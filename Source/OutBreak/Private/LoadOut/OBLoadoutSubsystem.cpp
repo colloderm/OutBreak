@@ -58,6 +58,34 @@ void UOBLoadoutSubsystem::GrantStarterIfEmpty(UOBWeaponCatalog* Catalog)
 	}
 }
 
+int32 UOBLoadoutSubsystem::GrantMissingStarters(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons)
+{
+	int32 Granted = 0;
+
+	for (const TSubclassOf<AOBWeaponBase>& WClass : Weapons)
+	{
+		if (!WClass) continue;
+
+		// 불변식 유지: 한 클래스는 창고 OR 슬롯 중 한 곳에만 존재한다.
+		if (IsOwnedOrEquipped(WClass)) continue;
+
+		const AOBWeaponBase* CDO = WClass->GetDefaultObject<AOBWeaponBase>();
+		const UOBWeaponData* Data = CDO ? CDO->GetWeaponData() : nullptr;
+		if (!Data) continue;
+
+		// 이미 찬 슬롯은 건너뛴다. 빈 슬롯만 메우는 게 목적이지 무료 교체가 아니다.
+		if (CurrentLoadout.SlotWeapons.Contains(Data->WeaponSlot)) continue;
+
+		CurrentLoadout.SlotWeapons.Add(Data->WeaponSlot, TSoftClassPtr<AOBWeaponBase>(WClass));
+		++Granted;
+	}
+
+	if (Granted > 0) 
+		SaveToDisk();
+
+	return Granted;
+}
+
 TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetSelectedClasses() const
 {
 	TArray<TSubclassOf<AOBWeaponBase>> Out;

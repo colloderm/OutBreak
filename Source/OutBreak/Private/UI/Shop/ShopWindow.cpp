@@ -25,12 +25,6 @@ void UShopWindow::NativeDestruct()
 
 FReply UShopWindow::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey() == EKeys::Escape)
-	{
-		RequestClose();
-		return FReply::Handled();
-	}
-
 	if (const FShopItemViewData* SelectedItem = FindDisplayedItem(CurrentSelectedItemId))
 	{
 		for (const FShopActionViewData& Action : SelectedItem->Actions)
@@ -209,6 +203,8 @@ const FShopWindowViewData& UShopWindow::GetCurrentViewData() const
 void UShopWindow::RequestClose()
 {
 	OnShopCloseRequested.Broadcast(CurrentViewData.ShopId);
+
+	Super::RequestClose();
 }
 
 void UShopWindow::HandleCategorySelected(FName CategoryId)

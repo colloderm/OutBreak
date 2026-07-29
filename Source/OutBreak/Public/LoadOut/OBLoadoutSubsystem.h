@@ -58,6 +58,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	void GrantStarterIfEmpty(UOBWeaponCatalog* Catalog);
 	
+	// 비어 있는 슬롯만 채운다. 이미 보유/장착 중인 건 건드리지 않는다.
+	// 반환값 = 실제 지급 개수(0이면 줄 게 없었다는 뜻).
+	int32 GrantMissingStarters(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
+	
 	// --- 통화 ---
 	UFUNCTION(BlueprintPure, Category = "Currency")
 	int32 GetCurrency() const { return CurrentCurrency; }
