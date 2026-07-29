@@ -22,13 +22,7 @@
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyPhysicalComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyPhysicalComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyController.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Nav/EnemyGenNavLinksProxy.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyCharacter.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/EnemyController.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Maps/OutBreak_Exterior.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Maps/OutBreak_Exterior.umap" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -392,7 +386,7 @@
       <workItem from="1785111860550" duration="41000" />
       <workItem from="1785111946988" duration="22955000" />
       <workItem from="1785199241584" duration="6392000" />
-      <workItem from="1785284554650" duration="6533000" />
+      <workItem from="1785284554650" duration="8946000" />
     </task>
     <servers />
   </component>
