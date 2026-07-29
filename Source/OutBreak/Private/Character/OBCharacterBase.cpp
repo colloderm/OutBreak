@@ -24,6 +24,7 @@
 #include "Character/Animation/OBAnimInstance.h"
 #include "Character/Components/OBCharacterMovementComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
+#include "TimerManager.h"
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
 {
@@ -395,6 +396,24 @@ void AOBCharacterBase::FinishDeathFromDowned()
 	StartDeath(); // 래그돌
 }
 
+void AOBCharacterBase::HoldUntilGrounded()
+{
+	if (!HasAuthority()) return;
+
+	// 바닥이 이미 있으면 스냅만 하고 끝(에디터·비스트리밍 맵의 정상 경로).
+	if (TryLandOnGround()) return;
+
+	// 월드 파티션 셀이 아직 안 올라옴. 지금 떨어뜨리면 지형 밑으로 빠진다.
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->StopMovementImmediately();
+		Move->SetMovementMode(MOVE_None);   // 복제되므로 클라도 같이 멈춘다
+	}
+
+	GroundWaitElapsed = 0.f;
+	GetWorldTimerManager().SetTimer(GroundWaitTimer, this, &AOBCharacterBase::PollGround, 0.25f, true);
+}
+
 void AOBCharacterBase::ApplyCombatFocusPostProcess()
 {
 	if (!FollowCamera) return;
@@ -556,6 +575,40 @@ void AOBCharacterBase::OnRep_IsDowned()
 			if (UAnimInstance* Anim = M->GetAnimInstance())
 				Anim->Montage_Play(DownedEnterMontage);
 	}
+}
+
+void AOBCharacterBase::PollGround()
+{
+	GroundWaitElapsed += 0.25f;
+
+	if (TryLandOnGround() || GroundWaitElapsed >= MaxGroundWaitSeconds)
+	{
+		GetWorldTimerManager().ClearTimer(GroundWaitTimer);
+		if (UCharacterMovementComponent* Move = GetCharacterMovement())
+		{
+			Move->SetMovementMode(MOVE_Walking);
+		}
+	}
+}
+
+bool AOBCharacterBase::TryLandOnGround()
+{
+	UWorld* W = GetWorld();
+	UCapsuleComponent* Capsule = GetCapsuleComponent();
+	if (!W || !Capsule) return false;
+
+	const FVector Start = GetActorLocation();
+	const FVector End   = Start - FVector(0.f, 0.f, GroundTraceDistance);
+
+	// 콜리전이 로드되지 않았으면 여기서 실패한다 = 셀 미도착 판정기.
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(SpawnGroundTrace), /*bTraceComplex=*/false, this);
+	FHitResult Hit;
+	if (!W->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params)) return false;
+
+	SetActorLocation(
+		Hit.ImpactPoint + FVector(0.f, 0.f, Capsule->GetScaledCapsuleHalfHeight() + 5.f),
+		/*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
+	return true;
 }
 
 void AOBCharacterBase::InitAbilitySystemComponent()

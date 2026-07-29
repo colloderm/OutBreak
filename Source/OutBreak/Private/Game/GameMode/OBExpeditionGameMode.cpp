@@ -22,7 +22,7 @@
 
 AOBExpeditionGameMode::AOBExpeditionGameMode()
 {
-	GameSessionClass = AOBExpeditionGameState::StaticClass();
+	GameStateClass = AOBExpeditionGameState::StaticClass();
 }
 
 void AOBExpeditionGameMode::StartPlay()
@@ -34,7 +34,13 @@ void AOBExpeditionGameMode::StartPlay()
 	// [데디 정원 강제] GameSession은 InitGame 단계에서 이미 생성됨.
 	// MaxPlayers는 원격 클라 접속 시 PreLogin의 AtCapacity() 판정에 사용됨.
 	if (GameSession)
+	{
 		GameSession->MaxPlayers = ResolveMaxPlayers();
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Expedition] GameSession 없음 → 정원 제한 미적용"));
+	}
 	
 	StartExpedition();
 }
@@ -126,7 +132,26 @@ void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, A
 	// 시작지점이 존이면 반경 내 랜덤(네비 투영) 트랜스폼으로 스폰 -> 파티원 산개
 	if (AOBExpeditionSpawnZone* Zone = Cast<AOBExpeditionSpawnZone>(StartSpot))
 	{
-		RestartPlayerAtTransform(NewPlayer, Zone->GetScatteredSpawnTransform());
+		const FTransform T = Zone->GetScatteredSpawnTransform();
+
+		// 월드 파티션은 컨트롤러(뷰 타깃)를 스트리밍 소스로 쓴다. 폰이 없는 지금은
+		// 컨트롤러 자신이 소스라, 먼저 옮겨야 스폰 지점 셀부터 로딩이 시작된다.
+		if (NewPlayer)
+		{
+			NewPlayer->SetActorLocation(T.GetLocation());
+		}
+
+		RestartPlayerAtTransform(NewPlayer, T);
+
+		// 셀이 올라올 때까지 낙하 금지.
+		if (NewPlayer)
+		{
+			if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(NewPlayer->GetPawn()))
+			{
+				Char->HoldUntilGrounded();
+			}
+		}
+		
 		return;
 	}
 	
