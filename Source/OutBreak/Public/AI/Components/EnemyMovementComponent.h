@@ -8,7 +8,6 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "AI/Struct/EnemyTraversalData.h"
-#include "AI/Interface/EnemyComponentInterface.h"
 #include "AI/Data/EnemyState.h"
 #include "EnemyMovementComponent.generated.h"
 

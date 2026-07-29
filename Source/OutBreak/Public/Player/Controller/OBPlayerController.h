@@ -25,6 +25,8 @@ class OUTBREAK_API AOBPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 public:
+	AOBPlayerController();
+	
 	//발사 시 시야 회전 반동 + 카메라 쉐이크 적용.
 	void ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale = 1.f);
 

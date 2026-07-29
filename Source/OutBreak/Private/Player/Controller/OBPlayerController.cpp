@@ -24,6 +24,13 @@
 #include "TimerManager.h"
 #include "Game/GameMode/OBExpeditionGameMode.h"
 
+
+
+AOBPlayerController::AOBPlayerController()
+{
+
+}
+
 void AOBPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -77,6 +84,8 @@ void AOBPlayerController::OnRep_PlayerState()
 
 	BindToExpeditionStatus();
 }
+
+
 
 void AOBPlayerController::ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale)
 {

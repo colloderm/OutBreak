@@ -66,6 +66,14 @@
 			"Enabled": true
 		},
 		{
+			"Name": "StateTree",
+			"Enabled": true
+		},
+		{
+			"Name": "PropertyBindingUtils",
+			"Enabled": true
+		},
+		{
 			"Name": "MotionTrajectory",
 			"Enabled": true
 		},

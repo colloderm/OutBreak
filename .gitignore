@@ -74,7 +74,8 @@ Plugins/**/Intermediate/*
 # Cache files for the editor to use
 DerivedDataCache/*
 
-.idea/*
+# JetBrains Rider / IntelliJ IDEA
+/.idea/
 
 # Dev B ignore
 Content/Infected/Infected_Female/Character_Poses
@@ -94,3 +95,7 @@ Content/Infected/Textures
 Content/PostABundle
 Content/__ExternalActors__
 Content/__ExternalObjects__
+Content/Abandoned_Mall
+
+/Output/
+

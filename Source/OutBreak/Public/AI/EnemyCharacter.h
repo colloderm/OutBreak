@@ -3,7 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/EnemyState.h"
 #include "GameFramework/Character.h"
+#include "GenericTeamAgentInterface.h"
+
 #include "EnemyCharacter.generated.h"
 
 class UEnemyAsset;
@@ -30,9 +33,15 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
 	bReducedWork);
 
 UCLASS(Blueprintable)
-class OUTBREAK_API AEnemyCharacter : public ACharacter
+class OUTBREAK_API AEnemyCharacter : public ACharacter, public IGenericTeamAgentInterface
 {
 	GENERATED_BODY()
+	
+public:
+	virtual FGenericTeamId GetGenericTeamId() const override;
+
+private:
+	FGenericTeamId TeamId = FGenericTeamId(2);
 
 public:
 	AEnemyCharacter(
@@ -43,6 +52,8 @@ private:
 	void InitializeAsset();
 public:
 	
+	
+	
 	/* ====================================== ABA ===================================== */
 	UFUNCTION(BlueprintCallable, Category = "Animation Budget")
 	void SetAnimationSignificance(float InSignificance);
@@ -50,6 +61,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Animation Budget|Debug")
 	FString GetAnimationBudgetDebugSummary() const;
 	
+	void GetCanMove();
+
 
 	UPROPERTY(BlueprintAssignable, Category = "Animation Budget")
 	FModularAnimationProxyReducedWorkChanged
@@ -60,6 +73,9 @@ public:
 	{
 		return EnemyAsset;
 	}
+	
+	ELocomotionWalkRunState GetLocomotionWalkRunState() const;
+	EEnemyMissingArmState GetMissingArmState() const;
 
 	UMotionWarpingComponent* GetMotionWarpingComponent() const
 	{
@@ -86,6 +102,7 @@ protected:
 		const FDamageEvent& DamageEvent,
 		AController* EventInstigator,
 		AActor* DamageCauser) override;
+	
 	
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))

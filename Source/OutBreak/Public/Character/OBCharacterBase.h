@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
+#include "GenericTeamAgentInterface.h"
 #include "OBCharacterBase.generated.h"
 
 class AOBWeaponBase;
@@ -21,10 +22,16 @@ class USpringArmComponent;
 class UCameraComponent;
 
 UCLASS()
-class OUTBREAK_API AOBCharacterBase : public ACharacter, public IAbilitySystemInterface
+class OUTBREAK_API AOBCharacterBase : public ACharacter, public IAbilitySystemInterface, public IGenericTeamAgentInterface
 {
 	GENERATED_BODY()
 
+public:
+	virtual FGenericTeamId GetGenericTeamId() const override;
+
+private:
+	FGenericTeamId TeamId = FGenericTeamId(1);
+	
 public:
 	// Sets default values for this character's properties
 	AOBCharacterBase(const FObjectInitializer& ObjectInitializer);

@@ -14,11 +14,11 @@ UEnemyPhysicalComponent::UEnemyPhysicalComponent()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
 	
-	Limbes.Add(FName(TEXT("Head")), FLimbData(100, 100));
-	Limbes.Add(FName(TEXT("upperarm_r")), FLimbData(100, 100));
-	Limbes.Add(FName(TEXT("upperarm_l")), FLimbData(100, 100));
-	Limbes.Add(FName(TEXT("thigh_r")), FLimbData(100, 100));
-	Limbes.Add(FName(TEXT("thigh_l")), FLimbData(100, 100));
+	Limbes.Add(FName(TEXT("Head")), FLimbData(20, 20));
+	Limbes.Add(FName(TEXT("upperarm_r")), FLimbData(40, 40));
+	Limbes.Add(FName(TEXT("upperarm_l")), FLimbData(40, 40));
+	Limbes.Add(FName(TEXT("thigh_r")), FLimbData(40, 40));
+	Limbes.Add(FName(TEXT("thigh_l")), FLimbData(40, 40));
 	// ...
 }
 
@@ -101,12 +101,14 @@ void UEnemyPhysicalComponent::ActionPhysical(FHitResult HitResult, float DamageA
 		return;
 	}
 	
-	if (Limbes.Find("Head")->bIsHas == false)
-	{
-		Action_Dead();
-	}
-	
 	Health -= DamageAmount;
+	
+	if (Health <= 0 )
+	{
+		
+		Action_Dead();
+		return;
+	}
 	
 	CacheBoneName = BoneName;
 	
@@ -197,6 +199,15 @@ void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName,
 				MeshComp->WakeAllRigidBodies();
 			}
 			
+			UAnimInstance* AnimInstance = TargetMesh->GetAnimInstance();
+			if (IsValid(AnimInstance))
+			{
+				if (AnimInstance->IsAnyMontagePlaying())
+				{
+					AnimInstance->StopAllMontages(0.f);
+				}
+			}
+			
 			ProxyMesh->HideBoneByName(BoneName, PBO_Term);
 			
 			AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
@@ -215,6 +226,11 @@ void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName,
 			
 			MovementComponent->SetLocomotationState(EvaluateLocomotionState());
 		}
+	}
+	
+	if (Limbes.Find("Head")->bIsHas == false)
+	{
+		Action_Dead();
 	}
 }
 
@@ -243,6 +259,36 @@ ELocomotionWalkRunState UEnemyPhysicalComponent::EvaluateLocomotionState() const
 		return ELocomotionWalkRunState::Crawling;
 	}
 	return ELocomotionWalkRunState::Walking;
+}
+
+EEnemyMissingArmState UEnemyPhysicalComponent::GetMissingArmState() const
+{
+	const FLimbData* RightArm =
+		Limbes.Find(FName(TEXT("upperarm_r")));
+	const FLimbData* LeftArm =
+		Limbes.Find(FName(TEXT("upperarm_l")));
+
+	const bool bRightArmMissing =
+		RightArm == nullptr || !RightArm->bIsHas;
+	const bool bLeftArmMissing =
+		LeftArm == nullptr || !LeftArm->bIsHas;
+
+	if (bLeftArmMissing && bRightArmMissing)
+	{
+		return EEnemyMissingArmState::Both;
+	}
+
+	if (bLeftArmMissing)
+	{
+		return EEnemyMissingArmState::Left;
+	}
+
+	if (bRightArmMissing)
+	{
+		return EEnemyMissingArmState::Right;
+	}
+
+	return EEnemyMissingArmState::None;
 }
 
 void UEnemyPhysicalComponent::Action_Dead()

@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "DetourCrowdAIController.h"
+#include "GenericTeamAgentInterface.h"
 #include "Perception/AIPerceptionTypes.h"
 #include "EnemyController.generated.h"
 
@@ -12,42 +13,59 @@ class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UAISenseConfig_Hearing;
 class UAISenseConfig_Damage;
-
-UENUM(BlueprintType)
-enum class EEnemyAlertState : uint8
-{
-	Idle,
-	Suspicious,
-	Investigating,
-	Combat
-};
-
+class UEnemyMemoryComponent;
 
 UCLASS()
 class OUTBREAK_API AEnemyController : public ADetourCrowdAIController
 {
 	GENERATED_BODY()
 
+
 public:
 	// Sets default values for this actor's properties
 	AEnemyController();
 
+	virtual ETeamAttitude::Type GetTeamAttitudeTowards(
+		const AActor& Other) const override;
+
 	void InitializeComponents();
 
-	
+	void Dead();
+
+	UFUNCTION(BlueprintPure, Category = "AI|Memory")
+	UEnemyMemoryComponent* GetEnemyMemoryComponent() const
+	{
+		return EnemyMemoryComponent.Get();
+	}
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
+	virtual void EndPlay(
+		const EEndPlayReason::Type EndPlayReason) override;
 	
-	virtual void OnPossess(APawn* inPawn) override;
+	virtual void OnPossess(APawn* InPawn) override;
+	virtual void OnUnPossess() override;
 public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
-
 	
-	/* =================================== AI Perception =================================== */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
+	bool bIsDead = false;
+
 private:
 	
+	/* ===================================== Components ==================================== */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Memory", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnemyMemoryComponent> EnemyMemoryComponent;
+	
+	void InitializeMemoryComponent();
+	void HandleMemoryUpdated();
+	
+	/* ==================================================================================== */
+	
+	
+	/* =================================== AI Perception =================================== */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAIPerceptionComponent> AIPerceptionComponent;
 	
@@ -61,36 +79,17 @@ private:
 	TObjectPtr<UAISenseConfig_Damage> DamageConfig;
 	
 	void InitializeAIPerception();
+
+	void ApplySightAffiliationFilter();
 	
 	UFUNCTION()
 	void HandleTargetPerceptionUpdated(AActor* UpdatedActor, FAIStimulus Stimulus);
 	
-	void HandleSightStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus);
+	UFUNCTION()
+	void HandleTargetPerceptionForgotten(AActor* UpdatedActor); 
 	
-	void HandleHearingStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus);
-	
-	void HandleDamageStimulus(AActor* UpdatedActor, const FAIStimulus& Stimulus);
-	
-	// AI Perception using variable
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<AActor> PerceptionTarget;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	FVector LastKnownTargetLocation = FVector::ZeroVector;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	EEnemyAlertState AlertState = EEnemyAlertState::Idle;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	bool bCanSeeTarget = false;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	TOptional<FVector> SelfToHearingDirection = FVector::ZeroVector;
-	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Perception", meta = (AllowPrivateAccess = "true"))
-	TOptional<FVector> SlefToDamageDirection = FVector::ZeroVector;
-	
+
 	/* ==================================================================================== */
 	
 	
@@ -100,11 +99,10 @@ private:
 	TObjectPtr<UStateTreeAIComponent> StateTreeComponent;
 	
 	void InitializeStateTree();
-	/* ==================================================================================== */
+	void StopStateTreeLogic(const FString& Reason);
 	
 
-	
-	
+	/* ==================================================================================== */
 	
 	
 	

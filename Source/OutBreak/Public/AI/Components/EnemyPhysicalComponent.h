@@ -10,6 +10,8 @@
 
 
 
+
+
 USTRUCT(BlueprintType)
 struct FLimbData
 {
@@ -55,11 +57,14 @@ public:
 	
 	void ActionPhysical(FHitResult HitResult, float DamageAmount);
 
+	ELocomotionWalkRunState EvaluateLocomotionState() const;
+
+	UFUNCTION(BlueprintPure, Category = "Physical|State")
+	EEnemyMissingArmState GetMissingArmState() const;
 private:
 	void ActionLimb(UStaticMesh* MeshAsset, FName BoneName, float Damage);
-	ELocomotionWalkRunState EvaluateLocomotionState() const;
 	
-	float Health = 200.f;
+	float Health = 175.f;
 	
 	FTimeline ReactTimeline;
 	FName CacheBoneName = NAME_None;

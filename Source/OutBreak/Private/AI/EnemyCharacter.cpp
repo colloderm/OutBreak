@@ -11,17 +11,26 @@
 
 #include "Components/ChildActorComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "GameFramework/Controller.h"
 #include "MotionWarpingComponent.h"
+#include "AI/EnemyController.h"
 
 #include "AI/Components/EnemyMovementComponent.h"
 #include "AI/Components/EnemyStatusComponent.h"
 #include "AI/Components/EnemyPhysicalComponent.h"
+#include "Perception/AISense_Damage.h"
 
 
 #include "AI/System/ModularSkeletalMeshActor.h"
 
 
+
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
+
+FGenericTeamId AEnemyCharacter::GetGenericTeamId() const
+{
+	return TeamId;
+}
 
 AEnemyCharacter::AEnemyCharacter(
 	const FObjectInitializer& ObjectInitializer)
@@ -36,6 +45,7 @@ AEnemyCharacter::AEnemyCharacter(
 {
 	PrimaryActorTick.bCanEverTick = true;
 
+	
 
 	InitializeComponents();
 	/*
@@ -209,25 +219,67 @@ float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
                                   AActor* DamageCauser)
 {
 	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
-	
+
+	FVector HitLocation = GetActorLocation();
 	if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
 	{
-		const FPointDamageEvent& PointEvent =
+		const FPointDamageEvent& PointDamageEvent =
 			static_cast<const FPointDamageEvent&>(DamageEvent);
-
-	
-		if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+		const FHitResult& HitResult = PointDamageEvent.HitInfo;
+		if (HitResult.bBlockingHit)
 		{
-			const FPointDamageEvent& PointDamageEvent =
-				static_cast<const FPointDamageEvent&>(DamageEvent);
-			
-			FHitResult HitResult= PointDamageEvent.HitInfo;
-			
+			HitLocation = HitResult.ImpactPoint;
+		}
+
+		if (IsValid(PhysicalComponent))
+		{
 			PhysicalComponent->ActionPhysical(HitResult, DamageAmount);
 		}
 	}
-	
+
+	AActor* DamageInstigatorActor =
+		IsValid(EventInstigator)
+			? EventInstigator->GetPawn()
+			: nullptr;
+	if (!IsValid(DamageInstigatorActor))
+	{
+		DamageInstigatorActor = DamageCauser;
+	}
+
+	if (ActualDamage > 0.0f &&
+		IsValid(DamageInstigatorActor) &&
+		DamageInstigatorActor != this)
+	{
+		UAISense_Damage::ReportDamageEvent(
+			this,
+			this,
+			DamageInstigatorActor,
+			ActualDamage,
+			DamageInstigatorActor->GetActorLocation(),
+			HitLocation);
+	}
+
 	return ActualDamage;
+}
+
+ELocomotionWalkRunState AEnemyCharacter::GetLocomotionWalkRunState() const
+{
+	UEnemyMovementComponent* MovementComponent = Cast<UEnemyMovementComponent>(GetMovementComponent());
+	if (IsValid(MovementComponent))
+	{
+		return MovementComponent->GetLocomotionState();
+	}
+	return ELocomotionWalkRunState::Dead;
+}
+
+EEnemyMissingArmState AEnemyCharacter::GetMissingArmState() const
+{
+	if (IsValid(PhysicalComponent))
+	{
+		return PhysicalComponent->GetMissingArmState();
+	}
+
+	return EEnemyMissingArmState::None;
 }
 
 USkeletalMeshComponent*
@@ -275,7 +327,14 @@ void AEnemyCharacter::StopCharacterMovement()
 
 void AEnemyCharacter::Dead()
 {
-	Destroy();
+	AEnemyController* EnemyContoller = Cast<AEnemyController>(GetController());
+	if (IsValid(EnemyContoller))
+	{
+		EnemyContoller->Dead();
+	}
+	GetMesh()->SetSimulatePhysics(true);
+	
+	
 }
 
 void AEnemyCharacter::SetAnimationSignificance(
