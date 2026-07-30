@@ -166,20 +166,14 @@ void AOBExpeditionGameMode::Logout(AController* Exiting)
 	// 남은 인원 기준으로 종료 여부 재평가.
 	CheckEndConditions();
 	
-	if (FOBPersonalZoneList* Zones = PersonalZones.Find(Exiting))
-	{
-		for (const TObjectPtr<AOBExtractionZone>& Z : Zones->Zones)
-		{
-			if (Z) Z->Destroy();
-		}
-		PersonalZones.Remove(Exiting);
-		PartyCodeByController.Remove(Exiting);
-	}
+	// 개인 탈출구는 이제 팀 공유다. 한 명 나갔다고 파괴하면 남은 팀원의 탈출구가 사라진다.
+	// 팀 전원이 나가도 세션 종료 시 레벨과 함께 정리되므로 개별 파괴는 하지 않는다.
+	PartyCodeByController.Remove(Exiting);
 }
 
 void AOBExpeditionGameMode::ValidateZoneSeparation() const
 {
-	// 3~5분 이격 검증(디자이너 배치 싨 ㅜ감지). 실패해도 게임은 진행(경고만)
+	// 3~5분 이격 검증(디자이너 배치 실수감지). 실패해도 게임은 진행(경고만)
 	for (int32 i = 0; i < AvailableZones.Num(); ++i)
 	{
 		for (int32 k = i + 1; k < AvailableZones.Num(); ++k)
@@ -643,7 +637,19 @@ void AOBExpeditionGameMode::CheckTeamWipe(uint8 TeamId)
 void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVector& SpawnOrigin)
 {
 	if (!C || !PersonalExtractClass) return;
-	if (PersonalZones.Contains(C)) return; // 1회만
+	
+	const AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>();
+	const uint8 TeamId = PS ? PS->GetTeamId() : 0;
+
+	// TeamId 0은 "미배정" 예약값. 팀 없이 배정하면 전원 공용으로 새어버린다.
+	if (TeamId == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Expedition] %s TeamId 미배정 → 개인탈출 배정 생략"), *C->GetName());
+		return;
+	}
+	
+	// 팀 단위 1회. 뒤늦게 들어온 팀원은 이미 배정된 탈출구를 그대로 공유한다.
+	if (PersonalZones.Contains(TeamId)) return;
 	
 	if (!bPersonalPointsCollected)
 	{
@@ -652,12 +658,9 @@ void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVec
 	}
 	if (PersonalExtractPoints.Num() == 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Expedition] 개인 탈출 마커 없음 → %s 미배정"), *C->GetName());
+		UE_LOG(LogTemp, Warning, TEXT("[Expedition] 개인 탈출 마커 없음 → Team %d 미배정"), TeamId);
 		return;
 	}
-	
-	const AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>();
-	const uint8 TeamId = PS ? PS->GetTeamId() : 0;
 	
 	TArray<AActor*> Markers = SelectPersonalMarkers(SpawnOrigin, TeamId);
 	
@@ -665,7 +668,7 @@ void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVec
 	const int32 StartSec = ActiveMapData ? ActiveMapData->PersonalActiveStartSec : 0;
 	const int32 EndSec = ActiveMapData ? ActiveMapData->PersonalActiveEndSec : 600;
 	
-	TArray<TObjectPtr<AOBExtractionZone>>& Zones = PersonalZones.FindOrAdd(C).Zones;
+	TArray<TObjectPtr<AOBExtractionZone>>& Zones = PersonalZones.FindOrAdd(TeamId).Zones;
 	UNavigationSystemV1* Nav = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	
 	for (AActor* M : Markers)
@@ -690,7 +693,7 @@ void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVec
 			ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
 		if (!Zone) continue;
 		
-		Zone->ConfigureAsPersonal(C);				// 소유 클라에만 복제(본인만 보임)
+		Zone->ConfigureAsPersonal(TeamId);			// 팀 전원에게 복제(본인만 X)
 		Zone->SetActiveWindow(StartSec, EndSec);	// 맵 별 활성창
 		UGameplayStatics::FinishSpawningActor(Zone, T);
 		
@@ -704,7 +707,7 @@ void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVec
 #endif
 	}
 	
-	UE_LOG(LogTemp, Log, TEXT("[Expedition] %s(Team %d) 개인탈출 %d개 배정"), *C->GetName(), TeamId, Zones.Num());
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] Team %d 개인탈출 %d개 배정(팀 공유)"), TeamId, Zones.Num());
 }
 
 void AOBExpeditionGameMode::RequestRespawn(AController* Controller, APawn* DeadPawn)

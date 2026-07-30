@@ -54,6 +54,21 @@ namespace OBGameplayTags
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Bandage);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Grenade);
 	
+	// 아이템 - 무기. 창고/가방은 이 태그로 무기를 지목하고, 실제 BP는 ItemDefinition.WeaponClass가 가리킨다.
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Weapon_AssaultRifle);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Weapon_SniperRifle);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Weapon_Shotgun);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Weapon_Pistol);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Weapon_FireAxe);
+	
+	// 아이템 - 귀중품. 쓸 데 없고 팔기만 하는 루팅 주 수입원. 아래 2개는 자리만 잡은 예시.
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Valuable_Watch);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Valuable_Gold);
+	
+	// 아이템 - 재료. 제작이 붙기 전까지는 귀중품과 동일하게 판매용.
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Material_Scrap);
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(Item_Material_Cloth);
+	
 	
 	// AI State Tree
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_StateTree_Event_TargetSighted);

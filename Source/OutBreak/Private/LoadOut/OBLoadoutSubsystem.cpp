@@ -4,11 +4,24 @@
 
 #include "SaveGame/OBSaveGame.h"
 #include "Kismet/GameplayStatics.h"
+#include "Item/OBItemRegistry.h"
+#include "Item/Data/OBItemDefinition.h"
 #include "Weapon/OBWeaponBase.h"
 #include "Weapon/Data/OBWeaponCatalog.h"
 #include "Weapon/Data/OBWeaponData.h"
 
 const FString UOBLoadoutSubsystem::SlotName = TEXT("OBPlayerProfile");
+
+namespace
+{
+	// 무기 클래스에서 슬롯을 얻는다. 슬롯은 무기 스펙의 소유라 ItemDefinition에 중복 저장하지 않았다.
+	const UOBWeaponData* WeaponDataOf(TSubclassOf<AOBWeaponBase> WeaponClass)
+	{
+		if (!WeaponClass) return nullptr;
+		const AOBWeaponBase* CDO = WeaponClass->GetDefaultObject<AOBWeaponBase>();
+		return CDO ? CDO->GetWeaponData() : nullptr;
+	}
+}
 
 void UOBLoadoutSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -18,12 +31,31 @@ void UOBLoadoutSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	LoadFromDisk();
 }
 
+TSubclassOf<AOBWeaponBase> UOBLoadoutSubsystem::ResolveWeaponClass(const FGameplayTag& ItemTag)
+{
+	const UOBItemDefinition* Def = UOBItemRegistry::FindItem(ItemTag);
+	if (!Def || Def->Category != EOBItemCategory::Weapon) return nullptr;
+
+	return TSubclassOf<AOBWeaponBase>(Def->WeaponClass.LoadSynchronous());
+}
+
+// --- 슬롯 ---
+
 void UOBLoadoutSubsystem::SetWeapon(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
 {
-	// 슬롯당 1개: 지정하면 덮어쓰고, null이면 비운다.
 	if (WeaponClass)
 	{
-		CurrentLoadout.SlotWeapons.Add(Slot, TSoftClassPtr<AOBWeaponBase>(WeaponClass));
+		const FGameplayTag Tag = UOBItemRegistry::FindTagForWeaponClass(WeaponClass);
+		if (!Tag.IsValid())
+		{
+			// 이 무기의 ItemDefinition을 안 만들었다. 조용히 사라지면 원인을 못 찾으니 크게 남긴다.
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Loadout] %s 에 대응하는 ItemDefinition이 없어 슬롯 지정을 무시했다. "
+					 "Content/Data/Items 에 WeaponClass=%s 인 정의를 만들 것."),
+				*WeaponClass->GetName(), *WeaponClass->GetName());
+			return;
+		}
+		CurrentLoadout.SlotWeapons.Add(Slot, Tag);
 	}
 	else
 	{
@@ -34,27 +66,172 @@ void UOBLoadoutSubsystem::SetWeapon(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBas
 	SaveToDisk();
 }
 
+TSubclassOf<AOBWeaponBase> UOBLoadoutSubsystem::GetSlotWeaponClass(EOBWeaponSlot Slot) const
+{
+	const FGameplayTag* Tag = CurrentLoadout.SlotWeapons.Find(Slot);
+	return Tag ? ResolveWeaponClass(*Tag) : nullptr;
+}
+
+TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetSelectedClasses() const
+{
+	TArray<TSubclassOf<AOBWeaponBase>> Out;
+	for (const TPair<EOBWeaponSlot, FGameplayTag>& Pair : CurrentLoadout.SlotWeapons)
+	{
+		// 선택된 소수 무기라 동기 로드 비용 미미.
+		if (TSubclassOf<AOBWeaponBase> Loaded = ResolveWeaponClass(Pair.Value))
+		{
+			Out.Add(Loaded);
+		}
+	}
+	return Out;
+}
+
 void UOBLoadoutSubsystem::ClearLoadout()
 {
 	CurrentLoadout.SlotWeapons.Empty();
 	SaveToDisk();
 }
 
+// --- 창고 ---
+
+void UOBLoadoutSubsystem::AddStashItem(const FGameplayTag& ItemTag, int32 Count)
+{
+	if (!ItemTag.IsValid() || Count <= 0) return;
+
+	// 창고는 칸 제한이 없어서 MaxStack을 적용하지 않고 태그당 한 항목으로 합친다.
+	const int32 Index = CurrentLoadout.StashItems.IndexOfByPredicate(
+		[&ItemTag](const FOBItemStack& S) { return S.ItemTag == ItemTag; });
+
+	if (Index != INDEX_NONE)
+	{
+		CurrentLoadout.StashItems[Index].Count += Count;
+	}
+	else
+	{
+		CurrentLoadout.StashItems.Emplace(ItemTag, Count);
+	}
+
+	// ponytail: 호출마다 파일 쓰기. 정산에서 수십 종을 한꺼번에 넣게 되면 배치 저장으로 바꾼다.
+	SaveToDisk();
+}
+
+bool UOBLoadoutSubsystem::RemoveStashItem(const FGameplayTag& ItemTag, int32 Count)
+{
+	if (!ItemTag.IsValid() || Count <= 0) return false;
+
+	const int32 Index = CurrentLoadout.StashItems.IndexOfByPredicate(
+		[&ItemTag](const FOBItemStack& S) { return S.ItemTag == ItemTag; });
+	if (Index == INDEX_NONE) return false;
+
+	// 부분 차감은 하지 않는다. 실패하면 창고는 그대로다.
+	if (CurrentLoadout.StashItems[Index].Count < Count) return false;
+
+	CurrentLoadout.StashItems[Index].Count -= Count;
+	if (CurrentLoadout.StashItems[Index].Count <= 0)
+	{
+		CurrentLoadout.StashItems.RemoveAt(Index);
+	}
+
+	SaveToDisk();
+	return true;
+}
+
+int32 UOBLoadoutSubsystem::GetStashCount(const FGameplayTag& ItemTag) const
+{
+	for (const FOBItemStack& Stack : CurrentLoadout.StashItems)
+	{
+		if (Stack.ItemTag == ItemTag) return Stack.Count;
+	}
+	return 0;
+}
+
+TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetOwnedClasses() const
+{
+	TArray<TSubclassOf<AOBWeaponBase>> Out;
+	for (const FOBItemStack& Stack : CurrentLoadout.StashItems)
+	{
+		if (Stack.IsEmpty()) continue;
+
+		// 창고에는 소모품/귀중품도 섞여 있다. 작업대 리스트는 무기만 본다.
+		if (TSubclassOf<AOBWeaponBase> Loaded = ResolveWeaponClass(Stack.ItemTag))
+		{
+			Out.Add(Loaded);
+		}
+	}
+	return Out;
+}
+
+bool UOBLoadoutSubsystem::IsTagOwnedOrEquipped(const FGameplayTag& ItemTag) const
+{
+	if (!ItemTag.IsValid()) return false;
+
+	for (const TPair<EOBWeaponSlot, FGameplayTag>& Pair : CurrentLoadout.SlotWeapons)
+	{
+		if (Pair.Value == ItemTag) return true;
+	}
+	return GetStashCount(ItemTag) > 0;
+}
+
+bool UOBLoadoutSubsystem::IsOwnedOrEquipped(TSubclassOf<AOBWeaponBase> WeaponClass) const
+{
+	return IsTagOwnedOrEquipped(UOBItemRegistry::FindTagForWeaponClass(WeaponClass));
+}
+
+void UOBLoadoutSubsystem::EquipFromStash(TSubclassOf<AOBWeaponBase> WeaponClass)
+{
+	const FGameplayTag Tag = UOBItemRegistry::FindTagForWeaponClass(WeaponClass);
+	if (!Tag.IsValid()) return;
+
+	const UOBWeaponData* WData = WeaponDataOf(WeaponClass);
+	if (!WData) return;
+
+	// 창고에 없으면(이미 장착이거나 미보유) 장착 불가.
+	if (!RemoveStashItem(Tag, 1)) return;
+
+	// 그 슬롯에 이미 무기가 있으면 창고로 반환(스왑).
+	if (const FGameplayTag* Old = CurrentLoadout.SlotWeapons.Find(WData->WeaponSlot))
+	{
+		AddStashItem(*Old, 1);
+	}
+
+	CurrentLoadout.SlotWeapons.Add(WData->WeaponSlot, Tag);
+
+	SaveToDisk();
+}
+
+// --- 스타터킷 ---
+
+bool UOBLoadoutSubsystem::HasAnyWeapon() const
+{
+	if (!CurrentLoadout.SlotWeapons.IsEmpty()) return true;
+
+	for (const FOBItemStack& Stack : CurrentLoadout.StashItems)
+	{
+		if (Stack.IsEmpty()) continue;
+
+		const UOBItemDefinition* Def = UOBItemRegistry::FindItem(Stack.ItemTag);
+		if (Def && Def->Category == EOBItemCategory::Weapon) return true;
+	}
+	return false;
+}
+
 void UOBLoadoutSubsystem::GrantStarterIfEmpty(UOBWeaponCatalog* Catalog)
 {
-	if (!Catalog || !IsEmpty()) return;
+	if (!Catalog || HasAnyWeapon()) return;
 
 	for (const TSubclassOf<AOBWeaponBase>& WClass : Catalog->StarterWeapons)
 	{
-		if (WClass)
-		{
-			CurrentLoadout.OwnedWeapons.Add(TSoftClassPtr<AOBWeaponBase>(WClass));
-		}
-	}
+		if (!WClass) continue;
 
-	if (!CurrentLoadout.OwnedWeapons.IsEmpty())
-	{
-		SaveToDisk();
+		const FGameplayTag Tag = UOBItemRegistry::FindTagForWeaponClass(WClass);
+		if (!Tag.IsValid())
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Loadout] 스타터 무기 %s 의 ItemDefinition이 없어 지급하지 못했다."), *WClass->GetName());
+			continue;
+		}
+
+		AddStashItem(Tag, 1);   // 내부에서 저장
 	}
 }
 
@@ -66,94 +243,34 @@ int32 UOBLoadoutSubsystem::GrantMissingStarters(const TArray<TSubclassOf<AOBWeap
 	{
 		if (!WClass) continue;
 
-		// 불변식 유지: 한 클래스는 창고 OR 슬롯 중 한 곳에만 존재한다.
-		if (IsOwnedOrEquipped(WClass)) continue;
+		const FGameplayTag Tag = UOBItemRegistry::FindTagForWeaponClass(WClass);
+		if (!Tag.IsValid())
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Loadout] 기본 지급 무기 %s 의 ItemDefinition이 없어 건너뛰었다."), *WClass->GetName());
+			continue;
+		}
 
-		const AOBWeaponBase* CDO = WClass->GetDefaultObject<AOBWeaponBase>();
-		const UOBWeaponData* Data = CDO ? CDO->GetWeaponData() : nullptr;
-		if (!Data) continue;
+		// 불변식 유지: 한 아이템은 창고 OR 슬롯 중 한 곳에만 존재한다.
+		if (IsTagOwnedOrEquipped(Tag)) continue;
+
+		const UOBWeaponData* WData = WeaponDataOf(WClass);
+		if (!WData) continue;
 
 		// 이미 찬 슬롯은 건너뛴다. 빈 슬롯만 메우는 게 목적이지 무료 교체가 아니다.
-		if (CurrentLoadout.SlotWeapons.Contains(Data->WeaponSlot)) continue;
+		if (CurrentLoadout.SlotWeapons.Contains(WData->WeaponSlot)) continue;
 
-		CurrentLoadout.SlotWeapons.Add(Data->WeaponSlot, TSoftClassPtr<AOBWeaponBase>(WClass));
+		CurrentLoadout.SlotWeapons.Add(WData->WeaponSlot, Tag);
 		++Granted;
 	}
 
-	if (Granted > 0) 
+	if (Granted > 0)
 		SaveToDisk();
 
 	return Granted;
 }
 
-TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetSelectedClasses() const
-{
-	TArray<TSubclassOf<AOBWeaponBase>> Out;
-	for (const TPair<EOBWeaponSlot, TSoftClassPtr<AOBWeaponBase>>& Pair : CurrentLoadout.SlotWeapons)
-	{
-		// 소프트 클래스 동기 로드(선택된 소수 무기라 비용 미미).
-		if (UClass* Loaded = Pair.Value.LoadSynchronous())
-		{
-			Out.Add(Loaded);
-		}
-	}
-	return Out;
-}
-
-TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetOwnedClasses() const
-{
-	TArray<TSubclassOf<AOBWeaponBase>> Out;
-	for (const TSoftClassPtr<AOBWeaponBase>& Soft : CurrentLoadout.OwnedWeapons)
-	{
-		if (UClass* Loaded = Soft.LoadSynchronous())
-		{
-			Out.Add(Loaded);
-		}
-	}
-	
-	return Out;
-}
-
-bool UOBLoadoutSubsystem::IsOwnedOrEquipped(TSubclassOf<AOBWeaponBase> WeaponClass) const
-{
-	if (!WeaponClass) return false;
-	
-	const TSoftClassPtr<AOBWeaponBase> Soft(WeaponClass);
-	if (CurrentLoadout.OwnedWeapons.Contains(Soft)) return true;
-
-	for (const TPair<EOBWeaponSlot, TSoftClassPtr<AOBWeaponBase>>& Pair : CurrentLoadout.SlotWeapons)
-	{
-		if (Pair.Value == Soft) return true;
-	}
-	
-	return false;
-}
-
-void UOBLoadoutSubsystem::EquipFromStash(TSubclassOf<AOBWeaponBase> WeaponClass)
-{
-	if (!WeaponClass) return;
-
-	const AOBWeaponBase* CDO = WeaponClass->GetDefaultObject<AOBWeaponBase>();
-	const UOBWeaponData* Data = CDO ? CDO->GetWeaponData() : nullptr;
-	if (!Data) return;
-
-	const TSoftClassPtr<AOBWeaponBase> Soft(WeaponClass);
-
-	// 창고에 없으면(이미 장착이거나 미보유) 장착 불가.
-	if (!CurrentLoadout.OwnedWeapons.Contains(Soft)) return;
-
-	CurrentLoadout.OwnedWeapons.Remove(Soft);
-
-	// 그 슬롯에 이미 무기가 있으면 창고로 반환(스왑).
-	if (const TSoftClassPtr<AOBWeaponBase>* Old = CurrentLoadout.SlotWeapons.Find(Data->WeaponSlot))
-	{
-		CurrentLoadout.OwnedWeapons.Add(*Old);
-	}
-
-	CurrentLoadout.SlotWeapons.Add(Data->WeaponSlot, Soft);
-	
-	SaveToDisk();
-}
+// --- 통화 ---
 
 bool UOBLoadoutSubsystem::TrySpend(int32 Amount)
 {
@@ -171,13 +288,15 @@ void UOBLoadoutSubsystem::AddCurrency(int32 Amount)
 	SaveToDisk();
 }
 
+// --- 상점 ---
+
 FShopWindowViewData UOBLoadoutSubsystem::BuildShopView(UOBWeaponCatalog* Catalog) const
 {
 	FShopWindowViewData View;
 	View.ShopId = TEXT("WeaponShop");
 	View.Currency.Scrap = CurrentCurrency;
 
-	// 카테고리 1개(무기)로 시작. 슬롯별로 나누려면 여기서 확장.
+	// 카테고리 1개(무기)로 시작. 아이템 판매 탭은 L8에서 붙인다.
 	FShopCategoryViewData Cat;
 	Cat.CategoryId = TEXT("Weapons");
 	Cat.DisplayName = FText::FromString(TEXT("무기"));
@@ -188,8 +307,7 @@ FShopWindowViewData UOBLoadoutSubsystem::BuildShopView(UOBWeaponCatalog* Catalog
 		for (const TSubclassOf<AOBWeaponBase>& WClass : Catalog->AvailableWeapons)
 		{
 			if (!WClass) continue;
-			const AOBWeaponBase* CDO = WClass->GetDefaultObject<AOBWeaponBase>();
-			const UOBWeaponData* Data = CDO ? CDO->GetWeaponData() : nullptr;
+			const UOBWeaponData* Data = WeaponDataOf(WClass);
 			if (!Data) continue;
 
 			FShopItemViewData Item;
@@ -274,10 +392,18 @@ bool UOBLoadoutSubsystem::TryPurchase(UOBWeaponCatalog* Catalog, FName ItemId)
 		// 이미 보유/장착 중이면 중복 구매 금지(알파: 클래스당 1개).
 		if (IsOwnedOrEquipped(WClass)) return false;
 
+		// 정의가 없으면 창고에 넣을 수 없다. 돈이 사라지지 않게 지불 전에 막는다.
+		const FGameplayTag Tag = UOBItemRegistry::FindTagForWeaponClass(WClass);
+		if (!Tag.IsValid())
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Loadout] %s 의 ItemDefinition이 없어 구매를 막았다."), *WClass->GetName());
+			return false;
+		}
+
 		if (!TrySpend(GetWeaponPrice(WClass))) return false; // 잔액 부족
 
-		CurrentLoadout.OwnedWeapons.Add(TSoftClassPtr<AOBWeaponBase>(WClass)); // 슬롯 아님, 창고로
-		SaveToDisk();
+		AddStashItem(Tag, 1);   // 슬롯 아님, 창고로(내부에서 저장)
 		
 		return true;
 	}
@@ -287,12 +413,11 @@ bool UOBLoadoutSubsystem::TryPurchase(UOBWeaponCatalog* Catalog, FName ItemId)
 
 int32 UOBLoadoutSubsystem::GetWeaponPrice(TSubclassOf<AOBWeaponBase> WeaponClass)
 {
-	if (!WeaponClass) return 0;
-	const AOBWeaponBase* CDO = WeaponClass->GetDefaultObject<AOBWeaponBase>();
-	const UOBWeaponData* Data = CDO ? CDO->GetWeaponData() : nullptr;
-	
+	const UOBWeaponData* Data = WeaponDataOf(WeaponClass);
 	return Data ? Data->WeaponPrice : 0;
 }
+
+// --- 저장 ---
 
 void UOBLoadoutSubsystem::SaveToDisk()
 {

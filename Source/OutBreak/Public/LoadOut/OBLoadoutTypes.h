@@ -3,27 +3,26 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Item/Data/OBItemTypes.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "OBLoadoutTypes.generated.h"
 
-class AOBWeaponBase;
-
 /**
- * 개인 장비 구성(슬롯별 선택 무기).
- * - 디스크 저장을 고려해 TSoftClassPtr 사용(에셋 경로로 직렬화 → 미로드 클래스도 안전).
- * - 런타임에선 GetClasses()로 로드해 서버로 push.
+ * 개인 장비 구성 + 창고.
+ * - 무기든 탄약이든 전부 아이템 태그로만 지목한다. 실제 무기 클래스는 ItemDefinition.WeaponClass가 안다.
+ * - 디스크에 태그(FName)로 직렬화되므로 에셋을 옮겨도 안전하다(예전 TSoftClassPtr은 경로가 바뀌면 깨졌다).
  */
 USTRUCT(BlueprintType)
 struct FOBLoadout
 {
 	GENERATED_BODY()
 
-	// 슬롯 → 무기 클래스. 슬롯당 1개(덮어쓰기).
+	// 슬롯 → 아이템 태그. 슬롯당 1개(덮어쓰기).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Loadout")
-	TMap<EOBWeaponSlot, TSoftClassPtr<AOBWeaponBase>> SlotWeapons;
-	
-	// 보유(미장착) 무기 풀 = 창고. 상점 구매로 추가, 사망에도 유지.
-	// ponytail: Set-of-class(클래스당 1개), 수량 필요하면 TMap<class,count>로.
+	TMap<EOBWeaponSlot, FGameplayTag> SlotWeapons;
+
+	// 창고. 무기(Count=1) / 탄약 / 소모품 / 귀중품이 모두 여기로 들어온다. 사망에도 유지.
+	// 칸 개념이 없어서 MaxStack을 적용하지 않고 태그당 한 항목으로 합친다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Loadout")
-	TSet<TSoftClassPtr<AOBWeaponBase>> OwnedWeapons;
+	TArray<FOBItemStack> StashItems;
 };

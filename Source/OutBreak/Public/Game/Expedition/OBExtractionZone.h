@@ -22,8 +22,11 @@ class OUTBREAK_API AOBExtractionZone : public AActor
 public:
 	AOBExtractionZone();
 	
-	// 개인 탈출구로 설정: 소유 클라에만 복제되도록(본인만 보임) + 소유자 지정.
-	void ConfigureAsPersonal(AController* InOwner);
+	// 개인(팀 전용) 탈출구로 설정. 같은 팀 전원에게만 복제되어 보인다.
+	void ConfigureAsPersonal(uint8 InTeamId);
+	
+	// 팀원 전원이 봐야 하므로 소유자 한정 복제 대신 팀으로 거른다.
+	virtual bool IsNetRelevantFor(const AActor* RealViewer, const AActor* ViewTarget, const FVector& SrcLocation) const override;
 	
 	// 활성 시간창 설정. GameMode가 개인 존 스폰 시 맵(MapData)별 값으로 덮어씀.
 	void SetActiveWindow(int32 InStartSec, int32 InEndSec);
@@ -79,6 +82,9 @@ protected:
 	FGameplayTag RequiredItemTag;
 
 private:
+	// 0 = 팀 제한 없음(공용). 그 외에는 이 팀에게만 보이고 이 팀만 사용 가능.
+	uint8 OwningTeamId = 0;
+	
 	// 서버 전용: 구역 안 컨트롤러 → 누적 홀드(초).
 	UPROPERTY(Transient)
 	TMap<TObjectPtr<AController>, float> HoldProgress;
