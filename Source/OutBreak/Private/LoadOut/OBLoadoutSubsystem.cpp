@@ -14,12 +14,40 @@ const FString UOBLoadoutSubsystem::SlotName = TEXT("OBPlayerProfile");
 
 namespace
 {
+	const FName ShopCategory_Weapons(TEXT("Weapons"));
+	const FName ShopCategory_Sell(TEXT("Sell"));
+	const FName ShopAction_Purchase(TEXT("Purchase"));
+	const FName ShopAction_SellOne(TEXT("SellOne"));
+	const FName ShopAction_SellAll(TEXT("SellAll"));
+
 	// 무기 클래스에서 슬롯을 얻는다. 슬롯은 무기 스펙의 소유라 ItemDefinition에 중복 저장하지 않았다.
 	const UOBWeaponData* WeaponDataOf(TSubclassOf<AOBWeaponBase> WeaponClass)
 	{
 		if (!WeaponClass) return nullptr;
 		const AOBWeaponBase* CDO = WeaponClass->GetDefaultObject<AOBWeaponBase>();
 		return CDO ? CDO->GetWeaponData() : nullptr;
+	}
+
+	void AddStat(FShopItemViewData& Item, const TCHAR* Id, const TCHAR* Label, FText Value, int32 Order)
+	{
+		FShopItemStatViewData Stat;
+		Stat.StatId = FName(Id);
+		Stat.DisplayName = FText::FromString(Label);
+		Stat.DisplayValue = MoveTemp(Value);
+		Stat.SortOrder = Order;
+		Item.Stats.Add(Stat);
+	}
+
+	void SetItemIcon(FShopItemViewData& Item, UTexture2D* Icon)
+	{
+		if (!Icon) return;
+
+		FSlateBrush Brush;
+		Brush.SetResourceObject(Icon);
+		Brush.DrawAs = ESlateBrushDrawType::Image;
+		Brush.ImageSize = FVector2D(64.f, 64.f);
+		Item.ListIconBrush = Brush;
+		Item.DetailImageBrush = Brush;
 	}
 }
 
@@ -38,8 +66,6 @@ TSubclassOf<AOBWeaponBase> UOBLoadoutSubsystem::ResolveWeaponClass(const FGamepl
 
 	return TSubclassOf<AOBWeaponBase>(Def->WeaponClass.LoadSynchronous());
 }
-
-// --- 슬롯 ---
 
 void UOBLoadoutSubsystem::SetWeapon(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass)
 {
@@ -91,8 +117,6 @@ void UOBLoadoutSubsystem::ClearLoadout()
 	CurrentLoadout.SlotWeapons.Empty();
 	SaveToDisk();
 }
-
-// --- 창고 ---
 
 void UOBLoadoutSubsystem::AddStashItem(const FGameplayTag& ItemTag, int32 Count)
 {
@@ -199,8 +223,6 @@ void UOBLoadoutSubsystem::EquipFromStash(TSubclassOf<AOBWeaponBase> WeaponClass)
 	SaveToDisk();
 }
 
-// --- 스타터킷 ---
-
 bool UOBLoadoutSubsystem::HasAnyWeapon() const
 {
 	if (!CurrentLoadout.SlotWeapons.IsEmpty()) return true;
@@ -288,97 +310,163 @@ void UOBLoadoutSubsystem::AddCurrency(int32 Amount)
 	SaveToDisk();
 }
 
-// --- 상점 ---
-
 FShopWindowViewData UOBLoadoutSubsystem::BuildShopView(UOBWeaponCatalog* Catalog) const
 {
 	FShopWindowViewData View;
 	View.ShopId = TEXT("WeaponShop");
 	View.Currency.Scrap = CurrentCurrency;
 
-	// 카테고리 1개(무기)로 시작. 아이템 판매 탭은 L8에서 붙인다.
-	FShopCategoryViewData Cat;
-	Cat.CategoryId = TEXT("Weapons");
-	Cat.DisplayName = FText::FromString(TEXT("무기"));
-	View.Categories.Add(Cat);
+	FShopCategoryViewData BuyCat;
+	BuyCat.CategoryId  = ShopCategory_Weapons;
+	BuyCat.DisplayName = FText::FromString(TEXT("무기 구매"));
+	BuyCat.SortOrder   = 0;
+	View.Categories.Add(BuyCat);
 
-	if (Catalog)
+	FShopCategoryViewData SellCat;
+	SellCat.CategoryId  = ShopCategory_Sell;
+	SellCat.DisplayName = FText::FromString(TEXT("판매"));
+	SellCat.SortOrder   = 1;
+	View.Categories.Add(SellCat);
+
+	AppendWeaponItems(Catalog, View);
+	AppendSellItems(View);
+
+	for (FShopCategoryViewData& Cat : View.Categories)
 	{
-		for (const TSubclassOf<AOBWeaponBase>& WClass : Catalog->AvailableWeapons)
+		Cat.ItemCount = 0;
+		for (const FShopItemViewData& Item : View.Items)
 		{
-			if (!WClass) continue;
-			const UOBWeaponData* Data = WeaponDataOf(WClass);
-			if (!Data) continue;
-
-			FShopItemViewData Item;
-			Item.ItemId = FName(*WClass->GetName());
-			Item.CategoryId = TEXT("Weapons");
-			Item.DisplayName = Data->DisplayName;
-			Item.MetaText = UEnum::GetDisplayValueAsText(Data->WeaponCategory);
-			Item.Description = Data->Description;
-			Item.Price = Data->WeaponPrice;
-			Item.StockQuantity = 1;
-			
-			// 상세 스탯(인스펙터 VBX_ItemStatList)
-			auto AddStat = [&Item](const TCHAR* Id, const TCHAR* Label, FText Value, int32 Order)
-			{
-				FShopItemStatViewData Stat;
-				Stat.StatId = FName(Id);
-				Stat.DisplayName = FText::FromString(Label);
-				Stat.DisplayValue = MoveTemp(Value);
-				Stat.SortOrder = Order;
-				Item.Stats.Add(Stat);
-			};
-			AddStat(TEXT("Damage"),   TEXT("데미지"), FText::AsNumber(Data->BaseDamage), 0);
-			AddStat(TEXT("RPM"),      TEXT("연사력"), FText::AsNumber(Data->RoundsPerMinute), 1);
-			AddStat(TEXT("Spread"),   TEXT("탄퍼짐"), FText::FromString(FString::Printf(TEXT("%.2f°"), Data->BaseSpreadDegrees)), 2);
-			AddStat(TEXT("Recoil"),   TEXT("반동"),   FText::FromString(FString::Printf(TEXT("%.1f"), Data->VerticalRecoil)), 3);
-			AddStat(TEXT("Magazine"), TEXT("탄창"),   FText::AsNumber(Data->MagazineSize), 4);
-			AddStat(TEXT("Mobility"), TEXT("기동성"), FText::FromString(FString::Printf(TEXT("x%.2f"), Data->MobilityMultiplier)), 5);
-
-			// 아이콘(리스트 + 상세 미리보기)
-			if (Data->WeaponIcon)
-			{
-				FSlateBrush Brush;
-				Brush.SetResourceObject(Data->WeaponIcon);
-				Brush.DrawAs = ESlateBrushDrawType::Image;
-				Brush.ImageSize = FVector2D(64.f, 64.f);
-				Item.ListIconBrush = Brush;
-				Item.DetailImageBrush = Brush;
-			}
-
-			// 보유/구매 상태
-			const bool bOwned  = IsOwnedOrEquipped(WClass);
-			const bool bAfford = CurrentCurrency >= Data->WeaponPrice;
-			Item.OwnedQuantity = bOwned ? 1 : 0;
-
-			// 구매 버튼(액션)
-			FShopActionViewData Buy;
-			Buy.ActionId   = TEXT("Purchase");
-			Buy.Label      = FText::FromString(TEXT("구매"));
-			Buy.InputDisplayText = FText::FromString(TEXT("F"));
-			Buy.InputKey   = EKeys::F;
-			Buy.Cost       = Data->WeaponPrice;
-			Buy.Quantity   = 1;
-			Buy.ActionType = EShopActionType::Purchase;
-			Buy.bCanExecute = !bOwned && bAfford;
-			if (bOwned)        Buy.DisabledReason = FText::FromString(TEXT("보유 중"));
-			else if (!bAfford) Buy.DisabledReason = FText::FromString(TEXT("잔액 부족"));
-			Item.Actions.Add(Buy);
-
-			View.Items.Add(Item);
+			if (Item.CategoryId == Cat.CategoryId) ++Cat.ItemCount;
 		}
 	}
-	
-	// 카테고리 수량 + 초기 선택(열자마자 인스펙터에 첫 아이템 표시)
-	View.Categories[0].ItemCount = View.Items.Num();
-	View.InitialSelectedCategoryId = TEXT("Weapons");
-	if (View.Items.Num() > 0)
+
+	// 열자마자 인스펙터에 구매 탭 첫 아이템 표시.
+	View.InitialSelectedCategoryId = ShopCategory_Weapons;
+	for (const FShopItemViewData& Item : View.Items)
 	{
-		View.InitialSelectedItemId = View.Items[0].ItemId;
+		if (Item.CategoryId == ShopCategory_Weapons)
+		{
+			View.InitialSelectedItemId = Item.ItemId;
+			break;
+		}
 	}
-	
+
 	return View;
+}
+
+void UOBLoadoutSubsystem::AppendWeaponItems(UOBWeaponCatalog* Catalog, FShopWindowViewData& View) const
+{
+	if (!Catalog) return;
+
+	for (const TSubclassOf<AOBWeaponBase>& WClass : Catalog->AvailableWeapons)
+	{
+		if (!WClass) continue;
+		const UOBWeaponData* Data = WeaponDataOf(WClass);
+		if (!Data) continue;
+
+		FShopItemViewData Item;
+		Item.ItemId        = FName(*WClass->GetName());
+		Item.CategoryId    = ShopCategory_Weapons;
+		Item.DisplayName   = Data->DisplayName;
+		Item.MetaText      = UEnum::GetDisplayValueAsText(Data->WeaponCategory);
+		Item.Description   = Data->Description;
+		Item.Price         = Data->WeaponPrice;
+		Item.StockQuantity = 1;
+
+		AddStat(Item, TEXT("Damage"),   TEXT("데미지"), FText::AsNumber(Data->BaseDamage), 0);
+		AddStat(Item, TEXT("RPM"),      TEXT("연사력"), FText::AsNumber(Data->RoundsPerMinute), 1);
+		AddStat(Item, TEXT("Spread"),   TEXT("탄퍼짐"), FText::FromString(FString::Printf(TEXT("%.2f°"), Data->BaseSpreadDegrees)), 2);
+		AddStat(Item, TEXT("Recoil"),   TEXT("반동"),   FText::FromString(FString::Printf(TEXT("%.1f"), Data->VerticalRecoil)), 3);
+		AddStat(Item, TEXT("Magazine"), TEXT("탄창"),   FText::AsNumber(Data->MagazineSize), 4);
+		AddStat(Item, TEXT("Mobility"), TEXT("기동성"), FText::FromString(FString::Printf(TEXT("x%.2f"), Data->MobilityMultiplier)), 5);
+
+		SetItemIcon(Item, Data->WeaponIcon);
+
+		const bool bOwned  = IsOwnedOrEquipped(WClass);
+		const bool bAfford = CurrentCurrency >= Data->WeaponPrice;
+		Item.OwnedQuantity = bOwned ? 1 : 0;
+
+		FShopActionViewData Buy;
+		Buy.ActionId         = ShopAction_Purchase;
+		Buy.Label            = FText::FromString(TEXT("구매"));
+		Buy.InputDisplayText = FText::FromString(TEXT("F"));
+		Buy.InputKey         = EKeys::F;
+		Buy.Cost             = Data->WeaponPrice;
+		Buy.Quantity         = 1;
+		Buy.ActionType       = EShopActionType::Purchase;
+		Buy.bCanExecute      = !bOwned && bAfford;
+		if (bOwned)        Buy.DisabledReason = FText::FromString(TEXT("보유 중"));
+		else if (!bAfford) Buy.DisabledReason = FText::FromString(TEXT("잔액 부족"));
+		Item.Actions.Add(Buy);
+
+		View.Items.Add(Item);
+	}
+}
+
+void UOBLoadoutSubsystem::AppendSellItems(FShopWindowViewData& View) const
+{
+	TArray<FShopItemViewData> SellItems;
+
+	for (const FOBItemStack& Stack : CurrentLoadout.StashItems)
+	{
+		if (Stack.IsEmpty()) continue;
+
+		const UOBItemDefinition* Def = UOBItemRegistry::FindItem(Stack.ItemTag);
+		if (!Def || Def->SellPrice <= 0) continue;   // 비매품은 목록에 띄우지 않는다
+
+		FShopItemViewData Item;
+		// 판매 목록의 ItemId는 아이템 태그 문자열이다. 구매 목록(무기 클래스명)과 겹치지 않는다.
+		Item.ItemId        = FName(*Stack.ItemTag.ToString());
+		Item.CategoryId    = ShopCategory_Sell;
+		Item.DisplayName   = Def->DisplayName;
+		Item.MetaText      = UEnum::GetDisplayValueAsText(Def->Category);
+		Item.Description   = Def->Description;
+		Item.Price         = Def->SellPrice;
+		Item.StockQuantity = Stack.Count;
+		Item.OwnedQuantity = Stack.Count;
+
+		// 인벤토리 자동 정렬과 같은 기준(카테고리 → SortOrder)으로 보여준다.
+		Item.SortOrder = static_cast<int32>(Def->Category) * 1000 + Def->SortOrder;
+
+		AddStat(Item, TEXT("SellPrice"), TEXT("개당 판매가"), FText::AsNumber(Def->SellPrice), 0);
+		AddStat(Item, TEXT("Owned"),     TEXT("보유"),        FText::AsNumber(Stack.Count), 1);
+		//AddStat(Item, TEXT("Weight"),    TEXT("무게"),        FText::FromString(FString::Printf(TEXT("%.2f kg"), Def->Weight)), 2);
+
+		SetItemIcon(Item, Def->Icon);
+
+		FShopActionViewData SellOne;
+		SellOne.ActionId         = ShopAction_SellOne;
+		SellOne.Label            = FText::FromString(TEXT("판매"));
+		SellOne.InputDisplayText = FText::FromString(TEXT("F"));
+		SellOne.InputKey         = EKeys::F;
+		SellOne.Quantity         = 1;
+		SellOne.ActionType       = EShopActionType::Exchange;
+		SellOne.bCanExecute      = true;
+		Item.Actions.Add(SellOne);
+
+		// 잡템 20개를 스무 번 클릭하게 만들지 않는다.
+		if (Stack.Count > 1)
+		{
+			FShopActionViewData SellAll;
+			SellAll.ActionId         = ShopAction_SellAll;
+			SellAll.Label            = FText::FromString(FString::Printf(TEXT("전부 판매 (%d)"), Stack.Count));
+			SellAll.InputDisplayText = FText::FromString(TEXT("G"));
+			SellAll.InputKey         = EKeys::G;
+			SellAll.Quantity         = Stack.Count;
+			SellAll.ActionType       = EShopActionType::Exchange;
+			SellAll.bCanExecute      = true;
+			Item.Actions.Add(SellAll);
+		}
+
+		SellItems.Add(MoveTemp(Item));
+	}
+
+	SellItems.Sort([](const FShopItemViewData& A, const FShopItemViewData& B)
+	{
+		return A.SortOrder != B.SortOrder ? A.SortOrder < B.SortOrder : A.ItemId.LexicalLess(B.ItemId);
+	});
+
+	View.Items.Append(MoveTemp(SellItems));
 }
 
 bool UOBLoadoutSubsystem::TryPurchase(UOBWeaponCatalog* Catalog, FName ItemId)
@@ -411,13 +499,28 @@ bool UOBLoadoutSubsystem::TryPurchase(UOBWeaponCatalog* Catalog, FName ItemId)
 	return false;
 }
 
+bool UOBLoadoutSubsystem::TrySell(const FGameplayTag& ItemTag, int32 Count)
+{
+	if (Count <= 0) return false;
+
+	const UOBItemDefinition* Def = UOBItemRegistry::FindItem(ItemTag);
+	if (!Def || Def->SellPrice <= 0) return false;   // 비매품
+
+	// 창고에서 먼저 빼고, 성공했을 때만 돈을 준다. 실패하면 창고는 그대로다.
+	if (!RemoveStashItem(ItemTag, Count)) return false;
+
+	// 돈 계산은 int32 넘침을 만들지 않는다.
+	const int64 Gain = static_cast<int64>(Def->SellPrice) * Count;
+	AddCurrency(static_cast<int32>(FMath::Min<int64>(Gain, MAX_int32)));
+
+	return true;
+}
+
 int32 UOBLoadoutSubsystem::GetWeaponPrice(TSubclassOf<AOBWeaponBase> WeaponClass)
 {
 	const UOBWeaponData* Data = WeaponDataOf(WeaponClass);
 	return Data ? Data->WeaponPrice : 0;
 }
-
-// --- 저장 ---
 
 void UOBLoadoutSubsystem::SaveToDisk()
 {

@@ -20,6 +20,9 @@ protected:
 	// 상점 구매/닫기 델리게이트 바인딩 대상.
 	UFUNCTION()
 	void OnPurchaseRequested(FName ShopId, FName ItemId, FName ActionId, int32 Quantity);
+	
+	UFUNCTION()
+	void OnSellRequested(FName ShopId, FName ItemId, FName ActionId, int32 Quantity);
 
 	UFUNCTION()
 	void OnShopClosed(FName ShopId);

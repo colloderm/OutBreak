@@ -107,6 +107,11 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Shop")
 	bool TryPurchase(UOBWeaponCatalog* Catalog, FName ItemId);
+	
+	// 창고의 아이템을 판다. 비매품(SellPrice<=0)이거나 수량이 모자라면 false.
+	// 장착 중인 무기는 창고에 없으므로 자동으로 걸러진다(창고/슬롯 불변식).
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	bool TrySell(const FGameplayTag& ItemTag, int32 Count);
 
 	UFUNCTION(BlueprintPure, Category = "Shop")
 	static int32 GetWeaponPrice(TSubclassOf<AOBWeaponBase> WeaponClass);
@@ -119,6 +124,11 @@ public:
 	void SaveToDisk();
 	void LoadFromDisk();
 
+private:
+	// 상점 뷰 구성. 구매 목록은 무기 카탈로그에서, 판매 목록은 창고에서 만든다.
+	void AppendWeaponItems(UOBWeaponCatalog* Catalog, FShopWindowViewData& View) const;
+	void AppendSellItems(FShopWindowViewData& View) const;
+	
 private:
 	// 런타임 권위값(로드/편집 대상).
 	FOBLoadout CurrentLoadout;
