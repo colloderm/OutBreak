@@ -20,10 +20,10 @@ struct FLimbData
 	bool bIsHas = true;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float MaxDurability;
+	float MaxDurability = 0.0f;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float Durability;
+	float Durability = 0.0f;
 	
 	FLimbData() = default;
 	
@@ -55,7 +55,8 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 	                           FActorComponentTickFunction* ThisTickFunction) override;
 	
-	void ActionPhysical(FHitResult HitResult, float DamageAmount);
+	void ApplyDamage(float DamageAmount);
+	void ActionPhysical(const FHitResult& HitResult, float DamageAmount);
 
 	ELocomotionWalkRunState EvaluateLocomotionState() const;
 

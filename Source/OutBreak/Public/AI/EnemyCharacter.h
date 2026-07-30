@@ -20,6 +20,7 @@ class AModularSkeletalMeshActor;
 class UEnemyStatusComponent;
 class UEnemyPhysicalComponent;
 class UStateTreeAIComponent;
+class UAudioComponent;
 
 
 DECLARE_LOG_CATEGORY_EXTERN(
@@ -87,6 +88,7 @@ public:
 	void StopCharacterMovement();
 	
 	void Dead();
+	bool IsDead() const { return bIsDead; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -108,6 +110,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
 
+	
+	TObjectPtr<UAudioComponent> CryingSoundComponent;
+	
 	UPROPERTY(
 		EditDefaultsOnly,
 		BlueprintReadOnly,
