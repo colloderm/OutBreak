@@ -43,16 +43,12 @@ void ULoadout::ShowDefaultStats()
 	UOBLoadoutSubsystem* LS = GetLoadout();
 	if (!LS) return;
 
-	const FOBLoadout& LO = LS->GetLoadout();
 	for (EOBWeaponSlot WeaponSlot : { EOBWeaponSlot::Primary, EOBWeaponSlot::Secondary, EOBWeaponSlot::Melee })
 	{
-		if (const TSoftClassPtr<AOBWeaponBase>* Soft = LO.SlotWeapons.Find(WeaponSlot))
+		if (TSubclassOf<AOBWeaponBase> Loaded = LS->GetSlotWeaponClass(WeaponSlot))
 		{
-			if (UClass* Loaded = Soft->LoadSynchronous())
-			{
-				ShowStats(Loaded); // 첫 장착 무기 스탯 표시
-				return;
-			}
+			ShowStats(Loaded); // 첫 장착 무기 스탯 표시
+			return;
 		}
 	}
 }
@@ -78,13 +74,9 @@ void ULoadout::HandleCardClicked(EOBWeaponSlot WeaponSlot)
 	UOBLoadoutSubsystem* LS = GetLoadout();
 	if (!LS) return;
 
-	const FOBLoadout& LO = LS->GetLoadout();
-	if (const TSoftClassPtr<AOBWeaponBase>* Soft = LO.SlotWeapons.Find(WeaponSlot))
+	if (TSubclassOf<AOBWeaponBase> Loaded = LS->GetSlotWeaponClass(WeaponSlot))
 	{
-		if (UClass* Loaded = Soft->LoadSynchronous())
-		{
-			ShowStats(Loaded);   // 그 슬롯 무기 스탯으로 하단 갱신
-		}
+		ShowStats(Loaded);   // 그 슬롯 무기 스탯으로 하단 갱신
 	}
 }
 
@@ -117,27 +109,22 @@ void ULoadout::RebuildSlots()
 	UOBLoadoutSubsystem* LS = GetLoadout();
 	if (!LS || !LoadoutSelectionView) return;
 
-	const FOBLoadout& LO = LS->GetLoadout();
-
 	auto FillSlot = [&](EOBWeaponSlot WeaponSlot)
 	{
 		FText Name = FText::FromString(TEXT("미선택"));
 		FText Category = FText::GetEmpty();
 		FText Desc = FText::GetEmpty();
 		UTexture2D* Icon = nullptr;
-		if (const TSoftClassPtr<AOBWeaponBase>* Soft = LO.SlotWeapons.Find(WeaponSlot))
+
+		if (TSubclassOf<AOBWeaponBase> Loaded = LS->GetSlotWeaponClass(WeaponSlot))
 		{
-			if (UClass* Loaded = Soft->LoadSynchronous())
+			const AOBWeaponBase* CDO = Loaded->GetDefaultObject<AOBWeaponBase>();
+			if (const UOBWeaponData* Data = CDO ? CDO->GetWeaponData() : nullptr)
 			{
-				const AOBWeaponBase* CDO = Loaded->GetDefaultObject<AOBWeaponBase>();
-				const UOBWeaponData* Data = CDO ? CDO->GetWeaponData() : nullptr;
-				if (Data) 
-				{ 
-					Name	 = Data->DisplayName; 
-					Category = UEnum::GetDisplayValueAsText(Data->WeaponCategory); 
-					Desc     = Data->Description; 
-					Icon	= Data->WeaponIcon; 
-				}
+				Name	 = Data->DisplayName;
+				Category = UEnum::GetDisplayValueAsText(Data->WeaponCategory);
+				Desc     = Data->Description;
+				Icon	 = Data->WeaponIcon;
 			}
 		}
 		LoadoutSelectionView->SetCardInfo(Name, WeaponSlot, Category, Desc, Icon);

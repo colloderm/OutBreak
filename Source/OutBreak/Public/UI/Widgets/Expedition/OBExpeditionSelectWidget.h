@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "UI/Widgets/OBInteractionWidget.h"
 #include "OBExpeditionSelectWidget.generated.h"
 
 class UTextBlock;
@@ -16,7 +16,7 @@ class UOBExpeditionMapData;
 class UOBExpeditionMapEntryWidget;
 
 UCLASS()
-class OUTBREAK_API UOBExpeditionSelectWidget : public UUserWidget
+class OUTBREAK_API UOBExpeditionSelectWidget : public UOBInteractionWidget
 {
 	GENERATED_BODY()
 	

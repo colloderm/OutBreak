@@ -3,8 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "UI/Shop/ShopWidgetTypes.h"
+#include "UI/Widgets/OBInteractionWidget.h"
 #include "ShopWindow.generated.h"
 
 class UShopCategory;
@@ -14,7 +14,7 @@ class UShopkeeperPortrait;
 class UUserCurrency;
 
 UCLASS()
-class OUTBREAK_API UShopWindow : public UUserWidget
+class OUTBREAK_API UShopWindow : public UOBInteractionWidget
 {
 	GENERATED_BODY()
 
@@ -54,8 +54,7 @@ public:
 
 	const FShopWindowViewData& GetCurrentViewData() const;
 
-	UFUNCTION(BlueprintCallable, Category = "Shop")
-	void RequestClose();
+	virtual void RequestClose() override;
 
 	UPROPERTY(BlueprintAssignable, Category = "Shop")
 	FShopWindowCategorySelectionChangedSignature OnCategorySelectionChanged;

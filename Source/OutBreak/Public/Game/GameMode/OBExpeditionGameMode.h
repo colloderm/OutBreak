@@ -194,9 +194,9 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AActor>> PersonalExtractPoints;
 
-	// 컨트롤러 → 그 플레이어의 개인 탈출구들(정리용).
+	// 팀ID → 그 팀의 개인 탈출구들. 팀원 전원이 같은 탈출구를 공유한다.
 	UPROPERTY(Transient)
-	TMap<TObjectPtr<AController>, FOBPersonalZoneList> PersonalZones;
+	TMap<uint8, FOBPersonalZoneList> PersonalZones;
 
 	// 팀ID → 이미 소비한 '중심' 마커(팀원끼리 다른 지역 강제).
 	// (중첩 컨테이너라 UPROPERTY 불가. 마커는 레벨 액터라 GC 안전)
