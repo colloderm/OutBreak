@@ -22,7 +22,7 @@
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI_Advanced.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/ST_EnemyAI_Advanced.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Enemy/Blueprint/STT_MSG.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Enemy/Blueprint/STT_MSG.uasset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -390,7 +390,7 @@
       <workItem from="1785372427762" duration="30000" />
       <workItem from="1785374840733" duration="2339000" />
       <workItem from="1785384433838" duration="3899000" />
-      <workItem from="1785460108767" duration="304000" />
+      <workItem from="1785460108767" duration="1158000" />
     </task>
     <servers />
   </component>
