@@ -646,11 +646,13 @@ void UEnemyMovementComponent::BegineTraversalClimbUp(FVector& Start, FVector& De
 		UE_LOG(LogTemp, Error, TEXT("%s::%s : World is Invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
-	DrawDebugSphere(World, WarpTarget1, 20, 12, FColor::Green, false, DrawTime, 0, 1);
-	DrawDebugSphere(World, WarpTarget2, 20, 12, FColor::White, false, DrawTime, 0, 1);
-	DrawDebugSphere(World, WarpTarget3, 20, 12, FColor::Blue, false, DrawTime, 0, 1);
-	DrawDebugSphere(World, WarpTarget4, 20, 12, FColor::White, false, DrawTime, 0, 1);
-	
+	if (bTraversalDrawDebug)
+	{
+		DrawDebugSphere(World, WarpTarget1, 20, 12, FColor::Green, false, DrawTime, 0, 1);
+		DrawDebugSphere(World, WarpTarget2, 20, 12, FColor::White, false, DrawTime, 0, 1);
+		DrawDebugSphere(World, WarpTarget3, 20, 12, FColor::Blue, false, DrawTime, 0, 1);
+		DrawDebugSphere(World, WarpTarget4, 20, 12, FColor::White, false, DrawTime, 0, 1);
+	}
 	BeginParkour();
 	
 	MotionWarping->AddOrUpdateWarpTargetFromLocationAndRotation(
