@@ -25,6 +25,19 @@ AOBExpeditionGameMode::AOBExpeditionGameMode()
 	GameStateClass = AOBExpeditionGameState::StaticClass();
 }
 
+void AOBExpeditionGameMode::PreInitializeComponents()
+{
+	// GameState는 이 모드의 동작 전제(페이즈/세션타이머/결과창)라 BP 설정을 신뢰하지 않는다.
+	// BP 서브클래스에 옛 값이 직렬화돼 있으면 C++ 생성자 기본값이 조용히 무시되고,
+	// 그러면 SetPhase가 통째로 안 돌아 결과창도 타이머도 죽는다(원인 찾기 매우 어려움).
+	if (!GameStateClass || !GameStateClass->IsChildOf(AOBExpeditionGameState::StaticClass()))
+	{
+		GameStateClass = AOBExpeditionGameState::StaticClass();
+	}
+	
+	Super::PreInitializeComponents(); // 여기서 GameState가 실제로 스폰된다
+}
+
 void AOBExpeditionGameMode::StartPlay()
 {
 	Super::StartPlay();
