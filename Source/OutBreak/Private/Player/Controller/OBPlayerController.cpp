@@ -615,6 +615,17 @@ void AOBPlayerController::ReturnToHome()
 		return;
 	}
 	
+	// 위젯 버튼 콜백 안에서 바로 레벨을 열면 월드/위젯 정리가 콜백 스택 위에서 일어나
+	// 호출자(WBP_ExpeditionResult)가 파괴된 채로 반환된다. 다음 틱으로 미뤄 안전하게 나간다.
+	GetWorldTimerManager().SetTimerForNextTick(this, &AOBPlayerController::TravelToHome);
+}
+
+void AOBPlayerController::TravelToHome()
+{
+	if (HomeLevel.IsNull()) return;
+
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] 홈 복귀: %s"), *HomeLevel.ToString());
+
 	// 데디 접속 종료 후 각 클라가 로컬 Home 로드(개별 복귀).
 	UGameplayStatics::OpenLevelBySoftObjectPtr(this, HomeLevel);
 }

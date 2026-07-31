@@ -255,6 +255,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
 	void ReturnToHome();
 	
+	// 실제 레벨 전환. ReturnToHome이 다음 틱으로 미뤄서 호출한다.
+	void TravelToHome();
+	
 	// 자동 복귀까지 남은 초(올림). 결과창 버튼 텍스트 "복귀하기 (N)"용.
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	int32 GetReturnCountdown() const;
