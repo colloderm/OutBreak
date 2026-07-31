@@ -6,7 +6,7 @@
 #include "Engine/DataAsset.h"
 #include "EnemyAsset.generated.h"
 
-
+class USoundCue;
 class UCurveFloat;
 class UPhysicalMaterial;
 class UStaticMesh;
