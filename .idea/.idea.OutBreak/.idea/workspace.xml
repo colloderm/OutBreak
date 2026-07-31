@@ -21,8 +21,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyAsset.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyAsset.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -390,7 +389,7 @@
       <workItem from="1785372427762" duration="30000" />
       <workItem from="1785374840733" duration="2339000" />
       <workItem from="1785384433838" duration="3899000" />
-      <workItem from="1785460108767" duration="1962000" />
+      <workItem from="1785460108767" duration="2948000" />
     </task>
     <servers />
   </component>
@@ -431,6 +430,11 @@
           <url>file://$PROJECT_DIR$/Source/OutBreak/Private/AI/EnemyCharacter.cpp</url>
           <line>2</line>
           <option name="timeStamp" value="8" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h</url>
+          <line>4</line>
+          <option name="timeStamp" value="10" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

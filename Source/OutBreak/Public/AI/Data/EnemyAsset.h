@@ -10,7 +10,7 @@
 class UCurveFloat;
 class UPhysicalMaterial;
 class UStaticMesh;
-
+class USoundCue;
 
 USTRUCT(BlueprintType)
 struct FEnemyLimbMesh
