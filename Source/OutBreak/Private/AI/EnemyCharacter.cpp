@@ -19,10 +19,12 @@
 #include "AI/Components/EnemyStatusComponent.h"
 #include "AI/Components/EnemyPhysicalComponent.h"
 #include "Perception/AISense_Damage.h"
+#include "Sound/SoundCue.h"
 
 
 #include "AI/System/ModularSkeletalMeshActor.h"
-
+#include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
 
 
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
@@ -181,7 +183,13 @@ void AEnemyCharacter::BeginPlay()
 		this,
 		&AEnemyCharacter::HandleReducedWorkChanged);
 	
-	ChildActorSkeletalMesh = GetChildActorSkeletalMesh(); 
+	ChildActorSkeletalMesh = GetChildActorSkeletalMesh();
+	
+	USoundCue* CryingSound = EnemyAsset->GetSoundAssets()->ZombieCryingSound;
+	if (IsValid(CryingSound))
+	{
+		CryingSoundComponent = UGameplayStatics::SpawnSoundAttached(CryingSound, RootComponent);
+	}
 	
 	/*
 	 * BeginPlay 시점에는 컴포넌트 등록이 끝났으므로
@@ -218,22 +226,31 @@ void AEnemyCharacter::EndPlay(
 float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator,
                                   AActor* DamageCauser)
 {
+	if (bIsDead)
+	{
+		return 0.0f;
+	}
+
 	const float ActualDamage = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 
 	FVector HitLocation = GetActorLocation();
-	if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
+	if (ActualDamage > 0.0f && IsValid(PhysicalComponent))
 	{
-		const FPointDamageEvent& PointDamageEvent =
-			static_cast<const FPointDamageEvent&>(DamageEvent);
-		const FHitResult& HitResult = PointDamageEvent.HitInfo;
-		if (HitResult.bBlockingHit)
+		if (DamageEvent.IsOfType(FPointDamageEvent::ClassID))
 		{
-			HitLocation = HitResult.ImpactPoint;
-		}
+			const FPointDamageEvent& PointDamageEvent =
+				static_cast<const FPointDamageEvent&>(DamageEvent);
+			const FHitResult& HitResult = PointDamageEvent.HitInfo;
+			if (HitResult.bBlockingHit)
+			{
+				HitLocation = HitResult.ImpactPoint;
+			}
 
-		if (IsValid(PhysicalComponent))
+			PhysicalComponent->ActionPhysical(HitResult, ActualDamage);
+		}
+		else
 		{
-			PhysicalComponent->ActionPhysical(HitResult, DamageAmount);
+			PhysicalComponent->ApplyDamage(ActualDamage);
 		}
 	}
 
@@ -327,14 +344,42 @@ void AEnemyCharacter::StopCharacterMovement()
 
 void AEnemyCharacter::Dead()
 {
-	AEnemyController* EnemyContoller = Cast<AEnemyController>(GetController());
-	if (IsValid(EnemyContoller))
+	if (bIsDead)
 	{
-		EnemyContoller->Dead();
+		return;
 	}
+
+	bIsDead = true;
+	
+	if (IsValid(CryingSoundComponent))
+	{
+		CryingSoundComponent->Stop();
+	}
+		
+	if (UEnemyMovementComponent* EnemyMovementComponent =
+		Cast<UEnemyMovementComponent>(GetMovementComponent()))
+	{
+		EnemyMovementComponent->SetLocomotationState(
+			ELocomotionWalkRunState::Dead);
+	}
+
+	AEnemyController* EnemyController =
+		Cast<AEnemyController>(GetController());
+	if (IsValid(EnemyController))
+	{
+		EnemyController->Dead(DeathCleanupDelay);
+	}
+
+	StopCharacterMovement();
 	GetMesh()->SetSimulatePhysics(true);
-	
-	
+
+	if (DeathCleanupDelay <= 0.0f)
+	{
+		Destroy();
+		return;
+	}
+
+	SetLifeSpan(DeathCleanupDelay);
 }
 
 void AEnemyCharacter::SetAnimationSignificance(

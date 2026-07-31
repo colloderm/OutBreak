@@ -97,6 +97,9 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Combat")
 	void OnCombatOrientationChanged(bool bCombat);
 	
+	// 스폰 직후 바닥(스트리밍 셀)이 올라올 때까지 공중에 고정. 서버 전용.
+	void HoldUntilGrounded();
+	
 public:
 	/*
 	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).
@@ -211,6 +214,10 @@ protected:
 	bool bLastCombatOrientation = false;
 	
 private:
+	void PollGround();
+	bool TryLandOnGround();
+	
+private:
 	float DefaultCameraFOV = 90.f;
 	float TargetCameraFOV = 90.f;
 	float CameraBlendSpeed = 12.f;
@@ -234,4 +241,15 @@ private:
 
 	// Tick 보간 목표(내부 상태)
 	float TargetCameraLagSpeed = 30.f; 
+	
+	FTimerHandle GroundWaitTimer;
+	float GroundWaitElapsed = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Spawn")
+	float GroundTraceDistance = 20000.f;
+
+	// 이 시간까지 바닥이 안 올라오면 포기하고 낙하 허용(영구 정지보다 낫다).
+	UPROPERTY(EditDefaultsOnly, Category = "Spawn")
+	float MaxGroundWaitSeconds = 15.f;
+	
 };

@@ -1,14 +1,26 @@
 #include "AI/Animation/Notify/AttackNotifyState.h"
 
+#include "Ability/Tags/OBGameplayTags.h"
+#include "AbilitySystemBlueprintLibrary.h"
+#include "AbilitySystemComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/HitResult.h"
 #include "GameFramework/Actor.h"
+#include "GameplayEffect.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "UObject/ConstructorHelpers.h"
 
 UAttackNotifyState::UAttackNotifyState(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
 	TraceObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> DefaultDamageEffect(
+		TEXT("/Game/GameAbilitySystem/Effects/GE_Damage"));
+	if (DefaultDamageEffect.Succeeded())
+	{
+		DamageEffect = DefaultDamageEffect.Class;
+	}
 }
 
 void UAttackNotifyState::NotifyBegin(
@@ -69,18 +81,20 @@ void UAttackNotifyState::NotifyEnd(
 		if (FAttackTraceRuntimeState* RuntimeState = RuntimeStates.Find(MeshKey))
 		{
 			TArray<AActor*> CollectedActors;
-			CollectedActors.Reserve(RuntimeState->CollectedActors.Num());
+			CollectedActors.Reserve(RuntimeState->CollectedHits.Num());
 
-			for (const TWeakObjectPtr<AActor>& CollectedActor : RuntimeState->CollectedActors)
+			AActor* AttackOwner = MeshComp->GetOwner();
+			for (const TPair<TWeakObjectPtr<AActor>, FHitResult>& CollectedHit : RuntimeState->CollectedHits)
 			{
-				if (AActor* Actor = CollectedActor.Get())
+				if (AActor* Actor = CollectedHit.Key.Get())
 				{
 					CollectedActors.Add(Actor);
+					ApplyDamageEffect(AttackOwner, CollectedHit.Value);
 				}
 			}
 
 			RuntimeStates.Remove(MeshKey);
-			ProcessCollectedActors(MeshComp, MeshComp->GetOwner(), CollectedActors);
+			ProcessCollectedActors(MeshComp, AttackOwner, CollectedActors);
 		}
 	}
 
@@ -105,6 +119,56 @@ void UAttackNotifyState::ProcessCollectedActors_Implementation(
 	AActor*,
 	const TArray<AActor*>&) const
 {
+}
+
+void UAttackNotifyState::ApplyDamageEffect(AActor* AttackOwner, const FHitResult& Hit) const
+{
+	AActor* HitActor = Hit.GetActor();
+	if (!IsValid(AttackOwner) || !IsValid(HitActor) || !DamageEffect || DamageAmount <= 0.0f)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* TargetASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
+	if (!TargetASC)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* SourceASC =
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(AttackOwner);
+
+	// AI attackers currently have no ASC. In that case the target ASC creates the
+	// spec, while the context still records the actual attacker and hit information.
+	UAbilitySystemComponent* SpecASC = SourceASC ? SourceASC : TargetASC;
+	FGameplayEffectContextHandle Context = SpecASC->MakeEffectContext();
+	Context.AddInstigator(AttackOwner, AttackOwner);
+	Context.AddSourceObject(AttackOwner);
+	Context.AddHitResult(Hit);
+
+	FGameplayEffectSpecHandle SpecHandle = SpecASC->MakeOutgoingSpec(
+		DamageEffect,
+		FMath::Max(DamageEffectLevel, 0.0f),
+		Context);
+
+	if (!SpecHandle.IsValid())
+	{
+		return;
+	}
+
+	SpecHandle.Data->SetSetByCallerMagnitude(
+		OBGameplayTags::SetByCaller_Damage,
+		DamageAmount);
+
+	if (SourceASC)
+	{
+		SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data.Get(), TargetASC);
+	}
+	else
+	{
+		TargetASC->ApplyGameplayEffectSpecToSelf(*SpecHandle.Data.Get());
+	}
 }
 
 void UAttackNotifyState::TraceAndCollect(USkeletalMeshComponent* MeshComp)
@@ -159,7 +223,7 @@ void UAttackNotifyState::TraceAndCollect(USkeletalMeshComponent* MeshComp)
 		AActor* HitActor = Hit.GetActor();
 		if (!ShouldIgnoreActor(HitActor, MeshOwner))
 		{
-			RuntimeState->CollectedActors.Add(TWeakObjectPtr<AActor>(HitActor));
+			RuntimeState->CollectedHits.FindOrAdd(TWeakObjectPtr<AActor>(HitActor), Hit);
 		}
 	}
 }

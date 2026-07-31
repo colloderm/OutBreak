@@ -127,8 +127,14 @@ struct FEnemyPerception
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sight|Config")
 	float MaxAge = 3.f;
 	
-	
+};
 
+USTRUCT(BlueprintType)
+struct FEnemySoundAsset
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sound")
+	TObjectPtr<USoundCue> ZombieCryingSound;
 };
 
 /**
@@ -143,6 +149,7 @@ public:
 	const FEnemyPhysicalReact* GetPhysicalReact() const { return &PhysicalReact; } 
 	const FEnemyLimbMesh* GetLimbMeshes() const { return &LimbMeshes; } 
 	const FTraversalSetting* GetTraversalSetting() const { return &TraversalSetting; } 
+	const FEnemySoundAsset* GetSoundAssets() const { return &SoundAssets; }
 	
 private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess="true"));
@@ -153,5 +160,8 @@ private:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess="true"));
 	FTraversalSetting TraversalSetting;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess="true"));
+	FEnemySoundAsset SoundAssets;
 	
 };

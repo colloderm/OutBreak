@@ -20,6 +20,7 @@ class AModularSkeletalMeshActor;
 class UEnemyStatusComponent;
 class UEnemyPhysicalComponent;
 class UStateTreeAIComponent;
+class UAudioComponent;
 
 
 DECLARE_LOG_CATEGORY_EXTERN(
@@ -87,6 +88,7 @@ public:
 	void StopCharacterMovement();
 	
 	void Dead();
+	bool IsDead() const { return bIsDead; }
 
 protected:
 	virtual void BeginPlay() override;
@@ -107,6 +109,24 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
+
+	
+	TObjectPtr<UAudioComponent> CryingSoundComponent;
+	
+	UPROPERTY(
+		EditDefaultsOnly,
+		BlueprintReadOnly,
+		Category = "Death",
+		meta = (AllowPrivateAccess = "true", ClampMin = "0.0", Units = "s"))
+	float DeathCleanupDelay = 5.0f;
+
+	UPROPERTY(
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Transient,
+		Category = "Death",
+		meta = (AllowPrivateAccess = "true"))
+	bool bIsDead = false;
 	
 	/* ================================================== Components ============================================= */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))

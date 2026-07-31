@@ -129,7 +129,7 @@ void AEnemyController::InitializeMemoryComponent()
 			TEXT("MemoryComponet"));
 }
 
-void AEnemyController::Dead()
+void AEnemyController::Dead(const float CleanupDelay)
 {
 	if (bIsDead)
 	{
@@ -137,14 +137,34 @@ void AEnemyController::Dead()
 	}
 
 	bIsDead = true;
+	StopMovement();
+	StopStateTreeLogic(TEXT("Enemy died"));
 
-	APawn* ControlledPawn = GetPawn();
-	if (IsValid(ControlledPawn))
+	if (IsValid(GetPawn()))
 	{
-		StopMovement();
-		StopStateTreeLogic(TEXT("Enemy died"));
 		UnPossess();
 	}
+
+	if (IsValid(AIPerceptionComponent))
+	{
+		AIPerceptionComponent->ForgetAll();
+		AIPerceptionComponent->SetComponentTickEnabled(false);
+	}
+
+	if (IsValid(EnemyMemoryComponent))
+	{
+		EnemyMemoryComponent->SetComponentTickEnabled(false);
+	}
+
+	SetActorTickEnabled(false);
+
+	if (CleanupDelay <= 0.0f)
+	{
+		Destroy();
+		return;
+	}
+
+	SetLifeSpan(CleanupDelay);
 }
 
 void AEnemyController::BeginPlay()

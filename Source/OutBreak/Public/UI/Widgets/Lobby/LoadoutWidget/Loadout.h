@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
+#include "UI/Widgets/OBInteractionWidget.h"
 #include "Weapon/Data/OBWeaponTypes.h"
 #include "Loadout.generated.h"
 
@@ -14,7 +14,7 @@ class UOBLoadoutSubsystem;
 class AOBWeaponBase;
 
 UCLASS()
-class OUTBREAK_API ULoadout : public UUserWidget
+class OUTBREAK_API ULoadout : public UOBInteractionWidget
 {
 	GENERATED_BODY()
 	

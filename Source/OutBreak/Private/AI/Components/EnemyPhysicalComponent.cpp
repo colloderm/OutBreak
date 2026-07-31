@@ -85,8 +85,33 @@ void UEnemyPhysicalComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	// ...
 }
 
-void UEnemyPhysicalComponent::ActionPhysical(FHitResult HitResult, float DamageAmount)
+void UEnemyPhysicalComponent::ApplyDamage(const float DamageAmount)
 {
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (DamageAmount <= 0.0f ||
+		!IsValid(OwnerCharacter) ||
+		OwnerCharacter->IsDead())
+	{
+		return;
+	}
+
+	Health = FMath::Max(0.0f, Health - DamageAmount);
+	if (Health <= 0.0f)
+	{
+		Action_Dead();
+	}
+}
+
+void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const float DamageAmount)
+{
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (DamageAmount <= 0.0f ||
+		!IsValid(OwnerCharacter) ||
+		OwnerCharacter->IsDead())
+	{
+		return;
+	}
+
 	const auto PhysicalReact = EnemyAsset->GetPhysicalReact();
 	const auto LimbMeshes = EnemyAsset->GetLimbMeshes();
 	TWeakObjectPtr<UPhysicalMaterial> PhyMtrl = HitResult.PhysMaterial;
@@ -95,24 +120,28 @@ void UEnemyPhysicalComponent::ActionPhysical(FHitResult HitResult, float DamageA
 	const FVector HitDirection = HitResult.Normal;
 	
 	
-	if (BoneName == FName(TEXT("pelvis")))
+	ApplyDamage(DamageAmount);
+	if (OwnerCharacter->IsDead())
 	{
-		UE_LOG(LogTemp, Display, TEXT("%s::%s: Hitted Bone is pelvis"), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
-	
-	Health -= DamageAmount;
-	
-	if (Health <= 0 )
+
+	// Pelvis hits still reduce overall health. Only the localized limb and
+	// temporary physics reaction are skipped for the root bone.
+	if (BoneName == FName(TEXT("pelvis")))
 	{
-		
-		Action_Dead();
+		UE_LOG(
+			LogTemp,
+			VeryVerbose,
+			TEXT("%s::%s: Pelvis hit applied damage; localized reaction skipped."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
 		return;
 	}
 	
 	CacheBoneName = BoneName;
 	
-	GetEnemyCharacter()->StopCharacterMovement();
+	OwnerCharacter->StopCharacterMovement();
 	
 	
 	if (PhyMtrl == PhysicalReact->PM_Head)
@@ -134,6 +163,14 @@ void UEnemyPhysicalComponent::ActionPhysical(FHitResult HitResult, float DamageA
 	else if (PhyMtrl == PhysicalReact->PM_Leg_L)
 	{
 		ActionLimb(LimbMeshes->SM_Leg_L, FName(TEXT("thigh_l")), DamageAmount);
+	}
+
+	// Head destruction or a lethal limb combination can enter the dead state
+	// inside ActionLimb. Do not restart the temporary hit-reaction timeline,
+	// because its finished callback disables skeletal simulation.
+	if (OwnerCharacter->IsDead())
+	{
+		return;
 	}
 	
 	
@@ -160,6 +197,18 @@ void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName,
 	}
 	
 	FLimbData* Data = Limbes.Find(BoneName);
+	if (Data == nullptr)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: Limb data was not found for bone %s."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*BoneName.ToString());
+		return;
+	}
+
 	if ((Data->bIsHas))
 	{
 		Data->Durability -= DamageAmount;
@@ -185,6 +234,7 @@ void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName,
 
 				FTransform SpawnTransform = ProxyMesh->GetSocketTransform(BoneName);
 				AStaticMeshActor* MeshPart = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), SpawnTransform, SpawnParams);
+				MeshPart->SetLifeSpan(10.f);
 				UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(MeshPart->GetRootComponent());
 				MeshComp->SetMobility(EComponentMobility::Movable);
 				MeshComp->SetStaticMesh(MeshAsset);
@@ -228,7 +278,8 @@ void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName,
 		}
 	}
 	
-	if (Limbes.Find("Head")->bIsHas == false)
+	const FLimbData* HeadData = Limbes.Find(FName(TEXT("Head")));
+	if (HeadData != nullptr && !HeadData->bIsHas)
 	{
 		Action_Dead();
 	}
@@ -293,6 +344,7 @@ EEnemyMissingArmState UEnemyPhysicalComponent::GetMissingArmState() const
 
 void UEnemyPhysicalComponent::Action_Dead()
 {
+	Health = 0.0f;
 	ReactTimeline.Stop();
 	if (AEnemyCharacter* OwnerCharacter = GetEnemyCharacter())
 	{

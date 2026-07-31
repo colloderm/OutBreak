@@ -30,12 +30,33 @@ AOBExtractionZone::AOBExtractionZone()
 	bReplicates = false; // 판정은 서버 전용, 결과는 PlayerState로 복제
 }
 
-void AOBExtractionZone::ConfigureAsPersonal(AController* InOwner)
+void AOBExtractionZone::ConfigureAsPersonal(uint8 InTeamId)
 {
-	// 소유 클라에만 복제 → 본인만 위치/메시가 보임(팀원도 안 보임).
+	OwningTeamId = InTeamId;
+
+	// 팀원 전원에게 보여야 하므로 bOnlyRelevantToOwner는 못 쓴다(소유자는 1명뿐).
 	SetReplicates(true);
-	bOnlyRelevantToOwner = true;
-	SetOwner(InOwner);
+	bOnlyRelevantToOwner = false;
+}
+
+bool AOBExtractionZone::IsNetRelevantFor(const AActor* RealViewer, const AActor* ViewTarget, const FVector& SrcLocation) const
+{
+	// 공용 탈출구는 엔진 기본 규칙(거리 컬링 포함) 그대로.
+	if (OwningTeamId == 0)
+	{
+		return Super::IsNetRelevantFor(RealViewer, ViewTarget, SrcLocation);
+	}
+
+	const AController* C = Cast<AController>(RealViewer);
+	if (!C)
+	{
+		if (const APawn* P = Cast<APawn>(ViewTarget)) C = P->GetController();
+	}
+
+	const AOBPlayerStateBase* PS = C ? C->GetPlayerState<AOBPlayerStateBase>() : nullptr;
+
+	// 비콘이라 거리와 무관하게 항상 보여야 한다. 팀만 본다.
+	return PS && PS->GetTeamId() == OwningTeamId;
 }
 
 void AOBExtractionZone::SetActiveWindow(int32 InStartSec, int32 InEndSec)
@@ -162,10 +183,17 @@ bool AOBExtractionZone::IsActiveNow() const
 	return true;
 }
 
-bool AOBExtractionZone::CanPlayerExtract(AController* /*C*/) const
+bool AOBExtractionZone::CanPlayerExtract(AController* C) const
 {
-	// TODO(인벤토리 붙으면): ExtractType==Personal && RequiredItemTag 유효 시
-	//   플레이어 인벤토리에 아이템이 있는지 검사 + 탈출 성사 시 소비.
+	// 판정은 서버 오버랩이라 "안 보인다"만으로는 못 막는다. 팀을 여기서 걸러야 한다.
+	if (OwningTeamId != 0)
+	{
+		const AOBPlayerStateBase* PS = C ? C->GetPlayerState<AOBPlayerStateBase>() : nullptr;
+		if (!PS || PS->GetTeamId() != OwningTeamId) return false;
+	}
+
+	// 인벤토리 붙으면: ExtractType==Personal && RequiredItemTag 유효 시
+	// 플레이어 인벤토리에 아이템이 있는지 검사 + 탈출 성사 시 소비.
 	return true;
 }
 
