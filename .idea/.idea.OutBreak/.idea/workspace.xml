@@ -21,7 +21,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyAsset.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/AI/Data/EnemyAsset.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Components/PlayerInventoryComponent.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Data/SlotData.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventoryData.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Sound/Zombie_Groan_Cue.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Sound/Zombie_Groan_Cue.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/UI/WBP_MainMenu.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/WBP_MainMenu.uasset" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -41,6 +48,7 @@
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Private/AIController.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/Actor.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/Controller.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Intermediate/Build/Win64/UnrealEditor/Inc/OutBreak/UHT/EnemyAsset.generated.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Animation/Notify/AttackNotifyState.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -54,6 +62,8 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/StateTree/Task/RandomLocationGen.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Global/OutBreakGlobal.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Components/PlayerInventoryComponent.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Data/SlotData.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/KeyBindableBtn.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -81,6 +91,7 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/RandomLocationGen.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/TimedMoveToTask.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/Global/OutBreakGlobal.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" root0="FORCE_HIGHLIGHTING" />
@@ -389,7 +400,7 @@
       <workItem from="1785372427762" duration="30000" />
       <workItem from="1785374840733" duration="2339000" />
       <workItem from="1785384433838" duration="3899000" />
-      <workItem from="1785460108767" duration="2948000" />
+      <workItem from="1785460108767" duration="10988000" />
     </task>
     <servers />
   </component>
@@ -435,6 +446,11 @@
           <url>file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h</url>
           <line>4</line>
           <option name="timeStamp" value="10" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
+          <url>file://$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h</url>
+          <line>4</line>
+          <option name="timeStamp" value="12" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
