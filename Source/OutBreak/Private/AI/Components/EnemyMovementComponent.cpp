@@ -248,7 +248,10 @@ void UEnemyMovementComponent::SetLocomotationState(ELocomotionWalkRunState State
 	case ELocomotionWalkRunState::Dead:
 		WalkingRunState = State;
 		MaxWalkSpeed = 0;
-		Character->Dead();
+		if (IsValid(Character) && !Character->IsDead())
+		{
+			Character->Dead();
+		}
 		break;
 	default:
 		break;

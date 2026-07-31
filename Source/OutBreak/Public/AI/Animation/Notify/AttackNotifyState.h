@@ -5,10 +5,12 @@
 #include "CoreMinimal.h"
 #include "Animation/AnimNotifies/AnimNotifyState.h"
 #include "Engine/EngineTypes.h"
+#include "Engine/HitResult.h"
 #include "AttackNotifyState.generated.h"
 
 class AActor;
 class UAnimSequenceBase;
+class UGameplayEffect;
 class USkeletalMeshComponent;
 
 /** Traces the area between two sockets for the lifetime of the notify state. */
@@ -86,9 +88,31 @@ protected:
 		meta = (ClampMin = "0.0"))
 	float DebugDrawDuration = 0.0f;
 
+	/** GameplayEffect applied once to every actor hit during this notify window. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attack Trace|Damage")
+	TSubclassOf<UGameplayEffect> DamageEffect;
+
+	/** Value passed to the damage GameplayEffect through SetByCaller.Damage. */
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		Category = "Attack Trace|Damage",
+		meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float DamageAmount = 20.0f;
+
+	/** Level used when creating the outgoing GameplayEffect spec. */
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadWrite,
+		AdvancedDisplay,
+		Category = "Attack Trace|Damage",
+		meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float DamageEffectLevel = 1.0f;
+
 	/**
 	 * Called exactly once from NotifyEnd with the unique, valid actors collected
-	 * during this notify window. Override this event to apply damage or other effects.
+	 * during this notify window, after the configured damage effect is applied.
+	 * Override this event for additional hit reactions or attack effects.
 	 */
 	UFUNCTION(BlueprintNativeEvent, Category = "Attack Trace")
 	void ProcessCollectedActors(
@@ -104,10 +128,11 @@ protected:
 private:
 	struct FAttackTraceRuntimeState
 	{
-		TSet<TWeakObjectPtr<AActor>> CollectedActors;
+		TMap<TWeakObjectPtr<AActor>, FHitResult> CollectedHits;
 	};
 
 	void TraceAndCollect(USkeletalMeshComponent* MeshComp);
+	void ApplyDamageEffect(AActor* AttackOwner, const FHitResult& Hit) const;
 	bool ShouldIgnoreActor(const AActor* Candidate, const AActor* MeshOwner) const;
 	bool CanRunTrace(const USkeletalMeshComponent* MeshComp) const;
 	void RemoveStaleRuntimeStates();
