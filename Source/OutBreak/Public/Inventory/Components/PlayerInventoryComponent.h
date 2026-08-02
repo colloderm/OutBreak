@@ -6,7 +6,6 @@
 #include "Components/ActorComponent.h"
 
 #include "Inventory/Data/InventoryData.h"
-#include "Engine/DataTable.h"
 
 #include "PlayerInventoryComponent.generated.h"
 
@@ -21,7 +20,9 @@ public:
 	UPlayerInventoryComponent();
 	
 	
-	FInventoryQueryResult QueryHasItem(FName QueryItemName);
+	FInventoryQueryResult QueryHasItem(const FName QueryItemName) const;
+	bool QueryItemEnough(const FInventoryQueryResult& Result, int QueryItemStack);
+	void ConsumeItem(const FInventoryQueryResult& Result, const int32 WantItemStack);
 	
 	void SetInventoryBackPackSize(int newSize);
 
@@ -34,7 +35,6 @@ protected:
 	void UpdateInventory();
 	void UpdateInventoryWidget();
 	
-	void LoadInventoryMetaData(void* LowData);
 	
 	void AddItem(FInventoryData Data);
 	void RemoveItem(int RemoveIndex);
@@ -46,11 +46,8 @@ public:
 	
 	
 private:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UUserWidget> InventoryWidget;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UDataTable> ItemDataTable; 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<class UInventoryWindow> InventoryWidget;
 	
 	UPROPERTY(EditAnywhere, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
 	int InventoryBackPackSize = 20;
@@ -69,6 +66,6 @@ private:
 	TArray<FInventoryData> InventoryContrainerArray;
 	
 	UPROPERTY(meta = (AllowPrivateAccess = "true"))
-	TArray<FInventoryData*> InventoryQuickSlotsArray;
+	TArray<FQuickSlotData> InventoryQuickSlotsArray;
 	
 };

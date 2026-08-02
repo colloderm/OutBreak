@@ -21,14 +21,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Components/PlayerInventoryComponent.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Data/SlotData.cpp" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventoryData.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Data/InventorySystemSetting.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Subsystem/ItemDataSubsystem.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Widget/InventorySlot.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Widget/InventoryWindow.cpp" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventorySystemSetting.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Subsystem/ItemDataSubsystem.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Widget/InventorySlot.h" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Widget/InventoryWindow.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Sound/Zombie_Groan_Cue.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Sound/Zombie_Groan_Cue.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/UI/WBP_MainMenu.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/WBP_MainMenu.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Components/PlayerInventoryComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Components/PlayerInventoryComponent.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventoryData.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventoryData.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,9 +50,6 @@
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/AIModule/Private/AIController.cpp" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/Actor.h" root0="FORCE_HIGHLIGHTING" />
-    <setting file="file://$PROJECT_DIR$/../../../../../Program Files/Epic Games/UE_5.7/Engine/Source/Runtime/Engine/Classes/GameFramework/Controller.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Intermediate/Build/Win64/UnrealEditor/Inc/OutBreak/UHT/EnemyAsset.generated.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Animation/Notify/AttackNotifyState.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyBaseActorComponent.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -63,7 +65,10 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Global/OutBreakGlobal.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Components/PlayerInventoryComponent.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Data/InventorySystemSetting.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Data/SlotData.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Subsystem/UItemDataSubsystem.cpp" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Widget/InventoryWindow.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemListElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/ItemStatElement.cpp" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Private/UI/Shop/KeyBindableBtn.cpp" root0="FORCE_HIGHLIGHTING" />
@@ -92,6 +97,9 @@
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/AI/StateTree/Task/TimedMoveToTask.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/Global/OutBreakGlobal.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventorySystemSetting.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Subsystem/UItemDataSubsystem.h" root0="FORCE_HIGHLIGHTING" />
+    <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Widget/InventoryWindow.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemListElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/ItemStatElement.h" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/Source/OutBreak/Public/UI/Shop/KeyBindableBtn.h" root0="FORCE_HIGHLIGHTING" />
@@ -116,61 +124,61 @@
   <component name="MetaFilesCheckinStateConfiguration" checkMetaFiles="true" />
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.0000004224868786" />
-      <entry key="MS500" value="1.0819198732025896" />
-      <entry key="S2" value="2.0295529687219362" />
-      <entry key="S5" value="3.4508770402567213" />
-      <entry key="S10" value="5.734616101199642" />
-      <entry key="S30" value="12.880679767833882" />
-      <entry key="S60" value="18.131860432372374" />
-      <entry key="M2" value="22.69406401340339" />
-      <entry key="M5" value="35.90091661333623" />
-      <entry key="M10" value="66.01432635652843" />
-      <entry key="M15" value="93.91744779889855" />
-      <entry key="M30" value="161.00924341118468" />
-      <entry key="H1" value="289.74282519002656" />
-      <entry key="H2" value="586.8529489465674" />
-      <entry key="H4" value="1071.0723242796969" />
-      <entry key="D1" value="2056.759110534065" />
-      <entry key="W1" value="2329.392483346735" />
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.0000009659766076" />
+      <entry key="S2" value="1.103858499539664" />
+      <entry key="S5" value="2.065767247643633" />
+      <entry key="S10" value="3.4661768187255593" />
+      <entry key="S30" value="9.604473350080614" />
+      <entry key="S60" value="21.92631996107436" />
+      <entry key="M2" value="41.992955851673074" />
+      <entry key="M5" value="79.90180657363796" />
+      <entry key="M10" value="148.03581115777465" />
+      <entry key="M15" value="219.32798601083763" />
+      <entry key="M30" value="394.47612472980757" />
+      <entry key="H1" value="643.3295775717335" />
+      <entry key="H2" value="1025.199231027424" />
+      <entry key="H4" value="1603.883452994513" />
+      <entry key="D1" value="2934.2999197313793" />
+      <entry key="W1" value="3339.6435928671854" />
     </decayedCancelled>
     <decayedSelected>
-      <entry key="MS100" value="5.422854177747823E-41" />
-      <entry key="MS500" value="9.580624139141215E-9" />
-      <entry key="S2" value="0.018464970677318338" />
-      <entry key="S5" value="0.40892036491374945" />
-      <entry key="S10" value="1.320810126210864" />
-      <entry key="S30" value="3.9937192297640287" />
-      <entry key="S60" value="6.203345837715074" />
-      <entry key="M2" value="8.211033244137232" />
-      <entry key="M5" value="11.398623050702328" />
-      <entry key="M10" value="15.742517501596984" />
-      <entry key="M15" value="19.26881924163732" />
-      <entry key="M30" value="27.366867574463015" />
-      <entry key="H1" value="41.21858528651929" />
-      <entry key="H2" value="70.20704389383752" />
-      <entry key="H4" value="115.98209387107565" />
-      <entry key="D1" value="208.03958348126804" />
-      <entry key="W1" value="233.39059853218856" />
+      <entry key="MS100" value="1.0212419352466358E-218" />
+      <entry key="MS500" value="2.522468362992166E-44" />
+      <entry key="S2" value="1.2608565160145888E-11" />
+      <entry key="S5" value="4.6954073262392834E-5" />
+      <entry key="S10" value="0.01049825262757782" />
+      <entry key="S30" value="0.7622415233566713" />
+      <entry key="S60" value="2.8651239042172763" />
+      <entry key="M2" value="6.52760626187345" />
+      <entry key="M5" value="13.919996672049754" />
+      <entry key="M10" value="24.738101205613724" />
+      <entry key="M15" value="34.72850749018915" />
+      <entry key="M30" value="58.108430803630505" />
+      <entry key="H1" value="90.41132340581659" />
+      <entry key="H2" value="135.6505423157041" />
+      <entry key="H4" value="197.16064970459362" />
+      <entry key="D1" value="329.37839348975086" />
+      <entry key="W1" value="368.71466931718976" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="9.52218009260394E-5" />
-      <entry key="MS500" value="0.19753580900284806" />
-      <entry key="S2" value="1.263513255987446" />
-      <entry key="S5" value="3.0949699436253457" />
-      <entry key="S10" value="6.323723846880861" />
-      <entry key="S30" value="16.26241180421672" />
-      <entry key="S60" value="23.876209854889403" />
-      <entry key="M2" value="30.608741169675554" />
-      <entry key="M5" value="47.14118444265953" />
-      <entry key="M10" value="81.64768805325059" />
-      <entry key="M15" value="113.09557029342957" />
-      <entry key="M30" value="188.3090450056141" />
-      <entry key="H1" value="330.9086578902701" />
-      <entry key="H2" value="657.0113142336494" />
-      <entry key="H4" value="1187.0112252411784" />
-      <entry key="D1" value="2264.784950553977" />
-      <entry key="W1" value="2562.780857592123" />
+      <entry key="MS100" value="2.9352770169852137E-7" />
+      <entry key="MS500" value="0.049378462338628464" />
+      <entry key="S2" value="0.5714686929126727" />
+      <entry key="S5" value="1.7882586711516073" />
+      <entry key="S10" value="3.3068341495847653" />
+      <entry key="S30" value="10.198360437811498" />
+      <entry key="S60" value="24.566833796678267" />
+      <entry key="M2" value="48.28712239542634" />
+      <entry key="M5" value="93.63845791834248" />
+      <entry key="M10" value="172.60910473756846" />
+      <entry key="M15" value="253.89750517003853" />
+      <entry key="M30" value="452.44582299332757" />
+      <entry key="H1" value="733.630665016018" />
+      <entry key="H2" value="1160.7645082053816" />
+      <entry key="H4" value="1800.9787800495717" />
+      <entry key="D1" value="3263.6586311684905" />
+      <entry key="W1" value="3708.355064886167" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -178,6 +186,9 @@
   &quot;associatedIndex&quot;: 5
 }</component>
   <component name="ProjectId" id="3FoYhVeQPI4kybaOIUwg6RHzUbL" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -195,7 +206,7 @@
     &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
     &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
     &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;ZombieSystem&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Temp__Zombie__AI&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
@@ -401,6 +412,12 @@
       <workItem from="1785374840733" duration="2339000" />
       <workItem from="1785384433838" duration="3899000" />
       <workItem from="1785460108767" duration="10988000" />
+      <workItem from="1785637800594" duration="2000" />
+      <workItem from="1785637871022" duration="1388000" />
+      <workItem from="1785661948059" duration="1378000" />
+      <workItem from="1785667114245" duration="228000" />
+      <workItem from="1785667970656" duration="685000" />
+      <workItem from="1785671169635" duration="3847000" />
     </task>
     <servers />
   </component>
@@ -429,7 +446,7 @@
         </breakpoint>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
           <url>file://$PROJECT_DIR$/Source/OutBreak/Private/AI/Components/EnemyMovementComponent.cpp</url>
-          <line>7</line>
+          <line>6</line>
           <option name="timeStamp" value="5" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
@@ -446,11 +463,6 @@
           <url>file://$PROJECT_DIR$/Source/OutBreak/Public/AI/Components/EnemyMovementComponent.h</url>
           <line>4</line>
           <option name="timeStamp" value="10" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
-          <url>file://$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h</url>
-          <line>4</line>
-          <option name="timeStamp" value="12" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>

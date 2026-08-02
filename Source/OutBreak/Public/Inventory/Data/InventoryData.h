@@ -16,11 +16,15 @@ struct OUTBREAK_API FInventoryQueryResult
 {
 	GENERATED_BODY()
 	
+	FName QueryItemName;
+	
 	bool HasItem = false;
 	
-	TArray<int> Indices;
+	TArray<int> BackpackIndices;
+	TArray<int> ContainerIndices;
 	
 	int TotalStack = -1;
+	
 };
 
 
@@ -36,10 +40,6 @@ struct OUTBREAK_API FItemMetaData : public FTableRowBase
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AActor> WorldItemClass;
 	
-	UPROPERTY(EditAnywhere)
-	
-	
-	
 	
 };
 
@@ -48,9 +48,10 @@ struct OUTBREAK_API FWorldItemData
 {
 	GENERATED_BODY()
 	
-	
+	UPROPERTY(EditAnywhere)
+	FName ItemName;
 
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere)
 	int ItemStack = -1;
 	
 	
@@ -82,13 +83,25 @@ struct OUTBREAK_API FInventoryData
 	GENERATED_BODY()
 	
 	UPROPERTY(BlueprintReadWrite)
-	FName ItemName;
+	FName ItemName = NAME_None;
 	
 	UPROPERTY(BlueprintReadWrite)
 	EItemType ItemType;
 	
 	UPROPERTY(BlueprintReadWrite)
 	int ItemStack = -1;
+};
+
+
+USTRUCT(BlueprintType)
+struct OUTBREAK_API FQuickSlotData
+{
+	GENERATED_BODY()
 	
+	UPROPERTY(BlueprintReadWrite)
+	FName ItemName = NAME_None;
+	
+	UPROPERTY(BlueprintReadWrite)
+	EItemType ItemType;
 	
 };
