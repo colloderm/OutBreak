@@ -10,6 +10,9 @@
 #include "PlayerInventoryComponent.generated.h"
 
 
+class AWorldItem;
+
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class OUTBREAK_API UPlayerInventoryComponent : public UActorComponent
 {
@@ -24,7 +27,10 @@ public:
 	bool QueryItemEnough(const FInventoryQueryResult& Result, int QueryItemStack);
 	void ConsumeItem(const FInventoryQueryResult& Result, const int32 WantItemStack);
 	
-	void SetInventoryBackPackSize(int newSize);
+	void PickUpWorldItem(AWorldItem* WorldItem);
+	
+	void SetInventoryBackPackSize(int NewSize);
+	void SetInventoryContainerSize(int NewSize);
 
 
 protected:
@@ -36,7 +42,13 @@ protected:
 	void UpdateInventoryWidget();
 	
 	
-	void AddItem(FInventoryData Data);
+	/*
+	 * @brief 현재 인벤토리에 지정된 아이템명과 아이템 개수만큼 추가를 시도합니다.
+	 * @param ItemName : Code identification based on item data table
+	 * @param ItemStack : Want Stack Number;
+	 * @return bool : 현재 아이템 스택이 인벤토리에 전부 추가 됬으면 true 아니면 false를 반환 합니다. 
+	 */
+	bool AddItem(const FName ItemName, int& ItemStack);
 	void RemoveItem(int RemoveIndex);
 
 public:

@@ -19,6 +19,9 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "Item Data")
 	TSoftObjectPtr<UDataTable> ItemDataTable;
 	
+	UPROPERTY(Config, EditAnywhere, Category = "Slot Widget Class")
+	TSubclassOf<UUserWidget> SlotWidget;
+	
 #if WITH_EDITOR
 	virtual FText GetSectionText() const override
 	{

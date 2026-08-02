@@ -5,6 +5,7 @@
 
 #include "Inventory/Subsystem/ItemDataSubsystem.h"
 #include "Inventory/Widget/InventoryWindow.h"
+#include "Inventory/Data/WorldItem.h"
 
 
 // Sets default values for this component's properties
@@ -164,9 +165,26 @@ void UPlayerInventoryComponent::ConsumeItem(
 		TEXT(__FUNCTION__));
 }
 
-void UPlayerInventoryComponent::SetInventoryBackPackSize(int newSize)
+void UPlayerInventoryComponent::PickUpWorldItem(AWorldItem* WorldItem)
 {
-	InventoryBackPackSize = newSize;
+	auto ItemData = WorldItem->GetWorldItemData();
+	const FName& ItemName = ItemData->ItemName;
+	
+	AddItem(ItemName, ItemData->ItemStack);
+	
+	
+}
+
+void UPlayerInventoryComponent::SetInventoryBackPackSize(int NewSize)
+{
+	InventoryBackPackSize = NewSize;
+	
+	UpdateInventory();
+}
+
+void UPlayerInventoryComponent::SetInventoryContainerSize(int NewSize)
+{
+	InventoryContainerSize = NewSize;
 	
 	UpdateInventory();
 }
@@ -209,6 +227,48 @@ void UPlayerInventoryComponent::UpdateInventoryWidget()
 {
 	// 위젯 데이터 재갱신 처리 요청.
 	InventoryWidget->Update();
+}
+
+bool UPlayerInventoryComponent::AddItem(const FName ItemName, int& ItemStack)
+{
+	UWorld* World = GetWorld();
+	if (!IsValid(World))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s : World is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return false;
+	}
+	
+	UGameInstance* GameInstance = World->GetGameInstance();
+	if (!IsValid(GameInstance))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s : Game Instance is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return false;
+	}
+	
+	UItemDataSubsystem* ItemDataSubsystem = GameInstance->GetSubsystem<UItemDataSubsystem>();
+	if (!IsValid(ItemDataSubsystem))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s : ItemData Subsystem is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return false;
+	}
+	
+	const FItemMetaData* MetaData = ItemDataSubsystem->FindItemRow(ItemName, TEXT("UInventoryComponent::AddItem"));
+	const int MaxStack = MetaData->MaxItemStack;
+	
+	for (auto& Element : InventoryBackPackArray)
+	{
+		if (Element.ItemName == ItemName)
+		{
+			int TotalStack = Element.ItemStack + ItemStack;
+			if (TotalStack > MaxStack)
+			{
+				TotalStack - MaxStack;
+			}
+		}
+	}
+	InventoryContrainerArray;
+	
+	return false;
 }
 
 

@@ -4,11 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Inventory/Data/InventoryData.h"
 #include "InventoryWindow.generated.h"
 
 /**
  * 
  */
+class UPlayerInventoryComponent;
+
 UCLASS()
 class OUTBREAK_API UInventoryWindow : public UUserWidget
 {
@@ -17,10 +20,16 @@ class OUTBREAK_API UInventoryWindow : public UUserWidget
 	
 public:
 	
+	
+	void SetInventoryArray(TArray<FInventoryData>& ArrayRef);
 	void Update();
 	
 	
 public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<class UUniformGridPanel> InventorySlots;
+	
+private:
+	UPROPERTY(meta = (AllowPrivateAccess = "true"))
+	TArray<FInventoryData>& InventoryArray;
 };

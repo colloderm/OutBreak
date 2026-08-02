@@ -40,6 +40,8 @@ struct OUTBREAK_API FItemMetaData : public FTableRowBase
 	UPROPERTY(EditAnywhere)
 	TSubclassOf<AActor> WorldItemClass;
 	
+	UPROPERTY(EditAnywhere)
+	int MaxItemStack = 1;
 	
 };
 
