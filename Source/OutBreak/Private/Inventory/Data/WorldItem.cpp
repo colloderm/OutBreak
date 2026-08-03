@@ -45,8 +45,7 @@ void AWorldItem::InitializeDroppedItem(
 
 	ItemInstance = InItemInstance;
 	ContainedInventory = InContainedInventory;
-	ItemData.ItemDefinition = InItemInstance.ItemDefinition;
-	ItemData.ItemName = InItemInstance.ItemName;
+	ItemData.ItemTag = InItemInstance.ItemTag;
 	ItemData.ItemStack = InItemInstance.ItemStack;
 	ForceNetUpdate();
 }

@@ -615,10 +615,10 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 
 	if (PlayerInventoryComponent)
 	{
-		if (PawnData && PawnData->DefaultBackpack)
+		if (PawnData && PawnData->DefaultBackpackTag.IsValid())
 		{
 			PlayerInventoryComponent->EquipStartingBackpack(
-				PawnData->DefaultBackpack);
+				PawnData->DefaultBackpackTag);
 		}
 		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Loadout)
 		{
