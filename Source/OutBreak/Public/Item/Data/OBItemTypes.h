@@ -50,3 +50,9 @@ struct FOBItemStack
 		return ItemTag == Other.ItemTag && Count == Other.Count;
 	}
 };
+
+namespace OBItemStacks
+{
+	// 같은 태그면 수량을 합치고, 없으면 새 항목을 추가한다. 컨테이너/드랍테이블 공용.
+	OUTBREAK_API void Add(TArray<FOBItemStack>& Stacks, const FGameplayTag& ItemTag, int32 Count);
+}

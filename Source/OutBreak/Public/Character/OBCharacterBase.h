@@ -76,6 +76,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "OB|Camera")
 	void SetSprintCameraLag(bool bSprinting);
 	
+	// 스프린트 입력 상태. BP의 스프린트 시작(true)/종료(false)에서 이걸 호출한다.
+	// 카메라 랙까지 함께 처리하므로 SetSprintCameraLag을 따로 부를 필요 없다.
+	UFUNCTION(BlueprintCallable, Category = "OB|Movement")
+	void SetSprintInput(bool bNewSprinting);
+
+	// 스프린트 키가 눌려 있는가. 발사 차단 판정용(속도가 아니라 입력 기준).
+	UFUNCTION(BlueprintPure, Category = "OB|Movement")
+	bool IsSprintInputHeld() const { return bSprintInputHeld; }
+	
 	// 발사 시 집중 효과 펄스(로컬용)
 	void AddFireFocusPulse(float PulseAmount);
 	
@@ -217,6 +226,9 @@ private:
 	void PollGround();
 	bool TryLandOnGround();
 	
+	UFUNCTION(Server, Reliable)
+	void Server_SetSprintInput(bool bNewSprinting);
+	
 private:
 	float DefaultCameraFOV = 90.f;
 	float TargetCameraFOV = 90.f;
@@ -251,5 +263,8 @@ private:
 	// 이 시간까지 바닥이 안 올라오면 포기하고 낙하 허용(영구 정지보다 낫다).
 	UPROPERTY(EditDefaultsOnly, Category = "Spawn")
 	float MaxGroundWaitSeconds = 15.f;
+
+	// 복제하지 않는다. 소유 클라(예측)와 서버(권위)만 알면 되고 시뮬레이트 프록시는 쓰지 않는다.
+	bool bSprintInputHeld = false;
 	
 };

@@ -289,6 +289,25 @@ void AOBCharacterBase::SetSprintCameraLag(bool bSprinting)
 	SetActorTickEnabled(true);
 }
 
+void AOBCharacterBase::SetSprintInput(bool bNewSprinting)
+{
+	if (bSprintInputHeld == bNewSprinting) return;
+
+	bSprintInputHeld = bNewSprinting;
+	SetSprintCameraLag(bNewSprinting);
+
+	// 발사 차단은 서버에서도 같은 결론이 나와야 예측이 롤백되지 않는다.
+	if (!HasAuthority() && IsLocallyControlled())
+	{
+		Server_SetSprintInput(bNewSprinting);
+	}
+}
+
+void AOBCharacterBase::Server_SetSprintInput_Implementation(bool bNewSprinting)
+{
+	bSprintInputHeld = bNewSprinting;
+}
+
 void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
 {
 	// 로컬 전용
