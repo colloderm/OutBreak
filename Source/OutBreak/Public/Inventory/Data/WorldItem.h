@@ -33,5 +33,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	
 private:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
 	FWorldItemData ItemData;
 };

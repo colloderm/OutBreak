@@ -19,9 +19,7 @@ class OUTBREAK_API UInventoryWindow : public UUserWidget
 	
 	
 public:
-	
-	
-	void SetInventoryArray(TArray<FInventoryData>& ArrayRef);
+	void SetInventoryArray(const TArray<FInventoryData>& ArrayRef);
 	void Update();
 	
 	
@@ -30,6 +28,6 @@ public:
 	TObjectPtr<class UUniformGridPanel> InventorySlots;
 	
 private:
-	UPROPERTY(meta = (AllowPrivateAccess = "true"))
-	TArray<FInventoryData>& InventoryArray;
+	UPROPERTY(Transient)
+	TArray<FInventoryData> InventoryArray;
 };

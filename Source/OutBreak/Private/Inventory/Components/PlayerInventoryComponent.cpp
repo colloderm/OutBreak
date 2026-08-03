@@ -3,30 +3,25 @@
 
 #include "Inventory/Components/PlayerInventoryComponent.h"
 
+#include "Inventory/Data/WorldItem.h"
 #include "Inventory/Subsystem/ItemDataSubsystem.h"
 #include "Inventory/Widget/InventoryWindow.h"
-#include "Inventory/Data/WorldItem.h"
 
 
-// Sets default values for this component's properties
 UPlayerInventoryComponent::UPlayerInventoryComponent()
 {
-	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
-	// off to improve performance if you don't need them.
-	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bCanEverTick = false;
 
-	// ...
-	
-	UpdateInventory();
+	InventoryBackPackArray.SetNum(FMath::Max(InventoryBackPackSize, 0));
+	InventoryContrainerArray.SetNum(FMath::Max(InventoryContainerSize, 0));
+	InventoryQuickSlotsArray.SetNum(FMath::Max(QuickSlotSize, 0));
 }
 
 FInventoryQueryResult UPlayerInventoryComponent::QueryHasItem(
 	const FName QueryItemName) const
 {
 	FInventoryQueryResult Result;
-
 	Result.QueryItemName = QueryItemName;
-	Result.TotalStack = 0;
 
 	if (QueryItemName.IsNone())
 	{
@@ -35,10 +30,9 @@ FInventoryQueryResult UPlayerInventoryComponent::QueryHasItem(
 
 	for (int32 Index = 0; Index < InventoryBackPackArray.Num(); ++Index)
 	{
-		const FInventoryData& InventoryData =
-			InventoryBackPackArray[Index];
-
-		if (InventoryData.ItemName != QueryItemName)
+		const FInventoryData& InventoryData = InventoryBackPackArray[Index];
+		if (InventoryData.ItemName != QueryItemName ||
+			InventoryData.ItemStack <= 0)
 		{
 			continue;
 		}
@@ -49,10 +43,9 @@ FInventoryQueryResult UPlayerInventoryComponent::QueryHasItem(
 
 	for (int32 Index = 0; Index < InventoryContrainerArray.Num(); ++Index)
 	{
-		const FInventoryData& InventoryData =
-			InventoryContrainerArray[Index];
-
-		if (InventoryData.ItemName != QueryItemName)
+		const FInventoryData& InventoryData = InventoryContrainerArray[Index];
+		if (InventoryData.ItemName != QueryItemName ||
+			InventoryData.ItemStack <= 0)
 		{
 			continue;
 		}
@@ -62,222 +55,340 @@ FInventoryQueryResult UPlayerInventoryComponent::QueryHasItem(
 	}
 
 	Result.HasItem = Result.TotalStack > 0;
-
 	return Result;
 }
 
-bool UPlayerInventoryComponent::QueryItemEnough(const FInventoryQueryResult& Result, int QueryItemStack)
+bool UPlayerInventoryComponent::QueryItemEnough(
+	const FInventoryQueryResult& Result,
+	const int32 QueryItemStack) const
 {
-	if (!Result.HasItem)
+	if (QueryItemStack <= 0 || Result.QueryItemName.IsNone())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::%s : Item \"%s\" do not Has."), *GetClass()->GetName(), TEXT(__FUNCTION__), *Result.QueryItemName.ToString());
 		return false;
 	}
-	
+
+	if (!Result.HasItem ||
+		(Result.BackpackIndices.IsEmpty() && Result.ContainerIndices.IsEmpty()))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("%s::%s : Item \"%s\" was not found."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*Result.QueryItemName.ToString());
+		return false;
+	}
+
 	if (Result.TotalStack < QueryItemStack)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("%s::%s : Item \"%s\" not enough stack."), *GetClass()->GetName(), TEXT(__FUNCTION__), *Result.QueryItemName.ToString());
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("%s::%s : Item \"%s\" does not have enough stack (%d/%d)."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*Result.QueryItemName.ToString(),
+			Result.TotalStack,
+			QueryItemStack);
 		return false;
 	}
-	
-	if (Result.BackpackIndices.Num() == 0 || Result.ContainerIndices.Num() == 0)
-	{
-		UE_LOG(LogTemp, Fatal, TEXT("%s::%s : Item \"%s\" Query Result is Fatal Error."), *GetClass()->GetName(), TEXT(__FUNCTION__), *Result.QueryItemName.ToString());
-		return false;
-	}
-	
+
 	return true;
-	
 }
 
 void UPlayerInventoryComponent::ConsumeItem(
 	const FInventoryQueryResult& Result,
 	const int32 WantItemStack)
 {
-	if (WantItemStack <= 0)
+	if (WantItemStack <= 0 || Result.QueryItemName.IsNone())
 	{
 		return;
 	}
 
-	if (!QueryItemEnough(Result, WantItemStack))
+	// Query results contain array indices, so refresh them before mutating data.
+	const FInventoryQueryResult CurrentResult =
+		QueryHasItem(Result.QueryItemName);
+	if (!QueryItemEnough(CurrentResult, WantItemStack))
 	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("%s::%s : Item \"%s\" is not enough."),
-			*GetClass()->GetName(),
-			TEXT(__FUNCTION__),
-			*Result.QueryItemName.ToString());
-
 		return;
 	}
 
 	int32 RemainWantItemStack = WantItemStack;
-
-	// 백팩에서 먼저 소비
-	for (const int32 Index : Result.BackpackIndices)
-	{
-		if (RemainWantItemStack <= 0)
+	auto ConsumeFromInventory =
+		[&](TArray<FInventoryData>& Inventory, const TArray<int32>& Indices)
 		{
-			break;
-		}
+			for (const int32 Index : Indices)
+			{
+				if (RemainWantItemStack <= 0)
+				{
+					break;
+				}
 
-		if (!InventoryBackPackArray.IsValidIndex(Index))
-		{
-			continue;
-		}
+				if (!Inventory.IsValidIndex(Index))
+				{
+					continue;
+				}
 
-		auto& Slot = InventoryBackPackArray[Index];
+				FInventoryData& Slot = Inventory[Index];
+				if (Slot.ItemName != CurrentResult.QueryItemName ||
+					Slot.ItemStack <= 0)
+				{
+					continue;
+				}
 
-		const int32 ConsumeStack =
-			FMath::Min(RemainWantItemStack, Slot.ItemStack);
+				const int32 ConsumeStack =
+					FMath::Min(RemainWantItemStack, Slot.ItemStack);
+				Slot.ItemStack -= ConsumeStack;
+				RemainWantItemStack -= ConsumeStack;
 
-		Slot.ItemStack -= ConsumeStack;
-		RemainWantItemStack -= ConsumeStack;
-	}
+				if (Slot.ItemStack == 0)
+				{
+					Slot = FInventoryData();
+				}
+			}
+		};
 
-	// 백팩에서 부족한 수량을 컨테이너에서 소비
-	for (const int32 Index : Result.ContainerIndices)
-	{
-		if (RemainWantItemStack <= 0)
-		{
-			break;
-		}
-
-		if (!InventoryContrainerArray.IsValidIndex(Index))
-		{
-			continue;
-		}
-
-		auto& Slot = InventoryContrainerArray[Index];
-
-		const int32 ConsumeStack =
-			FMath::Min(RemainWantItemStack, Slot.ItemStack);
-
-		Slot.ItemStack -= ConsumeStack;
-		RemainWantItemStack -= ConsumeStack;
-	}
+	ConsumeFromInventory(
+		InventoryBackPackArray,
+		CurrentResult.BackpackIndices);
+	ConsumeFromInventory(
+		InventoryContrainerArray,
+		CurrentResult.ContainerIndices);
 
 	ensureMsgf(
 		RemainWantItemStack == 0,
-		TEXT("%s::%s : Inventory query result does not match current inventory state."),
+		TEXT("%s::%s : Inventory changed while consuming item \"%s\"."),
 		*GetClass()->GetName(),
-		TEXT(__FUNCTION__));
+		TEXT(__FUNCTION__),
+		*CurrentResult.QueryItemName.ToString());
+
+	UpdateInventoryWidget();
 }
 
 void UPlayerInventoryComponent::PickUpWorldItem(AWorldItem* WorldItem)
 {
-	auto ItemData = WorldItem->GetWorldItemData();
-	const FName& ItemName = ItemData->ItemName;
-	
-	AddItem(ItemName, ItemData->ItemStack);
-	
-	
+	if (!IsValid(WorldItem))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("%s::%s : WorldItem is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
+		return;
+	}
+
+	FWorldItemData* ItemData = WorldItem->GetWorldItemData();
+	if (AddItem(ItemData->ItemName, ItemData->ItemStack))
+	{
+		WorldItem->PickUpCompleted();
+	}
 }
 
-void UPlayerInventoryComponent::SetInventoryBackPackSize(int NewSize)
+void UPlayerInventoryComponent::SetInventoryBackPackSize(const int NewSize)
 {
-	InventoryBackPackSize = NewSize;
-	
+	InventoryBackPackSize = FMath::Max(NewSize, 0);
 	UpdateInventory();
 }
 
-void UPlayerInventoryComponent::SetInventoryContainerSize(int NewSize)
+void UPlayerInventoryComponent::SetInventoryContainerSize(const int NewSize)
 {
-	InventoryContainerSize = NewSize;
-	
+	InventoryContainerSize = FMath::Max(NewSize, 0);
 	UpdateInventory();
 }
 
-
-// Called when the game starts
 void UPlayerInventoryComponent::BeginPlay()
 {
 	Super::BeginPlay();
-
-	// ...
-	
+	UpdateInventory();
 }
 
 void UPlayerInventoryComponent::UpdateInventory()
 {
 	if (InventoryBackPackArray.Num() != InventoryBackPackSize)
 	{
-		InventoryBackPackArray.SetNum(InventoryBackPackSize);
+		InventoryBackPackArray.SetNum(FMath::Max(InventoryBackPackSize, 0));
 	}
-	
-	
+
 	if (InventoryContrainerArray.Num() != InventoryContainerSize)
 	{
-		InventoryContrainerArray.SetNum(InventoryContainerSize);
+		InventoryContrainerArray.SetNum(FMath::Max(InventoryContainerSize, 0));
 	}
-	
-	
+
 	if (InventoryQuickSlotsArray.Num() != QuickSlotSize)
 	{
-		InventoryQuickSlotsArray.SetNum(QuickSlotSize);	
+		InventoryQuickSlotsArray.SetNum(FMath::Max(QuickSlotSize, 0));
 	}
-	
-	
+
 	UpdateInventoryWidget();
-	
 }
 
 void UPlayerInventoryComponent::UpdateInventoryWidget()
 {
-	// 위젯 데이터 재갱신 처리 요청.
-	InventoryWidget->Update();
+	if (!IsValid(InventoryWidget))
+	{
+		return;
+	}
+
+	InventoryWidget->SetInventoryArray(InventoryBackPackArray);
 }
 
-bool UPlayerInventoryComponent::AddItem(const FName ItemName, int& ItemStack)
+bool UPlayerInventoryComponent::AddItem(
+	const FName ItemName,
+	int32& ItemStack)
 {
+	if (ItemName.IsNone() || ItemStack < 0)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("%s::%s : Item name or stack is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
+		return false;
+	}
+
+	if (ItemStack == 0)
+	{
+		return true;
+	}
+
 	UWorld* World = GetWorld();
 	if (!IsValid(World))
 	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s : World is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s : World is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
 		return false;
 	}
-	
+
 	UGameInstance* GameInstance = World->GetGameInstance();
 	if (!IsValid(GameInstance))
 	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s : Game Instance is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s : GameInstance is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
 		return false;
 	}
-	
-	UItemDataSubsystem* ItemDataSubsystem = GameInstance->GetSubsystem<UItemDataSubsystem>();
+
+	UItemDataSubsystem* ItemDataSubsystem =
+		GameInstance->GetSubsystem<UItemDataSubsystem>();
 	if (!IsValid(ItemDataSubsystem))
 	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s : ItemData Subsystem is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s : ItemDataSubsystem is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
 		return false;
 	}
-	
-	const FItemMetaData* MetaData = ItemDataSubsystem->FindItemRow(ItemName, TEXT("UInventoryComponent::AddItem"));
-	const int MaxStack = MetaData->MaxItemStack;
-	
-	for (auto& Element : InventoryBackPackArray)
+
+	const FItemMetaData* MetaData =
+		ItemDataSubsystem->FindItemRow(
+			ItemName,
+			TEXT("UPlayerInventoryComponent::AddItem"));
+	if (MetaData == nullptr || MetaData->MaxItemStack <= 0)
 	{
-		if (Element.ItemName == ItemName)
-		{
-			int TotalStack = Element.ItemStack + ItemStack;
-			if (TotalStack > MaxStack)
-			{
-				TotalStack - MaxStack;
-			}
-		}
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s : Item metadata for \"%s\" is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*ItemName.ToString());
+		return false;
 	}
-	InventoryContrainerArray;
-	
-	return false;
+
+	const int32 MaxStack = MetaData->MaxItemStack;
+	const int32 OriginalStack = ItemStack;
+	int32 RemainingStack = ItemStack;
+
+	auto FillExistingStacks =
+		[&](TArray<FInventoryData>& Inventory)
+		{
+			for (FInventoryData& Slot : Inventory)
+			{
+				if (RemainingStack <= 0)
+				{
+					break;
+				}
+
+				if (Slot.ItemName != ItemName ||
+					Slot.ItemStack <= 0 ||
+					Slot.ItemStack >= MaxStack)
+				{
+					continue;
+				}
+
+				const int32 AddStack = FMath::Min(
+					MaxStack - Slot.ItemStack,
+					RemainingStack);
+				Slot.ItemStack += AddStack;
+				RemainingStack -= AddStack;
+			}
+		};
+
+	auto FillEmptySlots =
+		[&](TArray<FInventoryData>& Inventory)
+		{
+			for (FInventoryData& Slot : Inventory)
+			{
+				if (RemainingStack <= 0)
+				{
+					break;
+				}
+
+				if (!Slot.ItemName.IsNone() && Slot.ItemStack > 0)
+				{
+					continue;
+				}
+
+				const int32 AddStack =
+					FMath::Min(MaxStack, RemainingStack);
+				Slot = FInventoryData();
+				Slot.ItemName = ItemName;
+				Slot.ItemStack = AddStack;
+				RemainingStack -= AddStack;
+			}
+		};
+
+	FillExistingStacks(InventoryBackPackArray);
+	FillExistingStacks(InventoryContrainerArray);
+	FillEmptySlots(InventoryBackPackArray);
+	FillEmptySlots(InventoryContrainerArray);
+
+	ItemStack = RemainingStack;
+	if (RemainingStack != OriginalStack)
+	{
+		UpdateInventoryWidget();
+	}
+
+	return RemainingStack == 0;
 }
 
+void UPlayerInventoryComponent::RemoveItem(const int RemoveIndex)
+{
+	if (!InventoryBackPackArray.IsValidIndex(RemoveIndex))
+	{
+		return;
+	}
 
-// Called every frame
-void UPlayerInventoryComponent::TickComponent(float DeltaTime, ELevelTick TickType,
-                                              FActorComponentTickFunction* ThisTickFunction)
+	InventoryBackPackArray[RemoveIndex] = FInventoryData();
+	UpdateInventoryWidget();
+}
+
+void UPlayerInventoryComponent::TickComponent(
+	float DeltaTime,
+	ELevelTick TickType,
+	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	// ...
 }
-

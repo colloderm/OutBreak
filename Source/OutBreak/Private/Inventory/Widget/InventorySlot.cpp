@@ -11,28 +11,62 @@
 
 void UInventorySlot::Update()
 {
+	if (InventoryData.ItemName.IsNone() || InventoryData.ItemStack <= 0)
+	{
+		ClearSlot();
+		return;
+	}
+
 	const UGameInstance* GameInstance = GetGameInstance();
 	if (!IsValid(GameInstance))
 	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s : GameInstance is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
 		return;
 	}
 	
 	const UItemDataSubsystem* ItemDataSubsystem =
-	GameInstance->GetSubsystem<UItemDataSubsystem>();
-	
-	if (InventoryData->ItemName.IsNone())
+		GameInstance->GetSubsystem<UItemDataSubsystem>();
+
+	if (!IsValid(ItemDataSubsystem))
 	{
-		UE_LOG(LogTemp, Fatal, TEXT("%s::%s : Slot Fatal Error. Maybe, Inventory Data is None"), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s : ItemDataSubsystem is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
 		return;
 	}
-	auto ItemMetaDataRow = ItemDataSubsystem->FindItemRow(InventoryData->ItemName);
+
+	const FItemMetaData* ItemMetaDataRow =
+		ItemDataSubsystem->FindItemRow(
+			InventoryData.ItemName,
+			TEXT("UInventorySlot::Update"));
+
+	if (ItemMetaDataRow == nullptr)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s : Item row \"%s\" was not found."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*InventoryData.ItemName.ToString());
+		ClearSlot();
+		return;
+	}
 	
-	UTexture2D* RefTexture2D = ItemMetaDataRow->ItemTexture;
-	
-	SetSlotMetaData(RefTexture2D, InventoryData->ItemStack);
+	SetSlotMetaData(
+		ItemMetaDataRow->ItemTexture,
+		InventoryData.ItemStack);
 }
 
-void UInventorySlot::SetSlotData(FInventoryData* Data)
+void UInventorySlot::SetSlotData(const FInventoryData& Data)
 {
 	InventoryData = Data;
 	
@@ -41,6 +75,17 @@ void UInventorySlot::SetSlotData(FInventoryData* Data)
 
 void UInventorySlot::SetSlotMetaData(UTexture2D* Image, int Stack)
 {
+	if (!IsValid(ItemImage) || !IsValid(ItemStack))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s : Bound slot widgets are invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
+		return;
+	}
+
 	ItemImage->SetBrushFromTexture(Image);
 	
 
@@ -49,6 +94,19 @@ void UInventorySlot::SetSlotMetaData(UTexture2D* Image, int Stack)
 		ItemStack->SetText(FText::AsNumber(Stack));
 	}
 	else
+	{
+		ItemStack->SetText(FText::GetEmpty());
+	}
+}
+
+void UInventorySlot::ClearSlot()
+{
+	if (IsValid(ItemImage))
+	{
+		ItemImage->SetBrushFromTexture(nullptr);
+	}
+
+	if (IsValid(ItemStack))
 	{
 		ItemStack->SetText(FText::GetEmpty());
 	}

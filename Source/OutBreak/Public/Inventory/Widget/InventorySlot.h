@@ -22,15 +22,16 @@ class OUTBREAK_API UInventorySlot : public UUserWidget
 	GENERATED_BODY()
 	
 public:
-	auto Update() -> void;
+	void Update();
+	void SetSlotData(const FInventoryData& Data);
 	
 	void SetSlotMetaData(UTexture2D* Image, int Stack);
 	
-protected:
-	void SetSlotData(FInventoryData* Data);
-	
 private:
-	FInventoryData* InventoryData;
+	void ClearSlot();
+
+	UPROPERTY(Transient)
+	FInventoryData InventoryData;
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> ItemImage;

@@ -24,7 +24,9 @@ public:
 	
 	
 	FInventoryQueryResult QueryHasItem(const FName QueryItemName) const;
-	bool QueryItemEnough(const FInventoryQueryResult& Result, int QueryItemStack);
+	bool QueryItemEnough(
+		const FInventoryQueryResult& Result,
+		int32 QueryItemStack) const;
 	void ConsumeItem(const FInventoryQueryResult& Result, const int32 WantItemStack);
 	
 	void PickUpWorldItem(AWorldItem* WorldItem);
@@ -48,7 +50,7 @@ protected:
 	 * @param ItemStack : Want Stack Number;
 	 * @return bool : 현재 아이템 스택이 인벤토리에 전부 추가 됬으면 true 아니면 false를 반환 합니다. 
 	 */
-	bool AddItem(const FName ItemName, int& ItemStack);
+	bool AddItem(const FName ItemName, int32& ItemStack);
 	void RemoveItem(int RemoveIndex);
 
 public:

@@ -7,10 +7,11 @@
 #include "Inventory/Data/InventorySystemSetting.h"
 
 
-
-void UInventoryWindow::SetInventoryArray(TArray<FInventoryData>& ArrayRef)
+void UInventoryWindow::SetInventoryArray(
+	const TArray<FInventoryData>& ArrayRef)
 {
 	InventoryArray = ArrayRef;
+	Update();
 }
 
 void UInventoryWindow::Update()
@@ -146,6 +147,6 @@ void UInventoryWindow::Update()
 			CastChecked<UInventorySlot>(
 				InventorySlots->GetChildAt(Index));
 
-		InventorySlot->Update();
+		InventorySlot->SetSlotData(InventoryArray[Index]);
 	}
 }

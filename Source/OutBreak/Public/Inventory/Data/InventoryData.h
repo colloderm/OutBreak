@@ -20,10 +20,10 @@ struct OUTBREAK_API FInventoryQueryResult
 	
 	bool HasItem = false;
 	
-	TArray<int> BackpackIndices;
-	TArray<int> ContainerIndices;
+	TArray<int32> BackpackIndices;
+	TArray<int32> ContainerIndices;
 	
-	int TotalStack = -1;
+	int32 TotalStack = 0;
 	
 };
 
@@ -41,7 +41,7 @@ struct OUTBREAK_API FItemMetaData : public FTableRowBase
 	TSubclassOf<AActor> WorldItemClass;
 	
 	UPROPERTY(EditAnywhere)
-	int MaxItemStack = 1;
+	int32 MaxItemStack = 1;
 	
 };
 
@@ -54,7 +54,7 @@ struct OUTBREAK_API FWorldItemData
 	FName ItemName;
 
 	UPROPERTY(EditAnywhere)
-	int ItemStack = -1;
+	int32 ItemStack = 1;
 	
 	
 };
@@ -88,10 +88,10 @@ struct OUTBREAK_API FInventoryData
 	FName ItemName = NAME_None;
 	
 	UPROPERTY(BlueprintReadWrite)
-	EItemType ItemType;
+	EItemType ItemType = EItemType::Consumable;
 	
 	UPROPERTY(BlueprintReadWrite)
-	int ItemStack = -1;
+	int32 ItemStack = 0;
 };
 
 
@@ -104,6 +104,6 @@ struct OUTBREAK_API FQuickSlotData
 	FName ItemName = NAME_None;
 	
 	UPROPERTY(BlueprintReadWrite)
-	EItemType ItemType;
+	EItemType ItemType = EItemType::Consumable;
 	
 };
