@@ -9,7 +9,10 @@
 #include "OBItemDefinition.generated.h"
 
 class AOBWeaponBase;
+class AWorldItem;
+class UGameplayAbility;
 class UTexture2D;
+class UOBEquipmentData;
 
 /**
 왜 존재하는가?
@@ -58,6 +61,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Carry", Meta = (ClampMin = "0.0"))
 	float Weight = 0.f;
 
+	// Actor spawned when this item is dropped into the world. Backpack world items
+	// additionally receive the complete backpack contents from the inventory component.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Carry")
+	TSoftClassPtr<AWorldItem> WorldItemClass;
+
+	// Granted GAS ability activated when this item type is used from a quick
+	// slot. Leaving this empty makes the item non-usable from quick slots.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Use")
+	TSubclassOf<UGameplayAbility> UseAbility;
+
 	// ===== 상점 =====
 
 	// 구매가. 0이면 상점에서 살 수 없다.
@@ -75,4 +88,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon",
 		Meta = (EditCondition = "Category == EOBItemCategory::Weapon", EditConditionHides))
 	TSoftClassPtr<AOBWeaponBase> WeaponClass;
+
+	// Non-weapon equipment extension. Slot, runtime actor and passive abilities
+	// are defined by the equipment asset rather than duplicated in inventory data.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment",
+		Meta = (EditCondition = "Category == EOBItemCategory::Equipment", EditConditionHides))
+	TObjectPtr<UOBEquipmentData> EquipmentData;
 };

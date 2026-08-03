@@ -4,7 +4,7 @@
 
 #include "Weapon/OBWeaponBase.h"
 #include "Weapon/Data/OBWeaponData.h"
-#include "Inventory/Components/OBInventoryComponent.h"
+#include "Inventory/Components/PlayerInventoryComponent.h"
 
 void UOBAmmoViewModel::SetWeapon(AOBWeaponBase* InWeapon)
 {
@@ -23,7 +23,7 @@ void UOBAmmoViewModel::SetWeapon(AOBWeaponBase* InWeapon)
 	// null이면 마지막 값 유지(사망/교체 깜빡임 방지)
 }
 
-void UOBAmmoViewModel::SetInventory(UOBInventoryComponent* InInventory)
+void UOBAmmoViewModel::SetInventory(UPlayerInventoryComponent* InInventory)
 {
 	if (Inventory.IsValid() && PoolChangedHandle.IsValid())
 	{
@@ -53,7 +53,7 @@ void UOBAmmoViewModel::RefreshAmmo()
 		Mag = W->GetCurrentAmmo();
 		if (UOBWeaponData* Data = W->GetWeaponData())
 		{
-			if (UOBInventoryComponent* Inv = Inventory.Get())
+			if (UPlayerInventoryComponent* Inv = Inventory.Get())
 			{
 				Reserve = Inv->GetAmmo(Data->AmmoType);   // 무기 타입의 풀 예비탄
 			}

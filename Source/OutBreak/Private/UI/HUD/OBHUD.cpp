@@ -10,6 +10,7 @@
 #include "UI/ViewModels/OBAmmoViewModel.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Inventory/Components/OBInventoryComponent.h"
+#include "Inventory/Components/PlayerInventoryComponent.h"
 #include "UI/HUD/OBConsumableWidget.h"
 #include "View/MVVMView.h"
 
@@ -102,7 +103,8 @@ void AOBHUD::BindAmmoToCharacter(AOBCharacterBase* Character)
 	if (!Character || !AmmoWidgetClass) return;
 
 	UOBEquipmentComponent* Equipment = Character->FindComponentByClass<UOBEquipmentComponent>();
-	UOBInventoryComponent* Inventory = Character->FindComponentByClass<UOBInventoryComponent>();
+	UPlayerInventoryComponent* Inventory =
+		Character->FindComponentByClass<UPlayerInventoryComponent>();
 	if (!Equipment) return;
 	
 	if (!AmmoWidget)

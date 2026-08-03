@@ -4,7 +4,7 @@
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "Inventory/Components/OBInventoryComponent.h"
+#include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
 
 AOBWeaponBase::AOBWeaponBase()
@@ -59,7 +59,9 @@ bool AOBWeaponBase::CanReload() const
 {
 	if (!WeaponData || CurrentAmmo >= WeaponData->MagazineSize) return false;
 	
-	if (UOBInventoryComponent* Inv = GetOwner() ? GetOwner()->FindComponentByClass<UOBInventoryComponent>() : nullptr)
+	if (UPlayerInventoryComponent* Inv = GetOwner()
+		? GetOwner()->FindComponentByClass<UPlayerInventoryComponent>()
+		: nullptr)
 	{
 		return Inv->GetAmmo(WeaponData->AmmoType) > 0;   // 풀에 해당 타입 탄 있어야
 	}
@@ -80,7 +82,9 @@ void AOBWeaponBase::PerformReload()
 	const int32 Needed = WeaponData->MagazineSize - CurrentAmmo;
 	if (Needed <= 0) return;
 	
-	if (UOBInventoryComponent* Inv = GetOwner() ? GetOwner()->FindComponentByClass<UOBInventoryComponent>() : nullptr)
+	if (UPlayerInventoryComponent* Inv = GetOwner()
+		? GetOwner()->FindComponentByClass<UPlayerInventoryComponent>()
+		: nullptr)
 	{
 		const int32 ToLoad = Inv->ConsumeAmmoFromPool(WeaponData->AmmoType, Needed);
 		CurrentAmmo += ToLoad;

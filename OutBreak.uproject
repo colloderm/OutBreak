@@ -104,6 +104,14 @@
 		{
 			"Name": "WaterAdvanced",
 			"Enabled": true
+		},
+		{
+			"Name": "PCG",
+			"Enabled": true
+		},
+		{
+			"Name": "InteriorPCG",
+			"Enabled": true
 		}
 	]
 }

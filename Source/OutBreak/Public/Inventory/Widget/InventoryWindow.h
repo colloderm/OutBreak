@@ -20,8 +20,16 @@ class OUTBREAK_API UInventoryWindow : public UUserWidget
 	
 public:
 	void SetInventoryArray(const TArray<FInventoryData>& ArrayRef);
+	void SetInventorySource(
+		UPlayerInventoryComponent* InInventory,
+		EInventoryItemLocation InLocation,
+		const TArray<FInventoryData>& ArrayRef);
 	void Update();
-	
+
+	virtual bool NativeOnDrop(
+		const FGeometry& InGeometry,
+		const FDragDropEvent& InDragDropEvent,
+		UDragDropOperation* InOperation) override;
 	
 public:
 	UPROPERTY(meta = (BindWidget))
@@ -30,4 +38,11 @@ public:
 private:
 	UPROPERTY(Transient)
 	TArray<FInventoryData> InventoryArray;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPlayerInventoryComponent> InventoryComponent;
+
+	UPROPERTY(Transient)
+	EInventoryItemLocation InventoryLocation =
+		EInventoryItemLocation::Backpack;
 };

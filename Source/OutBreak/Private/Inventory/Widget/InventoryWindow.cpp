@@ -3,6 +3,9 @@
 
 #include "Inventory/Widget/InventoryWindow.h"
 #include "Components/UniformGridPanel.h"
+#include "Components/UniformGridSlot.h"
+#include "Inventory/Components/PlayerInventoryComponent.h"
+#include "Inventory/Widget/InventoryDragDropOperation.h"
 #include "Inventory/Widget/InventorySlot.h"
 #include "Inventory/Data/InventorySystemSetting.h"
 
@@ -12,6 +15,35 @@ void UInventoryWindow::SetInventoryArray(
 {
 	InventoryArray = ArrayRef;
 	Update();
+}
+
+void UInventoryWindow::SetInventorySource(
+	UPlayerInventoryComponent* InInventory,
+	const EInventoryItemLocation InLocation,
+	const TArray<FInventoryData>& ArrayRef)
+{
+	InventoryComponent = InInventory;
+	InventoryLocation = InLocation;
+	SetInventoryArray(ArrayRef);
+}
+
+bool UInventoryWindow::NativeOnDrop(
+	const FGeometry& InGeometry,
+	const FDragDropEvent& InDragDropEvent,
+	UDragDropOperation* InOperation)
+{
+	const UInventoryDragDropOperation* Operation =
+		Cast<UInventoryDragDropOperation>(InOperation);
+	if (!Operation || !Operation->Inventory)
+	{
+		return Super::NativeOnDrop(
+			InGeometry,
+			InDragDropEvent,
+			InOperation);
+	}
+
+	Operation->Inventory->DropItem(Operation->SourceHandle);
+	return true;
 }
 
 void UInventoryWindow::Update()
@@ -29,6 +61,11 @@ void UInventoryWindow::Update()
 	}
 
 	const int32 InventorySize = InventoryArray.Num();
+	const UInventorySystemSetting* Settings =
+		GetDefault<UInventorySystemSetting>();
+	const int32 GridColumns = Settings
+		? FMath::Max(1, Settings->InventoryGridColumns)
+		: 1;
 	int32 WidgetSlotCount = InventorySlots->GetChildrenCount();
 
 	/*
@@ -72,9 +109,6 @@ void UInventoryWindow::Update()
 	 */
 	if (WidgetSlotCount < InventorySize)
 	{
-		const UInventorySystemSetting* Settings =
-			GetDefault<UInventorySystemSetting>();
-
 		if (!IsValid(Settings))
 		{
 			UE_LOG(
@@ -87,15 +121,22 @@ void UInventoryWindow::Update()
 			return;
 		}
 
-		if (!IsValid(Settings->SlotWidget))
+		if (Settings->InventorySlotWidgetClass.IsNull())
 		{
 			UE_LOG(
 				LogTemp,
 				Error,
-				TEXT("%s::%s : SlotWidget class is invalid."),
+				TEXT("%s::%s : InventorySlotWidgetClass is not configured."),
 				*GetClass()->GetName(),
 				TEXT(__FUNCTION__));
 
+			return;
+		}
+
+		TSubclassOf<UInventorySlot> SlotWidgetClass =
+			Settings->InventorySlotWidgetClass.LoadSynchronous();
+		if (!SlotWidgetClass)
+		{
 			return;
 		}
 
@@ -118,7 +159,7 @@ void UInventoryWindow::Update()
 			UInventorySlot* NewSlotWidget =
 				CreateWidget<UInventorySlot>(
 					Controller,
-					Settings->SlotWidget);
+					SlotWidgetClass);
 
 			if (!IsValid(NewSlotWidget))
 			{
@@ -132,7 +173,10 @@ void UInventoryWindow::Update()
 				return;
 			}
 
-			InventorySlots->AddChild(NewSlotWidget);
+			InventorySlots->AddChildToUniformGrid(
+				NewSlotWidget,
+				WidgetSlotCount / GridColumns,
+				WidgetSlotCount % GridColumns);
 			++WidgetSlotCount;
 		}
 	}
@@ -146,7 +190,28 @@ void UInventoryWindow::Update()
 		UInventorySlot* InventorySlot =
 			CastChecked<UInventorySlot>(
 				InventorySlots->GetChildAt(Index));
+		if (UUniformGridSlot* GridSlot =
+			Cast<UUniformGridSlot>(InventorySlot->Slot))
+		{
+			GridSlot->SetRow(Index / GridColumns);
+			GridSlot->SetColumn(Index % GridColumns);
+		}
 
-		InventorySlot->SetSlotData(InventoryArray[Index]);
+		FInventoryItemHandle Handle;
+		if (InventoryComponent)
+		{
+			if (InventoryLocation == EInventoryItemLocation::Backpack)
+			{
+				Handle = InventoryComponent->MakeBackpackHandle(Index);
+			}
+			else if (InventoryLocation == EInventoryItemLocation::Container)
+			{
+				Handle = InventoryComponent->MakeContainerHandle(Index);
+			}
+		}
+		InventorySlot->SetSlotContext(
+			InventoryComponent,
+			Handle,
+			InventoryArray[Index]);
 	}
 }

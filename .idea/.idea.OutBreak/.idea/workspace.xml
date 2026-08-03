@@ -22,15 +22,34 @@
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/DefaultEngine.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultEngine.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Config/DefaultGame.ini" beforeDir="false" afterPath="$PROJECT_DIR$/Config/DefaultGame.ini" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Blueprint/Character/BP_PlayerController.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Blueprint/Character/BP_PlayerController.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Input/IMC_Default.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Input/IMC_Default.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/OutBreak.uproject" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.uproject" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplay/OBGameplayAbility_Consumable.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplay/OBGameplayAbility_Consumable.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Character/OBCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Character/OBCharacterBase.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Components/PlayerInventoryComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Components/PlayerInventoryComponent.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Data/WorldItem.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Data/WorldItem.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Widget/InventorySlot.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Widget/InventorySlot.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Widget/InventoryWindow.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Inventory/Widget/InventoryWindow.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/HUD/OBHUD.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/HUD/OBHUD.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/ViewModels/OBAmmoViewModel.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/ViewModels/OBAmmoViewModel.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Weapon/OBWeaponBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Weapon/OBWeaponBase.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Abilities/OBGameplay/OBGameplayAbility_Consumable.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Abilities/OBGameplay/OBGameplayAbility_Consumable.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Character/Data/OBPawnData.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Character/Data/OBPawnData.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Character/OBCharacterBase.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Character/OBCharacterBase.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Components/PlayerInventoryComponent.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventoryData.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventoryData.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventorySystemSetting.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/InventorySystemSetting.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/WorldItem.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Data/WorldItem.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Widget/InventorySlot.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Widget/InventorySlot.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Widget/InventoryWindow.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Inventory/Widget/InventoryWindow.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Item/Data/OBItemDefinition.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Item/Data/OBItemDefinition.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Item/Data/OBItemTypes.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Item/Data/OBItemTypes.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/UI/ViewModels/OBAmmoViewModel.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/UI/ViewModels/OBAmmoViewModel.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -417,7 +436,7 @@
       <workItem from="1785667970656" duration="685000" />
       <workItem from="1785671169635" duration="4595000" />
       <workItem from="1785681606007" duration="3847000" />
-      <workItem from="1785718300186" duration="3271000" />
+      <workItem from="1785718300186" duration="9566000" />
     </task>
     <servers />
   </component>

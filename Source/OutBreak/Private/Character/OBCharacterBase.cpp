@@ -11,6 +11,7 @@
 #include "Player/State/OBPlayerStateBase.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
 #include "Inventory/Components/OBInventoryComponent.h"
+#include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Character/Data/OBPawnData.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Ability/Data/OBAbilitySet.h"
@@ -55,6 +56,7 @@ AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
 	EquipmentComponent = CreateDefaultSubobject<UOBEquipmentComponent>(TEXT("EquipmentComponent"));
 	
 	InventoryComponent = CreateDefaultSubobject<UOBInventoryComponent>(TEXT("InventoryComponent"));
+	PlayerInventoryComponent = CreateDefaultSubobject<UPlayerInventoryComponent>(TEXT("PlayerInventoryComponent"));
 
 	bUseControllerRotationYaw = false;
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
@@ -544,18 +546,38 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 		Loadout = PawnData->DefaultWeapons;
 	}
 
-	if (InventoryComponent)
+	if (PlayerInventoryComponent)
 	{
+		if (PawnData && PawnData->DefaultBackpack)
+		{
+			PlayerInventoryComponent->EquipStartingBackpack(
+				PawnData->DefaultBackpack);
+		}
 		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Loadout)
 		{
-			if (WeaponClass) InventoryComponent->AddWeapon(WeaponClass);
+			if (WeaponClass)
+			{
+				PlayerInventoryComponent->AddWeapon(WeaponClass);
+			}
 		}
 		if (PawnData)
 		{
 			for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
-				InventoryComponent->AddItem(Item.Key, Item.Value);
+			{
+				PlayerInventoryComponent->AddItem(Item.Key, Item.Value);
+			}
 		}
-		InventoryComponent->EquipDefaultSlot();
+		PlayerInventoryComponent->EquipDefaultSlot();
+	}
+
+	// Transitional compatibility for consumable abilities/widgets that have not
+	// moved yet. Weapons are intentionally no longer added or equipped here.
+	if (InventoryComponent && PawnData)
+	{
+		for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
+		{
+			InventoryComponent->AddItem(Item.Key, Item.Value);
+		}
 	}
 }
 
