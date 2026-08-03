@@ -11,6 +11,7 @@
 
 class AOBWeaponBase;
 class UOBInventoryComponent;
+class UPlayerInventoryComponent;
 DECLARE_MULTICAST_DELEGATE(FOBOnAbilitySystemInitialized);
 
 class UOBPawnData;
@@ -58,6 +59,12 @@ public:
 	void Multicast_PlayFireMontage(UAnimMontage* MontageToPlay);
 	
 	void SetPawnData(UOBPawnData* InPawnData) { PawnData = InPawnData; }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	UPlayerInventoryComponent* GetPlayerInventoryComponent() const
+	{
+		return PlayerInventoryComponent;
+	}
 	
 	// 조준 상태(서버). 이동 감속 + 복제 상태
 	void SetAiming(bool bnewAiming);
@@ -174,6 +181,11 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TObjectPtr<UOBInventoryComponent> InventoryComponent;
+
+	// New player-owned inventory. Weapon state and equipment selection live here;
+	// the legacy component remains temporarily for consumers not migrated yet.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	TObjectPtr<UPlayerInventoryComponent> PlayerInventoryComponent;
 	
 	// 집중 강도(0~1).
 	UPROPERTY(EditDefaultsOnly, Category = "Camera|CombatFocus")

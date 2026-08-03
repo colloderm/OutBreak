@@ -8,6 +8,7 @@
 #include "OBPawnData.generated.h"
 
 class AOBWeaponBase;
+class UOBItemDefinition;
 
 UCLASS(BlueprintType, Const)
 class OUTBREAK_API UOBPawnData : public UPrimaryDataAsset
@@ -21,6 +22,10 @@ public:
 	// 시작 로드아웃 무기들(주/보조/근접).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loadout")
 	TArray<TSubclassOf<AOBWeaponBase>> DefaultWeapons;
+
+	// Equipped before weapons/items so it establishes the runtime backpack capacity.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loadout")
+	TObjectPtr<UOBItemDefinition> DefaultBackpack;
 
 	// 시작 소모품(붕대/수류탄 등): 태그→개수.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loadout", Meta = (Categories = "Item"))

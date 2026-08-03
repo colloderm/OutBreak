@@ -108,6 +108,10 @@
 		{
 			"Name": "PCG",
 			"Enabled": true
+		},
+		{
+			"Name": "InteriorPCG",
+			"Enabled": true
 		}
 	]
 }

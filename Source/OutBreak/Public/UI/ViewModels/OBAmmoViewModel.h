@@ -6,7 +6,7 @@
 #include "MVVMViewModelBase.h"
 #include "OBAmmoViewModel.generated.h"
 
-class UOBInventoryComponent;
+class UPlayerInventoryComponent;
 class AOBWeaponBase;
 
 UCLASS()
@@ -19,7 +19,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "OB|UI")
 	void SetWeapon(AOBWeaponBase* InWeapon);
 	
-	void SetInventory(UOBInventoryComponent* InInventory);
+	void SetInventory(UPlayerInventoryComponent* InInventory);
 
 private:
 	void HandleAmmoChanged();
@@ -38,7 +38,7 @@ private:
 	UPROPERTY()
 	TWeakObjectPtr<AOBWeaponBase> Weapon;
 	
-	TWeakObjectPtr<UOBInventoryComponent> Inventory;
+	TWeakObjectPtr<UPlayerInventoryComponent> Inventory;
 
 	FDelegateHandle AmmoChangedHandle;
 	

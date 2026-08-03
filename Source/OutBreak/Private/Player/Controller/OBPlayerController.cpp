@@ -12,7 +12,8 @@
 #include "Blueprint/UserWidget.h"
 #include "LyraInspired/Input/OBInputConfig.h"
 #include "Camera/PlayerCameraManager.h"
-#include "Inventory/Components/OBInventoryComponent.h"
+#include "Inventory/Components/PlayerInventoryComponent.h"
+#include "Inventory/Widget/InventoryWindow.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Game/GameMode/OBLobbyGameMode.h"
 #include "Game/GameState/OBExpeditionGameState.h"
@@ -175,6 +176,12 @@ void AOBPlayerController::SetupInputComponent()
 		EIC->BindAction(JumpAction, ETriggerEvent::Completed, this, &AOBPlayerController::Input_JumpCompleted);
 	}
 
+	if (InventoryAction)
+	{
+		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_InventoryStarted);
+		EIC->BindAction(InventoryAction, ETriggerEvent::Completed, this, &AOBPlayerController::Input_InventoryCompleted);
+	}
+
 	if (InputConfig)
 	{
 		for (const FOBInputAction& Action : InputConfig->AbilityInputActions)
@@ -200,6 +207,21 @@ void AOBPlayerController::SetupInputComponent()
 	if (SlotMeleeAction)
 	{
 		EIC->BindAction(SlotMeleeAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_EquipSlot, EOBWeaponSlot::Melee);
+	}
+
+	for (int32 QuickSlotIndex = 0;
+		 QuickSlotIndex < QuickSlotActions.Num();
+		 ++QuickSlotIndex)
+	{
+		if (QuickSlotActions[QuickSlotIndex])
+		{
+			EIC->BindAction(
+				QuickSlotActions[QuickSlotIndex],
+				ETriggerEvent::Started,
+				this,
+				&AOBPlayerController::Input_UseQuickSlot,
+				QuickSlotIndex);
+		}
 	}
 	
 	if (InteractAction)
@@ -258,6 +280,59 @@ void AOBPlayerController::Input_JumpCompleted()
 	}
 }
 
+void AOBPlayerController::Input_InventoryStarted()
+{
+	AOBCharacterBase* CharacterBase = Cast<AOBCharacterBase>(GetPawn());
+	if (!IsValid(CharacterBase))
+	{
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Character Base is not the Pawn owned by this controller."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		return;
+	}
+
+	UPlayerInventoryComponent* Inventory =
+		CharacterBase->GetPlayerInventoryComponent();
+	if (!IsValid(Inventory))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: PlayerInventoryComponent is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
+		return;
+	}
+
+	UInventoryWindow* InventoryWindow = Inventory->OpenInventory();
+	if (!IsValid(InventoryWindow))
+	{
+		return;
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(InventoryWindow->TakeWidget());
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(
+		EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	SetShowMouseCursor(true);
+}
+
+void AOBPlayerController::Input_InventoryCompleted()
+{
+	if (AOBCharacterBase* CharacterBase =
+		Cast<AOBCharacterBase>(GetPawn()))
+	{
+		if (UPlayerInventoryComponent* Inventory =
+			CharacterBase->GetPlayerInventoryComponent())
+		{
+			Inventory->CloseInventory();
+		}
+	}
+
+	SetInputMode(FInputModeGameOnly());
+	SetShowMouseCursor(false);
+}
+
 void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 {
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
@@ -283,9 +358,22 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 {
 	if (APawn* P = GetPawn())
 	{
-		if (UOBInventoryComponent* Inv = P->FindComponentByClass<UOBInventoryComponent>())
+		if (UPlayerInventoryComponent* Inv =
+			P->FindComponentByClass<UPlayerInventoryComponent>())
 		{
-			Inv->Server_EquipSlot(Slot);  // 클라 → 서버 요청
+			Inv->EquipSlot(Slot);
+		}
+	}
+}
+
+void AOBPlayerController::Input_UseQuickSlot(const int32 QuickSlotIndex)
+{
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		if (UPlayerInventoryComponent* Inventory =
+			ControlledPawn->FindComponentByClass<UPlayerInventoryComponent>())
+		{
+			Inventory->UseQuickSlot(QuickSlotIndex);
 		}
 	}
 }
