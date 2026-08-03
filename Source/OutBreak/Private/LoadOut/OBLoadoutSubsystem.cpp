@@ -57,7 +57,7 @@ namespace
 	// 구매/판매가 공통으로 채우는 부분.
 	// 무기는 이름/설명/아이콘/세부분류의 원본이 WeaponData다. ItemDefinition 쪽을 비워두면
 	// 거기서 끌어와, 같은 정보를 두 에셋에 중복 입력하지 않게 한다.
-	FShopItemViewData MakeItemView(const UOBItemDefinition& Def, const UOBWeaponData* WData)
+	FShopItemViewData MakeItemView(const FOBItemDefinitionRow& Def, const UOBWeaponData* WData)
 	{
 		FShopItemViewData Item;
 		Item.ItemId     = FName(*Def.ItemTag.ToString());
@@ -79,7 +79,9 @@ namespace
 		// 인벤토리 자동 정렬과 같은 기준(카테고리 → SortOrder).
 		Item.SortOrder = static_cast<int32>(Def.Category) * 1000 + Def.SortOrder;
 
-		SetItemIcon(Item, Def.Icon ? Def.Icon : (WData ? WData->WeaponIcon : nullptr));
+		// 표 전체가 로드돼도 아이콘은 필요할 때만 올린다(상점을 여는 순간).
+		const TObjectPtr<UTexture2D> IconTex = Def.Icon.LoadSynchronous();
+		SetItemIcon(Item, IconTex ? IconTex : (WData ? WData->WeaponIcon : nullptr));
 		return Item;
 	}
 
@@ -97,7 +99,7 @@ namespace
 	}
 	
 	// 무기 아이템이면 WeaponData를, 아니면 null. 상점을 여는 순간 목록에 뜬 무기 수만큼만 로드된다.
-	const UOBWeaponData* WeaponDataForItem(const UOBItemDefinition& Def)
+	const UOBWeaponData* WeaponDataForItem(const FOBItemDefinitionRow& Def)
 	{
 		if (Def.Category != EOBItemCategory::Weapon) return nullptr;
 		return WeaponDataOf(UOBLoadoutSubsystem::ResolveWeaponClass(Def.ItemTag));
@@ -138,7 +140,7 @@ void UOBLoadoutSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 TSubclassOf<AOBWeaponBase> UOBLoadoutSubsystem::ResolveWeaponClass(const FGameplayTag& ItemTag)
 {
-	const UOBItemDefinition* Def = UOBItemRegistry::FindItem(ItemTag);
+	const FOBItemDefinitionRow* Def = UOBItemRegistry::FindItem(ItemTag);
 	if (!Def || Def->Category != EOBItemCategory::Weapon) return nullptr;
 
 	return TSubclassOf<AOBWeaponBase>(Def->WeaponClass.LoadSynchronous());
@@ -308,7 +310,7 @@ bool UOBLoadoutSubsystem::HasAnyWeapon() const
 	{
 		if (Stack.IsEmpty()) continue;
 
-		const UOBItemDefinition* Def = UOBItemRegistry::FindItem(Stack.ItemTag);
+		const FOBItemDefinitionRow* Def = UOBItemRegistry::FindItem(Stack.ItemTag);
 		if (Def && Def->Category == EOBItemCategory::Weapon) return true;
 	}
 	return false;
@@ -424,10 +426,10 @@ FShopWindowViewData UOBLoadoutSubsystem::BuildShopView(EShopTab Tab) const
 
 void UOBLoadoutSubsystem::AppendBuyItems(FShopWindowViewData& View, TSet<EOBItemCategory>& OutCategories) const
 {
-	TArray<const UOBItemDefinition*> AllItems;
+	TArray<const FOBItemDefinitionRow*> AllItems;
 	UOBItemRegistry::GetAllItems(AllItems);
 
-	for (const UOBItemDefinition* Def : AllItems)
+	for (const FOBItemDefinitionRow* Def : AllItems)
 	{
 		if (!Def || Def->BuyPrice <= 0) continue;   // 비매품은 목록에 띄우지 않는다
 
@@ -490,7 +492,7 @@ void UOBLoadoutSubsystem::AppendSellItems(FShopWindowViewData& View, TSet<EOBIte
 	{
 		if (Stack.IsEmpty()) continue;
 
-		const UOBItemDefinition* Def = UOBItemRegistry::FindItem(Stack.ItemTag);
+		const FOBItemDefinitionRow* Def = UOBItemRegistry::FindItem(Stack.ItemTag);
 		if (!Def || Def->SellPrice <= 0) continue;   // 못 파는 물건은 목록에 띄우지 않는다
 
 		const UOBWeaponData* WData = WeaponDataForItem(*Def);
@@ -539,7 +541,7 @@ bool UOBLoadoutSubsystem::TryPurchaseItem(const FGameplayTag& ItemTag, int32 Cou
 {
 	if (Count <= 0) return false;
 
-	const UOBItemDefinition* Def = UOBItemRegistry::FindItem(ItemTag);
+	const FOBItemDefinitionRow* Def = UOBItemRegistry::FindItem(ItemTag);
 	if (!Def || Def->BuyPrice <= 0) return false;   // 비매품
 
 	// 무기는 알파 규칙상 종류당 1개.
@@ -563,7 +565,7 @@ bool UOBLoadoutSubsystem::TrySell(const FGameplayTag& ItemTag, int32 Count)
 {
 	if (Count <= 0) return false;
 
-	const UOBItemDefinition* Def = UOBItemRegistry::FindItem(ItemTag);
+	const FOBItemDefinitionRow* Def = UOBItemRegistry::FindItem(ItemTag);
 	if (!Def || Def->SellPrice <= 0) return false;   // 비매품
 
 	// 창고에서 먼저 빼고, 성공했을 때만 돈을 준다. 실패하면 창고는 그대로다.

@@ -48,9 +48,10 @@ void AOBLootContainer::RollContents()
 {
 	if (!HasAuthority()) return;
 	
-	if (!LootTable)
+	const FOBLootTableRow* Row = LootTableRow.GetRow<FOBLootTableRow>(TEXT("OBLootContainer"));
+	if (!Row)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Loot] %s: LootTable 미지정 → 빈 상자"), *GetName());
+		UE_LOG(LogTemp, Warning, TEXT("[Loot] %s: 드랍 테이블 행 미지정 → 빈 상자"), *GetName());
 		return;
 	}
 	
@@ -72,7 +73,7 @@ void AOBLootContainer::RollContents()
 	}
 	
 	FRandomStream Stream(static_cast<int32>(HashCombine(GetTypeHash(GetFName()), static_cast<uint32>(SessionSeed))));
-	LootTable->Roll(Stream, Contents);
+	Row->Roll(Stream, Contents);
 
 	OnRep_Contents();   // OnRep은 서버에서 안 불린다. 호스트 화면을 위해 직접 호출.
 }
@@ -111,4 +112,38 @@ void AOBLootContainer::Interact_Implementation(AOBPlayerController* PC)
 #endif
 
 	Super::Interact_Implementation(PC);
+}
+
+AOBLootContainer* AOBLootContainer::SpawnWithContents(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
+	const FTransform& SpawnTransform, const TArray<FOBItemStack>& Items)
+{
+	if (!World || !ContainerClass) return nullptr;
+	if (World->GetNetMode() == NM_Client) return nullptr;	// 스폰은 서버 권위
+	if (Items.IsEmpty()) return nullptr;					// 빈 시체/ 빈 자루를 남기지 않음
+	
+	AOBLootContainer* LootContainer = World->SpawnActorDeferred<AOBLootContainer>(
+		ContainerClass, SpawnTransform, nullptr, nullptr,
+		ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
+	if (!LootContainer) return nullptr;
+	
+	// BeginPlay가 드랍테이블로 덮어쓰지 않도록 먼저 끈 뒤 내용물을 넣는다.
+	LootContainer->bRollOnBeginPlay = false;
+	LootContainer->Contents = Items;
+	
+	LootContainer->FinishSpawning(SpawnTransform);
+	return LootContainer;
+}
+
+AOBLootContainer* AOBLootContainer::SpawnFromTable(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
+	const FTransform& SpawnTransform, const FDataTableRowHandle& LootRow)
+{
+	const FOBLootTableRow* Row = LootRow.GetRow<FOBLootTableRow>(TEXT("OBLootContainer"));
+	if (!Row) return nullptr;
+	
+	// 처치 드랍은 매번 달라야 하므로 시드를 고정하지 않는다(레벨 상자와 정반대)
+	FRandomStream Stream(FMath::Rand());
+	TArray<FOBItemStack> Items;
+	Row->Roll(Stream, Items);
+	
+	return SpawnWithContents(World, ContainerClass, SpawnTransform, Items);
 }

@@ -3,9 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Dialogs/Dialogs.h"
 #include "Interaction/OBInteractableActor.h"
 #include "Item/Data/OBItemTypes.h"
+#include "Engine/DataTable.h"
 #include "OBLootContainer.generated.h"
 
 class UOBLootTable;
@@ -30,6 +30,15 @@ class OUTBREAK_API AOBLootContainer : public AOBInteractableActor
 
 public:
 	AOBLootContainer();
+	
+	// 서버 전용. 내용물이 있을 때만 스폰한다(빈 상자를 월드에 남기지 않는다).
+	// 시체 / 바닥에 버린 아이템처럼 내용이 이미 정해진 경우.
+	static AOBLootContainer* SpawnWithContents(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
+		const FTransform& SpawnTransform, const TArray<FOBItemStack>& Items);
+
+	// 서버 전용. 즉석에서 굴려 스폰한다(좀비 처치 등 매번 달라야 하는 드랍).
+	static AOBLootContainer* SpawnFromTable(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
+		const FTransform& SpawnTransform, const FDataTableRowHandle& LootRow);
 	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
@@ -56,9 +65,9 @@ protected:
 	UFUNCTION()
 	void OnRep_Contents();
 	
-	// 이 상자가 쓸 드랍 테이블. 비우면 빈 상자가 된다.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot")
-	TObjectPtr<UOBLootTable> LootTable;
+	// DT_LootTables의 행을 고른다. 에디터에서 드롭다운으로 선택된다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot", Meta = (RowType = "/Script/OutBreak.OBLootTableRow"))
+	FDataTableRowHandle LootTableRow;
 	
 	// 레벨 배치 상자는 켠다. 런타임 스폰(시체/바닥 픽업)은 끄고 SetContets로 직접 채운다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot")

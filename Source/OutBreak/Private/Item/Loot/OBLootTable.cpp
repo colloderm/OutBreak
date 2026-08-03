@@ -3,7 +3,7 @@
 
 #include "Item/Loot/OBLootTable.h"
 
-void UOBLootTable::Roll(FRandomStream& Stream, TArray<FOBItemStack>& OutItems) const
+void FOBLootTableRow::Roll(FRandomStream& Stream, TArray<FOBItemStack>& OutItems) const
 {
 	OutItems.Reset();
 	if (Entries.IsEmpty()) return;
@@ -18,9 +18,7 @@ void UOBLootTable::Roll(FRandomStream& Stream, TArray<FOBItemStack>& OutItems) c
 	}
 	if (TotalWeight <= 0.f) return; // 전부 가중치 0 -> 나올게 없다
 	
-	const int32 Lo = FMath::Min(MinRolls, MaxRolls);
-	const int32 Hi = FMath::Max(MinRolls, MaxRolls);
-	const int32 Rolls = Stream.RandRange(Lo, Hi);
+	const int32 Rolls = Stream.RandRange(FMath::Min(MinRolls, MaxRolls), FMath::Max(MinRolls, MaxRolls));
 	
 	for (int32 i = 0; i < Rolls; ++i)
 	{

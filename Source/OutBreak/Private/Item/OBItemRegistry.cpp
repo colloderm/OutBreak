@@ -2,134 +2,117 @@
 
 #include "Item/OBItemRegistry.h"
 
-#include "AssetRegistry/AssetData.h"
-#include "Engine/AssetManager.h"
+#include "Engine/DataTable.h"
 #include "Item/Data/OBItemDefinition.h"
 
-#if WITH_EDITOR
-#include "AssetRegistry/AssetRegistryModule.h"
-#endif
+namespace
+{
+	// 캐시를 채우려면 const가 아닌 CDO가 필요하다(설정을 바꾸는 게 아니라 캐시만 채운다).
+	UOBItemRegistry* GetReadyRegistry()
+	{
+		UOBItemRegistry* Registry = GetMutableDefault<UOBItemRegistry>();
+		if (!Registry) return nullptr;
 
-const FName UOBItemRegistry::ItemAssetType(TEXT("OBItemDefinition"));
+		Registry->EnsureCache();
+		return Registry;
+	}
+}
 
-
-const UOBItemDefinition* UOBItemRegistry::FindItem(const FGameplayTag& ItemTag)
+const FOBItemDefinitionRow* UOBItemRegistry::FindItem(const FGameplayTag& ItemTag)
 {
 	if (!ItemTag.IsValid()) return nullptr;
 
-	// 캐시를 채우려면 const가 아닌 CDO가 필요하다(설정을 바꾸는 게 아니라 캐시만 채운다).
-	UOBItemRegistry* Registry = GetMutableDefault<UOBItemRegistry>();
+	UOBItemRegistry* Registry = GetReadyRegistry();
 	if (!Registry) return nullptr;
 
-	if (!Registry->bCacheBuilt)
-	{
-		Registry->RebuildCache();
-	}
-
-	const TObjectPtr<UOBItemDefinition>* Found = Registry->ItemCache.Find(ItemTag);
-	return Found ? Found->Get() : nullptr;
+	const FOBItemDefinitionRow* const* Found = Registry->ItemCache.Find(ItemTag);
+	return Found ? *Found : nullptr;
 }
 
 FGameplayTag UOBItemRegistry::FindTagForWeaponClass(const UClass* WeaponClass)
 {
 	if (!WeaponClass) return FGameplayTag();
 
-	UOBItemRegistry* Registry = GetMutableDefault<UOBItemRegistry>();
+	UOBItemRegistry* Registry = GetReadyRegistry();
 	if (!Registry) return FGameplayTag();
-
-	if (!Registry->bCacheBuilt)
-	{
-		Registry->RebuildCache();
-	}
 
 	const FGameplayTag* Found = Registry->WeaponPathToTag.Find(FSoftObjectPath(WeaponClass));
 	return Found ? *Found : FGameplayTag();
 }
 
-void UOBItemRegistry::GetAllItems(TArray<const UOBItemDefinition*>& OutItems)
+void UOBItemRegistry::GetAllItems(TArray<const FOBItemDefinitionRow*>& OutItems)
 {
 	OutItems.Reset();
-	
-	UOBItemRegistry* Registry = GetMutableDefault<UOBItemRegistry>();
+
+	UOBItemRegistry* Registry = GetReadyRegistry();
 	if (!Registry) return;
 
-	if (!Registry->bCacheBuilt)
-	{
-		Registry->RebuildCache();
-	}
-
 	OutItems.Reserve(Registry->ItemCache.Num());
-	for (const TPair<FGameplayTag, TObjectPtr<UOBItemDefinition>>& Pair : Registry->ItemCache)
+	for (const TPair<FGameplayTag, const FOBItemDefinitionRow*>& Pair : Registry->ItemCache)
 	{
 		if (Pair.Value) OutItems.Add(Pair.Value);
 	}
 }
 
+UDataTable* UOBItemRegistry::GetLootTable()
+{
+	UOBItemRegistry* Registry = GetReadyRegistry();
+	return Registry ? Registry->LoadedLootTable.Get() : nullptr;
+}
+
+void UOBItemRegistry::EnsureCache()
+{
+	if (!bCacheBuilt)
+	{
+		RebuildCache();
+	}
+}
+
 void UOBItemRegistry::RebuildCache()
 {
-	UAssetManager* Manager = UAssetManager::GetIfInitialized();
-	if (!Manager)
-	{
-		// 엔진 초기화보다 먼저 불렸다. 캐시를 확정하지 말고 다음 호출에서 다시 시도한다.
-		return;
-	}
-
 	ItemCache.Reset();
 	WeaponPathToTag.Reset();
 	bCacheBuilt = true;
 
-#if WITH_EDITOR
-	// 에디터에서 아이템 에셋을 만들거나 지우면 캐시를 버린다(에디터 재시작 없이 반영).
-	if (!bAssetHooksBound)
-	{
-		bAssetHooksBound = true;
-		IAssetRegistry& AR = FAssetRegistryModule::GetRegistry();
-		AR.OnAssetAdded().AddUObject(this, &UOBItemRegistry::HandleAssetChanged);
-		AR.OnAssetRemoved().AddUObject(this, &UOBItemRegistry::HandleAssetChanged);
-	}
-#endif
+	// 드랍 테이블은 컨테이너의 RowHandle이 참조하므로 여기서 붙잡아 두기만 한다.
+	LoadedLootTable = LootTable.LoadSynchronous();
 
-	TArray<FAssetData> ScannedAssets;
-	Manager->GetPrimaryAssetDataList(FPrimaryAssetType(ItemAssetType), ScannedAssets);
-
-	if (ScannedAssets.IsEmpty())
+	LoadedItemTable = ItemTable.LoadSynchronous();
+	if (!LoadedItemTable)
 	{
 		UE_LOG(LogTemp, Warning,
-			TEXT("[OBItemRegistry] '%s' 타입이 하나도 스캔되지 않았다. Project Settings > Game > Asset Manager 의 "
-				 "Primary Asset Types to Scan 에 같은 이름으로 등록됐는지 확인할 것."),
-			*ItemAssetType.ToString());
+			TEXT("[OBItemRegistry] 아이템 표가 없다. Project Settings > Game > OutBreak Items 의 "
+				 "Item Table에 DT_Items를 지정할 것."));
 		return;
 	}
 
-	for (const FAssetData& Data : ScannedAssets)
+	// 캐시는 표의 행 메모리를 직접 가리킨다. 표를 하드 참조로 붙잡아 두므로 언로드되지 않는다.
+	for (const TPair<FName, uint8*>& Pair : LoadedItemTable->GetRowMap())
 	{
-		UOBItemDefinition* Def = Cast<UOBItemDefinition>(Data.GetAsset());
-		if (!Def)
+		const FOBItemDefinitionRow* Row = reinterpret_cast<const FOBItemDefinitionRow*>(Pair.Value);
+		if (!Row) continue;
+
+		if (!Row->ItemTag.IsValid())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[OBItemRegistry] 로드 실패: %s"), *Data.GetObjectPathString());
+			UE_LOG(LogTemp, Warning, TEXT("[OBItemRegistry] 행 '%s': ItemTag가 비어 있어 조회되지 않는다."),
+				*Pair.Key.ToString());
 			continue;
 		}
 
-		if (!Def->ItemTag.IsValid())
+		// 중복은 조용히 앞의 것만 반환돼서 원인 찾기가 오래 걸린다. 임포트 직후에 알린다.
+		if (ItemCache.Contains(Row->ItemTag))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[OBItemRegistry] %s: ItemTag가 비어 있어 조회되지 않는다."),
-				*Def->GetName());
+			UE_LOG(LogTemp, Warning, TEXT("[OBItemRegistry] ItemTag 중복: %s (행 '%s'). 앞의 행만 사용된다."),
+				*Row->ItemTag.ToString(), *Pair.Key.ToString());
 			continue;
 		}
 
-		// 중복은 조용히 앞의 것만 반환돼서 원인 찾기가 오래 걸린다. 등록 시점에 알린다.
-		if (const TObjectPtr<UOBItemDefinition>* Dup = ItemCache.Find(Def->ItemTag))
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[OBItemRegistry] ItemTag 중복: %s — %s / %s. 앞의 것만 사용된다."),
-				*Def->ItemTag.ToString(), *(*Dup)->GetName(), *Def->GetName());
-			continue;
-		}
+		ItemCache.Add(Row->ItemTag, Row);
 
-		ItemCache.Add(Def->ItemTag, Def);
-		// 무기는 역방향 조회도 필요하다. 경로만 넣으므로 무기 BP는 로드되지 않는다.
-		if (Def->Category == EOBItemCategory::Weapon && !Def->WeaponClass.IsNull())
+		// 무기는 역방향(클래스 → 태그) 조회도 필요하다. 경로만 넣으므로 BP를 로드하지 않는다.
+		if (Row->Category == EOBItemCategory::Weapon && !Row->WeaponClass.IsNull())
 		{
-			WeaponPathToTag.Add(Def->WeaponClass.ToSoftObjectPath(), Def->ItemTag);
+			WeaponPathToTag.Add(Row->WeaponClass.ToSoftObjectPath(), Row->ItemTag);
 		}
 	}
 
@@ -137,11 +120,11 @@ void UOBItemRegistry::RebuildCache()
 }
 
 #if WITH_EDITOR
-void UOBItemRegistry::HandleAssetChanged(const FAssetData& AssetData)
+void UOBItemRegistry::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	if (AssetData.AssetClassPath == UOBItemDefinition::StaticClass()->GetClassPathName())
-	{
-		bCacheBuilt = false;
-	}
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	// 표를 갈아끼우면 캐시가 옛 행을 가리킨 채 남는다. 즉시 버린다.
+	bCacheBuilt = false;
 }
 #endif

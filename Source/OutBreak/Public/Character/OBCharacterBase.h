@@ -9,6 +9,7 @@
 #include "GenericTeamAgentInterface.h"
 #include "OBCharacterBase.generated.h"
 
+class AOBLootContainer;
 class AOBWeaponBase;
 class UOBInventoryComponent;
 DECLARE_MULTICAST_DELEGATE(FOBOnAbilitySystemInitialized);
@@ -136,6 +137,9 @@ protected:
 	// 사망 클라이언트 연출 처리.
 	UFUNCTION()
 	void OnRep_IsDead();
+	
+	// 장착 무기(+추후 가방)를 시체로 넘긴다. 서버 전용, 중복 호출 안전.
+	void DropCorpseLoot();
 
 	// 이동/충돌 비활성 공통 로직(서버+클라).
 	void DisablePawnForDeath();
@@ -157,7 +161,8 @@ protected:
 	void UpdateCombatOrientation();
 	void ClearRecentlyFired();
 	
-	UFUNCTION() void OnRep_IsDowned();
+	UFUNCTION() 
+	void OnRep_IsDowned();
 	
 protected:
 	UPROPERTY()
@@ -183,6 +188,10 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TObjectPtr<UOBInventoryComponent> InventoryComponent;
+	
+	// 사망 시 남길 시체 컨테이너. 비우면 시체를 남기지 않는다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")
+	TSubclassOf<AOBLootContainer> CorpseContainerClass;
 	
 	// 집중 강도(0~1).
 	UPROPERTY(EditDefaultsOnly, Category = "Camera|CombatFocus")
@@ -266,5 +275,7 @@ private:
 
 	// 복제하지 않는다. 소유 클라(예측)와 서버(권위)만 알면 되고 시뮬레이트 프록시는 쓰지 않는다.
 	bool bSprintInputHeld = false;
+	
+	bool bCorpseDropped = false;
 	
 };
