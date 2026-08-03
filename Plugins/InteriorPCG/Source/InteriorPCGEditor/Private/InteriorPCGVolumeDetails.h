@@ -13,6 +13,8 @@ public:
 private:
 	FReply OnGenerateRandom();
 	FReply OnGeneratePreset();
+	FReply OnGeneratePresetBatch();
+	FReply OnScanFloors();
 	FReply OnSaveNewPreset();
 	FReply OnUpdatePreset();
 	FReply OnClearGenerated();

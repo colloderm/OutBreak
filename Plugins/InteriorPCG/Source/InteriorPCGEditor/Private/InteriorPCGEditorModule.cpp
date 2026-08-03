@@ -1,4 +1,5 @@
 #include "InteriorPCGVolumeDetails.h"
+#include "InteriorPCGWallVolumeDetails.h"
 
 #include "Modules/ModuleManager.h"
 #include "PropertyEditorModule.h"
@@ -12,6 +13,9 @@ public:
 		PropertyEditor.RegisterCustomClassLayout(
 			TEXT("InteriorPCGVolume"),
 			FOnGetDetailCustomizationInstance::CreateStatic(&FInteriorPCGVolumeDetails::MakeInstance));
+		PropertyEditor.RegisterCustomClassLayout(
+			TEXT("InteriorPCGWallVolume"),
+			FOnGetDetailCustomizationInstance::CreateStatic(&FInteriorPCGWallVolumeDetails::MakeInstance));
 		PropertyEditor.NotifyCustomizationModuleChanged();
 	}
 
@@ -20,6 +24,7 @@ public:
 		if (FPropertyEditorModule* PropertyEditor = FModuleManager::GetModulePtr<FPropertyEditorModule>(TEXT("PropertyEditor")))
 		{
 			PropertyEditor->UnregisterCustomClassLayout(TEXT("InteriorPCGVolume"));
+			PropertyEditor->UnregisterCustomClassLayout(TEXT("InteriorPCGWallVolume"));
 			PropertyEditor->NotifyCustomizationModuleChanged();
 		}
 	}

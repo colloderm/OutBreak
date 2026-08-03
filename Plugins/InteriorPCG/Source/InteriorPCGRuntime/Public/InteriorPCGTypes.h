@@ -35,6 +35,15 @@ enum class EInteriorPCGGraphGenerationMode : uint8
 	SelectedPreset UMETA(DisplayName = "Selected Preset")
 };
 
+UENUM(BlueprintType)
+enum class EInteriorPCGItemRole : uint8
+{
+	FurnitureOrProp UMETA(DisplayName = "Furniture Or Prop"),
+	InteriorWall UMETA(DisplayName = "Interior Wall"),
+	DoorWall UMETA(DisplayName = "Door Wall"),
+	Stair UMETA(DisplayName = "Stair")
+};
+
 USTRUCT(BlueprintType)
 struct INTERIORPCGRUNTIME_API FInteriorPCGAssetEntry
 {
@@ -98,6 +107,12 @@ struct INTERIORPCGRUNTIME_API FInteriorPCGPresetItem
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Placement")
 	bool bEnabled = true;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Placement")
+	EInteriorPCGItemRole Role = EInteriorPCGItemRole::FurnitureOrProp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Placement")
+	int32 FloorIndex = INDEX_NONE;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Asset")
 	EInteriorPCGAssetKind AssetKind = EInteriorPCGAssetKind::StaticMesh;

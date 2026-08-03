@@ -351,9 +351,10 @@ void AEnemyCharacter::Dead()
 
 	bIsDead = true;
 	
-	if (IsValid(CryingSoundComponent))
+	if (UAudioComponent* CryingAudio = CryingSoundComponent.Get())
 	{
-		CryingSoundComponent->Stop();
+		CryingSoundComponent.Reset();
+		CryingAudio->Stop();
 	}
 		
 	if (UEnemyMovementComponent* EnemyMovementComponent =

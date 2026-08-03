@@ -79,6 +79,22 @@ void FInteriorPCGVolumeDetails::CustomizeDetails(IDetailLayoutBuilder& DetailBui
 			.ToolTipText(LOCTEXT("GeneratePresetTip", "Clear registered preview actors and rebuild the selected PCG Preset against this volume's floor."))
 			.OnClicked(this, &FInteriorPCGVolumeDetails::OnGeneratePreset)
 		]
+		+ SHorizontalBox::Slot().FillWidth(1.0f).Padding(2.0f)
+		[
+			SNew(SButton)
+			.Text(LOCTEXT("GeneratePresetBatch", "등록 프리셋 전체 생성"))
+			.ToolTipText(LOCTEXT("GeneratePresetBatchTip", "Selected Presets (Batch) 배열의 모든 프리셋을 현재 Volume에 한 번에 생성합니다."))
+			.OnClicked(this, &FInteriorPCGVolumeDetails::OnGeneratePresetBatch)
+		]
+	];
+
+	Category.AddCustomRow(LOCTEXT("MultiFloorActions", "다층 바닥 검사"))
+	.WholeRowContent()
+	[
+		SNew(SButton)
+		.Text(LOCTEXT("ScanFloorLayers", "Volume 내부 바닥 층 검사"))
+		.ToolTipText(LOCTEXT("ScanFloorLayersTip", "Volume 내부를 격자로 아래 방향 검사하고 감지된 바닥의 월드 Z 높이를 갱신합니다."))
+		.OnClicked(this, &FInteriorPCGVolumeDetails::OnScanFloors)
 	];
 
 	Category.AddCustomRow(LOCTEXT("PresetActions", "Save PCG Preset"))
@@ -153,6 +169,46 @@ FReply FInteriorPCGVolumeDetails::OnGeneratePreset()
 		}
 		const int32 Count = Generator->GenerateFromSelectedPreset();
 		InteriorPCGVolumeDetailsPrivate::Notify(FText::Format(LOCTEXT("PresetGeneratedCount", "Generated {0} editable actors from the preset."), Count));
+	}
+	return FReply::Handled();
+}
+
+FReply FInteriorPCGVolumeDetails::OnGeneratePresetBatch()
+{
+	if (AInteriorPCGVolume* Generator = Volume.Get())
+	{
+		if (Generator->SelectedPresets.IsEmpty())
+		{
+			InteriorPCGVolumeDetailsPrivate::Notify(LOCTEXT("NoPresetBatch", "Selected Presets (Batch) 배열에 프리셋을 하나 이상 등록하세요."), SNotificationItem::CS_Fail);
+			return FReply::Handled();
+		}
+
+		const FScopedTransaction Transaction(LOCTEXT("GeneratePresetBatchTransaction", "등록된 인테리어 PCG 프리셋 전체 생성"));
+		Generator->Modify();
+		if (ULevel* Level = Generator->GetLevel())
+		{
+			Level->Modify();
+		}
+		const int32 Count = Generator->GenerateFromSelectedPresets();
+		InteriorPCGVolumeDetailsPrivate::Notify(FText::Format(LOCTEXT("PresetBatchGeneratedCount", "등록한 프리셋에서 편집 가능한 Actor {0}개를 생성했습니다."), Count));
+	}
+	return FReply::Handled();
+}
+
+FReply FInteriorPCGVolumeDetails::OnScanFloors()
+{
+	if (AInteriorPCGVolume* Generator = Volume.Get())
+	{
+		const int32 Count = Generator->ScanFloorLayers();
+		const FString Heights = FString::JoinBy(Generator->LastDetectedFloorWorldHeights, TEXT(", "), [](const float Height)
+		{
+			return FString::Printf(TEXT("%.1f"), Height);
+		});
+		InteriorPCGVolumeDetailsPrivate::Notify(FText::Format(
+			LOCTEXT("DetectedFloorLayers", "바닥 {0}개를 감지했습니다. 월드 Z: {1}"),
+			Count,
+			FText::FromString(Heights)),
+			Count > 0 ? SNotificationItem::CS_Success : SNotificationItem::CS_Fail);
 	}
 	return FReply::Handled();
 }

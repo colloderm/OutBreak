@@ -111,7 +111,7 @@ protected:
 	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
 
 	
-	TObjectPtr<UAudioComponent> CryingSoundComponent;
+	TWeakObjectPtr<UAudioComponent> CryingSoundComponent;
 	
 	UPROPERTY(
 		EditDefaultsOnly,
