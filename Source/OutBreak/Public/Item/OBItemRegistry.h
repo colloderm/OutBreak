@@ -35,6 +35,9 @@ public:
 	// 무기 클래스 → 아이템 태그(역방향). 창고/상점이 무기 클래스로 말할 때 태그로 바꿔준다.
 	// 에셋 경로만 비교하므로 무기 BP를 로드하지 않는다.
 	static FGameplayTag FindTagForWeaponClass(const UClass* WeaponClass);
+	
+	// 등록된 전체 아이템. 순서는 보장하지 않는다(상점 구매 목록 등).
+	static void GetAllItems(TArray<const UOBItemDefinition*>& OutItems);
 
 private:
 	void RebuildCache();

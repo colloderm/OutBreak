@@ -46,6 +46,25 @@ FGameplayTag UOBItemRegistry::FindTagForWeaponClass(const UClass* WeaponClass)
 	return Found ? *Found : FGameplayTag();
 }
 
+void UOBItemRegistry::GetAllItems(TArray<const UOBItemDefinition*>& OutItems)
+{
+	OutItems.Reset();
+	
+	UOBItemRegistry* Registry = GetMutableDefault<UOBItemRegistry>();
+	if (!Registry) return;
+
+	if (!Registry->bCacheBuilt)
+	{
+		Registry->RebuildCache();
+	}
+
+	OutItems.Reserve(Registry->ItemCache.Num());
+	for (const TPair<FGameplayTag, TObjectPtr<UOBItemDefinition>>& Pair : Registry->ItemCache)
+	{
+		if (Pair.Value) OutItems.Add(Pair.Value);
+	}
+}
+
 void UOBItemRegistry::RebuildCache()
 {
 	UAssetManager* Manager = UAssetManager::GetIfInitialized();

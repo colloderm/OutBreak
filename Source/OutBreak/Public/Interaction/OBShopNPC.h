@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "OBDialogueNPC.h"
+#include "UI/Shop/ShopWidgetTypes.h"
 #include "OBShopNPC.generated.h"
 
 class UOBWeaponCatalog;
@@ -23,6 +24,12 @@ protected:
 	
 	UFUNCTION()
 	void OnSellRequested(FName ShopId, FName ItemId, FName ActionId, int32 Quantity);
+	
+	UFUNCTION()
+	void HandleTabChanged(FName ShopId, EShopTab Tab);
+
+	// 현재 탭 기준으로 목록을 다시 만든다. bResetSelection=true면 선택도 초기화.
+	void RefreshShopView(bool bResetSelection);
 
 	UFUNCTION()
 	void OnShopClosed(FName ShopId);
