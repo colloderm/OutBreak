@@ -11,7 +11,7 @@
 class UBlendSpace;
 class UAnimSequence;
 class UNiagaraSystem;
-class USoundBase;
+class USoundCue;
 class UTexture2D;
 class UCameraShakeBase;
 class UOBAbilitySet;
@@ -149,7 +149,7 @@ public:
 	// 발사음(무기별).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Audio",
 		Meta = (EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
-	TObjectPtr<USoundBase> FireSound;
+	TObjectPtr<USoundCue> FireSound;
 
 	// --- 반동 3종 + 카메라쉐이크 ---
 	

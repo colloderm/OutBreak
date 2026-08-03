@@ -12,6 +12,7 @@
 class AOBLootContainer;
 class AOBWeaponBase;
 class UOBInventoryComponent;
+class UPlayerInventoryComponent;
 DECLARE_MULTICAST_DELEGATE(FOBOnAbilitySystemInitialized);
 
 class UOBPawnData;
@@ -59,6 +60,12 @@ public:
 	void Multicast_PlayFireMontage(UAnimMontage* MontageToPlay);
 	
 	void SetPawnData(UOBPawnData* InPawnData) { PawnData = InPawnData; }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	UPlayerInventoryComponent* GetPlayerInventoryComponent() const
+	{
+		return PlayerInventoryComponent;
+	}
 	
 	// 조준 상태(서버). 이동 감속 + 복제 상태
 	void SetAiming(bool bnewAiming);
@@ -188,6 +195,11 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TObjectPtr<UOBInventoryComponent> InventoryComponent;
+
+	// New player-owned inventory. Weapon state and equipment selection live here;
+	// the legacy component remains temporarily for consumers not migrated yet.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	TObjectPtr<UPlayerInventoryComponent> PlayerInventoryComponent;
 	
 	// 사망 시 남길 시체 컨테이너. 비우면 시체를 남기지 않는다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")

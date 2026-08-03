@@ -6,7 +6,7 @@
 #include "Ability/Abilities/OBGameplayAbility.h"
 #include "OBGameplayAbility_Consumable.generated.h"
 
-class UOBInventoryComponent;
+class UPlayerInventoryComponent;
 
 UCLASS(Abstract)
 class OUTBREAK_API UOBGameplayAbility_Consumable : public UOBGameplayAbility
@@ -22,7 +22,7 @@ public:
 protected:
 	// 파생에서 실제 효과 구현(서버에서 호출)
 	virtual void ApplyConsumableEffect() {}
-	UOBInventoryComponent* GetInventory() const;
+	UPlayerInventoryComponent* GetInventory() const;
 	
 	UFUNCTION()
 	void OnReleased();

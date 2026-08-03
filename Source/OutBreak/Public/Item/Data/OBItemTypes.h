@@ -23,7 +23,8 @@ enum class EOBItemCategory : uint8
 	Ammo        UMETA(DisplayName = "탄약"),
 	Consumable  UMETA(DisplayName = "소모품"),
 	Valuable    UMETA(DisplayName = "귀중품"),
-	Material    UMETA(DisplayName = "재료")
+	Material    UMETA(DisplayName = "재료"),
+	Equipment   UMETA(DisplayName = "장비")
 };
 
 USTRUCT(BlueprintType)

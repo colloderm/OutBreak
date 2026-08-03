@@ -4,7 +4,7 @@
 
 #include "Ability/Tags/OBGameplayTags.h"
 #include "Character/OBCharacterBase.h"
-#include "Inventory/Components/OBInventoryComponent.h"
+#include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 
@@ -28,7 +28,7 @@ void UOBGameplayAbility_Consumable::ActivateAbility(const FGameplayAbilitySpecHa
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
-	UOBInventoryComponent* Inv = GetInventory();
+	UPlayerInventoryComponent* Inv = GetInventory();
 	if (!Inv || Inv->GetItemCount(ItemTag) <= 0 || !CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
@@ -66,7 +66,7 @@ void UOBGameplayAbility_Consumable::OnReleased()
 	if (HasAuthority(&CurrentActivationInfo))
 	{
 		ApplyConsumableEffect();                 // 투척 / 회복 등
-		if (UOBInventoryComponent* Inv = GetInventory())
+		if (UPlayerInventoryComponent* Inv = GetInventory())
 		{
 			Inv->ConsumeItem(ItemTag, 1);
 		}
@@ -95,11 +95,11 @@ void UOBGameplayAbility_Consumable::OnUseCancelled()
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 }
 
-UOBInventoryComponent* UOBGameplayAbility_Consumable::GetInventory() const
+UPlayerInventoryComponent* UOBGameplayAbility_Consumable::GetInventory() const
 {
 	if (AOBCharacterBase* Character = GetOBCharacterFromActorInfo())
 	{
-		return Character->FindComponentByClass<UOBInventoryComponent>();
+		return Character->GetPlayerInventoryComponent();
 	}
 	return nullptr;
 }

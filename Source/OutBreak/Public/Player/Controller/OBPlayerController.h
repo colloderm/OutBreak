@@ -65,6 +65,9 @@ protected:
 	void Input_Look(const FInputActionValue& Value);
 	void Input_JumpStarted();
 	void Input_JumpCompleted();
+
+	void Input_InventoryStarted();
+	void Input_InventoryCompleted();
 	
 	// 능력 입력 핸들러(눌림/뗌).
 	void Input_AbilityInputPressed(FGameplayTag InputTag);
@@ -74,6 +77,7 @@ protected:
 	UOBAbilitySystemComponent* GetOBAbilitySystemComponent() const;
 	
 	void Input_EquipSlot(EOBWeaponSlot Slot);
+	void Input_UseQuickSlot(int32 QuickSlotIndex);
 	
 	virtual void AcknowledgePossession(APawn* P) override;
 	
@@ -111,6 +115,9 @@ protected:
 	TObjectPtr<UInputAction> JumpAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> InventoryAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	int32 InputMappingPriority = 0;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -122,6 +129,10 @@ protected:
 	TObjectPtr<UInputAction> SlotSecondaryAction;
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Weapon")
 	TObjectPtr<UInputAction> SlotMeleeAction;
+
+	// Array index is the quick-slot index. Assign IA_QuickSlot1..N in order.
+	UPROPERTY(EditDefaultsOnly, Category = "Input|QuickSlot")
+	TArray<TObjectPtr<UInputAction>> QuickSlotActions;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> InteractAction;
