@@ -5,9 +5,12 @@
 
 #include "Components/StaticMeshComponent.h"
 #include "Game/GameState/OBExpeditionGameState.h"
+#include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Item/Loot/OBLootTable.h"
 #include "Net/UnrealNetwork.h"
-
+#include "Player/Controller/OBPlayerController.h"
+#include "UI/Loot/OBLootWindow.h"
+#include "TimerManager.h"
 
 AOBLootContainer::AOBLootContainer()
 {
@@ -38,9 +41,15 @@ void AOBLootContainer::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	if (HasAuthority() && bRollOnBeginPlay)
+	if (HasAuthority())
 	{
-		RollContents();
+		if (bRollOnBeginPlay)
+		{
+			RollContents();
+		}
+
+		// RollContents를 안 타는 경로(SpawnWithContents)도 여기서 타이머를 건다.
+		RestartDespawnTimer();
 	}
 }
 
@@ -96,20 +105,27 @@ void AOBLootContainer::AddContent(const FGameplayTag& ItemTag, int32 Count)
 
 void AOBLootContainer::OnRep_Contents()
 {
+	// 내용물이 바뀌면 남은 시간 기준도 바뀐다(있음 → 없음).
+	// 클라에서 Destroy하면 안 되므로 서버에서만 다시 건다.
+	if (HasAuthority())
+	{
+		RestartDespawnTimer();
+	}
+	
 	OnContentsChanged.Broadcast();
 }
 
 void AOBLootContainer::Interact_Implementation(AOBPlayerController* PC)
 {
-	// 루팅 UI는 인벤토리 그리드 위젯이 나온 뒤에 붙인다(M4).
-	// 지금은 복제가 제대로 되는지 확인할 수 있게 내용물만 찍는다.
-#if !UE_BUILD_SHIPPING
-	UE_LOG(LogTemp, Log, TEXT("[Loot] %s 내용물 %d종"), *GetName(), Contents.Num());
-	for (const FOBItemStack& Stack : Contents)
+	// 빈 상자를 열어봐야 할 일이 없다. 프롬프트도 이미 "비어 있음"이다.
+	if (!PC || Contents.IsEmpty()) return;
+
+	// 커서·입력모드·이동잠금은 컨트롤러가 처리한다. 우리는 대상만 물려준다.
+	UUserWidget* Widget = PC->OpenInteractionWidget(InteractWidgetClass);
+	if (UOBLootWindow* Window = Cast<UOBLootWindow>(Widget))
 	{
-		UE_LOG(LogTemp, Log, TEXT("  - %s x%d"), *Stack.ItemTag.ToString(), Stack.Count);
+		Window->BindToContainer(this);
 	}
-#endif
 
 	Super::Interact_Implementation(PC);
 }
@@ -131,6 +147,7 @@ AOBLootContainer* AOBLootContainer::SpawnWithContents(UWorld* World, TSubclassOf
 	LootContainer->Contents = Items;
 	
 	LootContainer->FinishSpawning(SpawnTransform);
+	
 	return LootContainer;
 }
 
@@ -146,4 +163,91 @@ AOBLootContainer* AOBLootContainer::SpawnFromTable(UWorld* World, TSubclassOf<AO
 	Row->Roll(Stream, Items);
 	
 	return SpawnWithContents(World, ContainerClass, SpawnTransform, Items);
+}
+
+int32 AOBLootContainer::TryTakeItem(UPlayerInventoryComponent* Inventory, const FGameplayTag& ItemTag, int32 Count)
+{
+	if (!HasAuthority() || !Inventory || Count <= 0) return 0;
+
+	FOBItemStack* Found = Contents.FindByPredicate(
+		[&ItemTag](const FOBItemStack& S)
+		{
+			return S.ItemTag == ItemTag;
+		});
+	if (!Found || Found->Count <= 0) return 0;
+
+	// 클라가 수량을 부풀려 보내도 상자에 있는 만큼이 상한이다.
+	const int32 Requested = FMath::Min(Count, Found->Count);
+
+	// AddItemByTag는 "넣고 남은 수량"을 인자에 되돌려준다(가방이 꽉 차면 부분 적재).
+	int32 Remaining = Requested;
+	Inventory->AddItemByTag(ItemTag, Remaining);
+
+	const int32 Moved = Requested - Remaining;
+	if (Moved <= 0) return 0;
+
+	Found->Count -= Moved;
+	Found = nullptr; // 아래 RemoveAll이 배열을 재배치한다. 다시 쓰지 않는다.
+
+	Contents.RemoveAll(
+		[](const FOBItemStack& S)
+		{
+			return S.Count <= 0;
+		});
+
+	OnRep_Contents(); // OnRep은 서버에서 안 불린다. 호스트 화면을 위해 직접 호출.
+	
+	return Moved;
+}
+
+int32 AOBLootContainer::TryTakeAll(UPlayerInventoryComponent* Inventory)
+{
+	if (!HasAuthority() || !Inventory) return 0;
+
+	// 복사본을 돈다. TryTakeItem이 Contents를 건드린다.
+	const TArray<FOBItemStack> Snapshot = Contents;
+
+	int32 Total = 0;
+	for (const FOBItemStack& Stack : Snapshot)
+	{
+		Total += TryTakeItem(Inventory, Stack.ItemTag, Stack.Count);
+	}
+	
+	return Total;
+}
+
+FText AOBLootContainer::GetInteractPromptText_Implementation() const
+{
+	// 다 턴 상자를 또 열게 만들지 않는다.
+	if (Contents.IsEmpty())
+	{
+		return NSLOCTEXT("OBLoot", "EmptyContainer", "비어 있음");
+	}
+	
+	return Super::GetInteractPromptText_Implementation();
+}
+
+void AOBLootContainer::RestartDespawnTimer()
+{
+	if (!HasAuthority()) return;
+
+	const float Delay = Contents.IsEmpty() ? DespawnDelayWhenEmpty : DespawnDelayWithItems;
+
+	// 0 이하 = 영구 존치. 레벨 배치 상자가 여기에 해당한다.
+	if (Delay <= 0.f)
+	{
+		GetWorldTimerManager().ClearTimer(DespawnTimer);
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(DespawnTimer, this, &AOBLootContainer::HandleDespawn, Delay, false);
+}
+
+void AOBLootContainer::HandleDespawn()
+{
+	if (!HasAuthority()) return;
+
+	// 컨트롤러의 대상 목록은 약참조라 다음 갱신(0.15초)에 저절로 정리된다.
+	// 열려 있던 루팅 창도 컨테이너가 null이 되면 스스로 닫힌다.
+	Destroy();
 }

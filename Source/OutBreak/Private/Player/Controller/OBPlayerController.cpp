@@ -24,7 +24,7 @@
 #include "Weapon/Data/OBWeaponData.h"
 #include "TimerManager.h"
 #include "Game/GameMode/OBExpeditionGameMode.h"
-
+#include "Item/Loot/OBLootContainer.h"
 
 
 AOBPlayerController::AOBPlayerController()
@@ -727,8 +727,24 @@ int32 AOBPlayerController::GetReturnCountdown() const
 
 void AOBPlayerController::SetCurrentInteractable(AOBInteractableActor* Interactable)
 {
-	CurrentInteractable = Interactable;
-	// (선택) 여기서 "E 눌러 상호작용" 프롬프트 위젯 토글 가능 — 지금은 생략.
+	AOBInteractableActor* Previous = CurrentInteractable.Get();
+
+	if (Previous != Interactable)
+	{
+		// 프롬프트와 하이라이트는 항상 한 개만 켜져 있어야 한다.
+		if (Previous)     
+			Previous->SetHighlighted(false);
+		if (Interactable) 
+			Interactable->SetHighlighted(true);
+
+		CurrentInteractable = Interactable;
+	}
+	else if (Interactable)
+	{
+		// 대상이 그대로여도 문구는 바뀔 수 있다(다 털린 상자 → "비어 있음").
+		// RefreshInteractTarget이 0.15초마다 여기로 온다.
+		Interactable->RefreshPromptText();
+	}
 }
 
 AOBInteractableActor* AOBPlayerController::GetCurrentInteractable() const
@@ -803,4 +819,141 @@ void AOBPlayerController::Server_StartGame_Implementation()
 {
 	if (AOBLobbyGameMode* GM = GetWorld()->GetAuthGameMode<AOBLobbyGameMode>())
 		GM->TryStartGame(this);
+}
+
+void AOBPlayerController::AddNearbyInteractable(AOBInteractableActor* Interactable)
+{
+	if (!Interactable) return;
+
+	NearbyInteractables.AddUnique(Interactable);
+
+	// 매 프레임 거리를 재는 건 낭비다. 걸어서 대상이 바뀌는 속도면 0.15초로 충분하다.
+	if (!GetWorldTimerManager().IsTimerActive(InteractRefreshTimer))
+	{
+		GetWorldTimerManager().SetTimer(
+			InteractRefreshTimer, this, &AOBPlayerController::RefreshInteractTarget, 0.15f, true);
+	}
+
+	RefreshInteractTarget();   // 들어서자마자 프롬프트가 떠야 한다.
+}
+
+void AOBPlayerController::RemoveNearbyInteractable(AOBInteractableActor* Interactable)
+{
+	NearbyInteractables.RemoveAll(
+		[Interactable](const TWeakObjectPtr<AOBInteractableActor>& Entry)
+		{
+			return !Entry.IsValid() || Entry.Get() == Interactable;
+		});
+
+	if (NearbyInteractables.IsEmpty())
+	{
+		GetWorldTimerManager().ClearTimer(InteractRefreshTimer);
+		SetCurrentInteractable(nullptr);
+		return;
+	}
+
+	RefreshInteractTarget();
+}
+
+void AOBPlayerController::RefreshInteractTarget()
+{
+	const APawn* MyPawn = GetPawn();
+	if (!MyPawn)
+	{
+		SetCurrentInteractable(nullptr);
+		return;
+	}
+
+	// 3인칭 카메라는 벽을 뚫고 뒤로 빠진다. 캐릭터 눈높이가 기준이어야 한다.
+	const FVector ViewLocation = MyPawn->GetPawnViewLocation();
+
+	AOBInteractableActor* Nearest = nullptr;
+	float NearestDistSq = TNumericLimits<float>::Max();
+
+	for (int32 i = NearbyInteractables.Num() - 1; i >= 0; --i)
+	{
+		AOBInteractableActor* Candidate = NearbyInteractables[i].Get();
+		if (!Candidate)
+		{
+			// 다 털려서 사라진 시체 등. EndOverlap이 안 오므로 여기서 청소한다.
+			NearbyInteractables.RemoveAtSwap(i);
+			continue;
+		}
+
+		// 거리부터 본다. 가려짐 판정(트레이스)이 더 비싸다.
+		const float DistSq = FVector::DistSquared(ViewLocation, Candidate->GetActorLocation());
+		if (DistSq >= NearestDistSq)
+		{
+			continue;
+		}
+
+		if (IsInteractableOccluded(ViewLocation, Candidate))
+		{
+			continue;
+		}
+
+		NearestDistSq = DistSq;
+		Nearest = Candidate;
+	}
+
+	SetCurrentInteractable(Nearest);
+}
+
+bool AOBPlayerController::IsInteractableOccluded(const FVector& ViewLocation, const AOBInteractableActor* Candidate) const
+{
+	const UWorld* World = GetWorld();
+	if (!World || !Candidate) return true;
+
+	// 충돌을 끈 시체 상자도 포함해야 한다(기본값은 충돌 켜진 컴포넌트만 센다).
+	const FBox Bounds = Candidate->GetComponentsBoundingBox(true);
+	const FVector Target = Bounds.IsValid ? Bounds.GetCenter() : Candidate->GetActorLocation();
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(OBInteractOcclusion), false, GetPawn());
+	Params.AddIgnoredActor(Candidate);   // 상자 자기 자신에 막히면 영원히 못 본다.
+
+	FHitResult Hit;
+	return World->LineTraceSingleByChannel(Hit, ViewLocation, Target, ECC_Visibility, Params);
+}
+
+namespace
+{
+	// 상호작용 반경(기본 200)보다 넉넉히 잡는다. 지연 때문에 서버 위치가 조금 다르다.
+	constexpr float OBMaxLootDistanceSq = 500.f * 500.f;
+}
+
+void AOBPlayerController::Server_TakeLoot_Implementation(AOBLootContainer* Container, FGameplayTag ItemTag, int32 Count)
+{
+	if (!Container || Count <= 0) return;
+
+	AOBCharacterBase* MyChar = Cast<AOBCharacterBase>(GetPawn());
+	if (!MyChar || MyChar->IsDead()) return;
+
+	// 클라가 보낸 걸 믿지 않는다. 실제로 그 앞에 서 있는지 서버가 확인한다.
+	if (FVector::DistSquared(MyChar->GetActorLocation(), Container->GetActorLocation()) > OBMaxLootDistanceSq)
+	{
+		return;
+	}
+
+	if (UPlayerInventoryComponent* Inv = MyChar->GetPlayerInventoryComponent())
+	{
+		Container->TryTakeItem(Inv, ItemTag, Count);
+	}
+}
+
+void AOBPlayerController::Server_TakeAllLoot_Implementation(AOBLootContainer* Container)
+{
+	if (!Container) return;
+
+	AOBCharacterBase* MyChar = Cast<AOBCharacterBase>(GetPawn());
+	if (!MyChar || MyChar->IsDead()) return;
+
+	if (FVector::DistSquared(MyChar->GetActorLocation(), Container->GetActorLocation()) > OBMaxLootDistanceSq)
+	{
+		return;
+	}
+
+	if (UPlayerInventoryComponent* Inv = MyChar->GetPlayerInventoryComponent())
+	{
+		Container->TryTakeAll(Inv);
+	}
 }

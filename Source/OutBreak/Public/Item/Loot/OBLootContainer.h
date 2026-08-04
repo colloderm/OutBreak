@@ -8,6 +8,7 @@
 #include "Engine/DataTable.h"
 #include "OBLootContainer.generated.h"
 
+class UPlayerInventoryComponent;
 class UOBLootTable;
 class UStaticMeshComponent;
 
@@ -49,13 +50,23 @@ public:
 	void SetContents(const TArray<FOBItemStack>& InItems);
 	void AddContent(const FGameplayTag& ItemTag, int32 Count);
 	
-	const TArray<FOBItemStack>& GetContents() { return Contents; }
+	// GetContents를 const 함수로 고친다(위젯이 const 포인터로도 읽어야 한다)
+	const TArray<FOBItemStack>& GetContents() const { return Contents; }
 	
 	UFUNCTION(BlueprintPure, Category = "Loot")
 	bool IsEmptyContainer() const { return Contents.IsEmpty(); }
 	
 	// 내용물이 바뀔 때. 루팅 UI가 구독
 	FOBOnLootContentsChanged OnContentsChanged;
+	
+	// 서버: 가방에 들어가는 만큼만 옮기고 그만큼 상자에서 뺀다. 부분 이동을 허용한다.
+	// 반환: 실제로 옮긴 개수(0이면 가방이 꽉 찼거나 그 아이템이 없다).
+	int32 TryTakeItem(UPlayerInventoryComponent* Inventory, const FGameplayTag& ItemTag, int32 Count);
+
+	// 서버: 들어있는 걸 전부 시도한다. 안 들어가는 건 상자에 남는다.
+	int32 TryTakeAll(UPlayerInventoryComponent* Inventory);
+
+	virtual FText GetInteractPromptText_Implementation() const override;
 	
 	virtual void Interact_Implementation(AOBPlayerController* PC) override;
 
@@ -69,9 +80,19 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot", Meta = (RowType = "/Script/OutBreak.OBLootTableRow"))
 	FDataTableRowHandle LootTableRow;
 	
-	// 레벨 배치 상자는 켠다. 런타임 스폰(시체/바닥 픽업)은 끄고 SetContets로 직접 채운다.
+	// 레벨 배치 상자는 켠다. 런타임 스폰(시체/바닥 픽업)은 끄고 SetContents로 직접 채운다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot")
 	bool bRollOnBeginPlay = true;
+	
+	// 내용물이 있을 때 남아 있는 시간. 0 이하면 사라지지 않는다(레벨 배치 상자).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot|Despawn", Meta = (ClampMin = "0.0", Units = "s"))
+	float DespawnDelayWithItems = 0.f;
+
+	// 비었을 때 남아 있는 시간. 마지막 아이템을 꺼내는 순간 이쪽으로 갈아끼워진다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot|Despawn", Meta = (ClampMin = "0.0", Units = "s"))
+	float DespawnDelayWhenEmpty = 0.f;
+
+	FTimerHandle DespawnTimer;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_Contents)
 	TArray<FOBItemStack> Contents;
@@ -79,4 +100,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Loot")
 	TObjectPtr<UStaticMeshComponent> StaticMeshComp;
 
+protected:
+	// 서버 전용. 현재 내용물 상태에 맞는 시간으로 타이머를 다시 건다.
+	void RestartDespawnTimer();
+	void HandleDespawn();
+	
 };

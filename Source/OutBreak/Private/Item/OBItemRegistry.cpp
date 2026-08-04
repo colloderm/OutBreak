@@ -4,6 +4,8 @@
 
 #include "Engine/DataTable.h"
 #include "Item/Data/OBItemDefinition.h"
+#include "Weapon/OBWeaponBase.h"
+#include "Weapon/Data/OBWeaponData.h"
 
 namespace
 {
@@ -52,6 +54,50 @@ void UOBItemRegistry::GetAllItems(TArray<const FOBItemDefinitionRow*>& OutItems)
 	{
 		if (Pair.Value) OutItems.Add(Pair.Value);
 	}
+}
+
+bool UOBItemRegistry::GetItemDisplay(const FGameplayTag& ItemTag, FText& OutName, UTexture2D*& OutIcon)
+{
+	// 표에 없어도 빈칸으로 두지 않는다. 태그가 그대로 보여야 오타를 바로 찾는다.
+	OutName = FText::FromName(ItemTag.GetTagName());
+	OutIcon = nullptr;
+
+	const FOBItemDefinitionRow* Row = FindItem(ItemTag);
+	if (!Row)
+	{
+		return false;
+	}
+
+	FText RowName = Row->DisplayName;
+
+	// 소프트 참조라 표가 로드돼도 아이콘까지 따라 올라오지 않는다.
+	OutIcon = Row->Icon.LoadSynchronous();
+
+	// 무기는 이름/아이콘의 원본이 WeaponData다. 행을 비워두면 거기서 상속한다.
+	// (같은 값을 CSV와 무기 에셋에 두 번 입력하지 않게 하는 규칙)
+	if (RowName.IsEmpty() || !OutIcon)
+	{
+		if (UClass* WeaponClass = Row->WeaponClass.LoadSynchronous())
+		{
+			if (const AOBWeaponBase* CDO = WeaponClass->GetDefaultObject<AOBWeaponBase>())
+			{
+				if (const UOBWeaponData* WData = CDO->GetWeaponData())
+				{
+					if (RowName.IsEmpty()) 
+						RowName = WData->DisplayName;
+					if (!OutIcon)
+						OutIcon = WData->WeaponIcon;
+				}
+			}
+		}
+	}
+
+	if (!RowName.IsEmpty())
+	{
+		OutName = RowName;
+	}
+	
+	return true;
 }
 
 UDataTable* UOBItemRegistry::GetLootTable()
