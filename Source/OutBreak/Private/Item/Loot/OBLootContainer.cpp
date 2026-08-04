@@ -10,6 +10,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "UI/Loot/OBLootWindow.h"
+#include "TimerManager.h"
 
 AOBLootContainer::AOBLootContainer()
 {
@@ -40,9 +41,15 @@ void AOBLootContainer::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	if (HasAuthority() && bRollOnBeginPlay)
+	if (HasAuthority())
 	{
-		RollContents();
+		if (bRollOnBeginPlay)
+		{
+			RollContents();
+		}
+
+		// RollContents를 안 타는 경로(SpawnWithContents)도 여기서 타이머를 건다.
+		RestartDespawnTimer();
 	}
 }
 
@@ -98,6 +105,13 @@ void AOBLootContainer::AddContent(const FGameplayTag& ItemTag, int32 Count)
 
 void AOBLootContainer::OnRep_Contents()
 {
+	// 내용물이 바뀌면 남은 시간 기준도 바뀐다(있음 → 없음).
+	// 클라에서 Destroy하면 안 되므로 서버에서만 다시 건다.
+	if (HasAuthority())
+	{
+		RestartDespawnTimer();
+	}
+	
 	OnContentsChanged.Broadcast();
 }
 
@@ -211,4 +225,29 @@ FText AOBLootContainer::GetInteractPromptText_Implementation() const
 	}
 	
 	return Super::GetInteractPromptText_Implementation();
+}
+
+void AOBLootContainer::RestartDespawnTimer()
+{
+	if (!HasAuthority()) return;
+
+	const float Delay = Contents.IsEmpty() ? DespawnDelayWhenEmpty : DespawnDelayWithItems;
+
+	// 0 이하 = 영구 존치. 레벨 배치 상자가 여기에 해당한다.
+	if (Delay <= 0.f)
+	{
+		GetWorldTimerManager().ClearTimer(DespawnTimer);
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(DespawnTimer, this, &AOBLootContainer::HandleDespawn, Delay, false);
+}
+
+void AOBLootContainer::HandleDespawn()
+{
+	if (!HasAuthority()) return;
+
+	// 컨트롤러의 대상 목록은 약참조라 다음 갱신(0.15초)에 저절로 정리된다.
+	// 열려 있던 루팅 창도 컨테이너가 null이 되면 스스로 닫힌다.
+	Destroy();
 }

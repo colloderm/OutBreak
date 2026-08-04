@@ -80,9 +80,19 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot", Meta = (RowType = "/Script/OutBreak.OBLootTableRow"))
 	FDataTableRowHandle LootTableRow;
 	
-	// 레벨 배치 상자는 켠다. 런타임 스폰(시체/바닥 픽업)은 끄고 SetContets로 직접 채운다.
+	// 레벨 배치 상자는 켠다. 런타임 스폰(시체/바닥 픽업)은 끄고 SetContents로 직접 채운다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot")
 	bool bRollOnBeginPlay = true;
+	
+	// 내용물이 있을 때 남아 있는 시간. 0 이하면 사라지지 않는다(레벨 배치 상자).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot|Despawn", Meta = (ClampMin = "0.0", Units = "s"))
+	float DespawnDelayWithItems = 0.f;
+
+	// 비었을 때 남아 있는 시간. 마지막 아이템을 꺼내는 순간 이쪽으로 갈아끼워진다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Loot|Despawn", Meta = (ClampMin = "0.0", Units = "s"))
+	float DespawnDelayWhenEmpty = 0.f;
+
+	FTimerHandle DespawnTimer;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_Contents)
 	TArray<FOBItemStack> Contents;
@@ -90,4 +100,9 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Loot")
 	TObjectPtr<UStaticMeshComponent> StaticMeshComp;
 
+protected:
+	// 서버 전용. 현재 내용물 상태에 맞는 시간으로 타이머를 다시 건다.
+	void RestartDespawnTimer();
+	void HandleDespawn();
+	
 };

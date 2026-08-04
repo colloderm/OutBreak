@@ -56,6 +56,9 @@ private:
 	FTimerHandle InteractRefreshTimer;
 
 	void RefreshInteractTarget();
+	
+	// 눈높이에서 대상까지 막혀 있는가. 벽 너머 상자에 프롬프트가 뜨지 않게 한다.
+	bool IsInteractableOccluded(const FVector& ViewLocation, const AOBInteractableActor* Candidate) const;
 
 	// 현재 열려있는 상호작용 위젯(중복 오픈 방지 + 닫기용).
 	UPROPERTY()

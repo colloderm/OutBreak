@@ -864,7 +864,8 @@ void AOBPlayerController::RefreshInteractTarget()
 		return;
 	}
 
-	const FVector From = MyPawn->GetActorLocation();
+	// 3인칭 카메라는 벽을 뚫고 뒤로 빠진다. 캐릭터 눈높이가 기준이어야 한다.
+	const FVector ViewLocation = MyPawn->GetPawnViewLocation();
 
 	AOBInteractableActor* Nearest = nullptr;
 	float NearestDistSq = TNumericLimits<float>::Max();
@@ -879,15 +880,39 @@ void AOBPlayerController::RefreshInteractTarget()
 			continue;
 		}
 
-		const float DistSq = FVector::DistSquared(From, Candidate->GetActorLocation());
-		if (DistSq < NearestDistSq)
+		// 거리부터 본다. 가려짐 판정(트레이스)이 더 비싸다.
+		const float DistSq = FVector::DistSquared(ViewLocation, Candidate->GetActorLocation());
+		if (DistSq >= NearestDistSq)
 		{
-			NearestDistSq = DistSq;
-			Nearest = Candidate;
+			continue;
 		}
+
+		if (IsInteractableOccluded(ViewLocation, Candidate))
+		{
+			continue;
+		}
+
+		NearestDistSq = DistSq;
+		Nearest = Candidate;
 	}
 
 	SetCurrentInteractable(Nearest);
+}
+
+bool AOBPlayerController::IsInteractableOccluded(const FVector& ViewLocation, const AOBInteractableActor* Candidate) const
+{
+	const UWorld* World = GetWorld();
+	if (!World || !Candidate) return true;
+
+	// 충돌을 끈 시체 상자도 포함해야 한다(기본값은 충돌 켜진 컴포넌트만 센다).
+	const FBox Bounds = Candidate->GetComponentsBoundingBox(true);
+	const FVector Target = Bounds.IsValid ? Bounds.GetCenter() : Candidate->GetActorLocation();
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(OBInteractOcclusion), false, GetPawn());
+	Params.AddIgnoredActor(Candidate);   // 상자 자기 자신에 막히면 영원히 못 본다.
+
+	FHitResult Hit;
+	return World->LineTraceSingleByChannel(Hit, ViewLocation, Target, ECC_Visibility, Params);
 }
 
 namespace
