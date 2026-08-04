@@ -79,4 +79,5 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UUserWidget> CrosshairWidget;
+	
 };

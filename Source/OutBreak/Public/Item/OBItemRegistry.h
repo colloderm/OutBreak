@@ -8,6 +8,7 @@
 #include "UObject/SoftObjectPath.h"
 #include "OBItemRegistry.generated.h"
 
+class UTexture2D;
 class UDataTable;
 struct FOBItemDefinitionRow;
 
@@ -42,6 +43,11 @@ public:
 	
 	// 등록된 전체 아이템(상점 구매 목록 등). 순서는 보장하지 않는다.
 	static void GetAllItems(TArray<const FOBItemDefinitionRow*>& OutItems);
+	
+	// 태그 → 화면에 그릴 이름/아이콘. 행의 DisplayName·Icon이 비면 무기 데이터에서 상속한다.
+	// 표시 규칙을 여기 한 곳에만 둔다(상점·루팅·인벤토리가 같은 결과를 내야 한다).
+	// 반환값: 표에 행이 있었는가. false여도 OutName에는 태그 문자열이 들어간다.
+	static bool GetItemDisplay(const FGameplayTag& ItemTag, FText& OutName, UTexture2D*& OutIcon);
 
 	// 드랍 테이블이 담긴 표. 컨테이너의 RowHandle이 이걸 가리켜야 한다.
 	static UDataTable* GetLootTable();
