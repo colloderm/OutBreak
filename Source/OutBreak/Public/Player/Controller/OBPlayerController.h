@@ -9,6 +9,7 @@
 #include "OBPlayerController.generated.h"
 
 class AOBLootContainer;
+class AWorldItem;
 class UWorld;
 class AOBInteractableActor;
 class UUserWidget;
@@ -69,6 +70,7 @@ private:
 	// 눈높이에서 대상까지 막혀 있는가. 벽 너머 상자에 프롬프트가 뜨지 않게 한다.
 	bool IsInteractableOccluded(const FVector& ViewLocation, const AOBInteractableActor* Candidate) const;
 	
+	bool bInventoryToggle;
 protected:
 	//~ APlayerController interface
 	virtual void SetupInputComponent() override;
@@ -83,8 +85,9 @@ protected:
 	void Input_JumpStarted();
 	void Input_JumpCompleted();
 
-	void Input_InventoryStarted();
-	void Input_InventoryCompleted();
+	void Input_InventoryKey();
+	void InventoryStarted();
+	void InventoryCompleted();
 	
 	// 능력 입력 핸들러(눌림/뗌).
 	void Input_AbilityInputPressed(FGameplayTag InputTag);
@@ -256,6 +259,9 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void Server_TakeAllLoot(AOBLootContainer* Container);
+
+	UFUNCTION(Server, Reliable)
+	void Server_PickUpWorldItem(AWorldItem* WorldItem);
 	
 	//~ Expedition 관전 -------------------------------------------
 	// 서버 → 클라: 관전 시작(팀원 생존).

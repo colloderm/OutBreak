@@ -197,8 +197,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Equipment")
 	TObjectPtr<UOBEquipmentComponent> EquipmentComponent;
 
+
 	// New player-owned inventory. Weapon state and equipment selection live here;
 	// the legacy component remains temporarily for consumers not migrated yet.
+
+	
+	// Sole player-owned inventory for item quantities, equipment and weapon state.
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TObjectPtr<UPlayerInventoryComponent> PlayerInventoryComponent;
 	

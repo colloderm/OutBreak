@@ -6,11 +6,55 @@
 #include "Components/StaticMeshComponent.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
+#include "Item/Data/OBItemDefinition.h"
 #include "Item/Loot/OBLootTable.h"
+#include "Item/OBItemRegistry.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "UI/Loot/OBLootWindow.h"
 #include "TimerManager.h"
+
+namespace
+{
+	void AppendStackAsInstances(
+		const FOBItemStack& Stack,
+		TArray<FInventoryData>& OutItems)
+	{
+		const FOBItemDefinitionRow* ItemRow =
+			UOBItemRegistry::FindItem(Stack.ItemTag);
+		if (!ItemRow || Stack.Count <= 0)
+		{
+			return;
+		}
+
+		const bool bEquippable =
+			ItemRow->Category == EOBItemCategory::Weapon ||
+			ItemRow->Category == EOBItemCategory::Equipment;
+		const int32 MaxStack = bEquippable
+			? 1
+			: FMath::Max(1, ItemRow->MaxStack);
+		int32 Remaining = Stack.Count;
+		while (Remaining > 0)
+		{
+			FInventoryData& Item = OutItems.AddDefaulted_GetRef();
+			Item.ItemTag = Stack.ItemTag;
+			Item.ItemStack = FMath::Min(MaxStack, Remaining);
+			Item.InstanceId = FGuid::NewGuid();
+			Remaining -= Item.ItemStack;
+		}
+	}
+
+	TArray<FInventoryData> ConvertStacksToInstances(
+		const TArray<FOBItemStack>& Stacks)
+	{
+		TArray<FInventoryData> Instances;
+		for (const FOBItemStack& Stack : Stacks)
+		{
+			AppendStackAsInstances(Stack, Instances);
+		}
+		return Instances;
+	}
+}
 
 AOBLootContainer::AOBLootContainer()
 {
@@ -82,7 +126,9 @@ void AOBLootContainer::RollContents()
 	}
 	
 	FRandomStream Stream(static_cast<int32>(HashCombine(GetTypeHash(GetFName()), static_cast<uint32>(SessionSeed))));
-	Row->Roll(Stream, Contents);
+	TArray<FOBItemStack> RolledStacks;
+	Row->Roll(Stream, RolledStacks);
+	Contents = ConvertStacksToInstances(RolledStacks);
 
 	OnRep_Contents();   // OnRep은 서버에서 안 불린다. 호스트 화면을 위해 직접 호출.
 }
@@ -91,15 +137,36 @@ void AOBLootContainer::SetContents(const TArray<FOBItemStack>& InItems)
 {
 	if (!HasAuthority()) return;
 	
+	Contents = ConvertStacksToInstances(InItems);
+	OnRep_Contents();
+}
+
+void AOBLootContainer::SetItemInstances(
+	const TArray<FInventoryData>& InItems)
+{
+	if (!HasAuthority()) return;
+
 	Contents = InItems;
+	Contents.RemoveAll(
+		[](const FInventoryData& Item)
+		{
+			return !Item.ItemTag.IsValid() || Item.ItemStack <= 0;
+		});
+	for (FInventoryData& Item : Contents)
+	{
+		if (!Item.InstanceId.IsValid())
+		{
+			Item.InstanceId = FGuid::NewGuid();
+		}
+	}
 	OnRep_Contents();
 }
 
 void AOBLootContainer::AddContent(const FGameplayTag& ItemTag, int32 Count)
 {
 	if (!HasAuthority()) return;
-	
-	OBItemStacks::Add(Contents, ItemTag, Count);
+
+	AppendStackAsInstances(FOBItemStack(ItemTag, Count), Contents);
 	OnRep_Contents();
 }
 
@@ -133,9 +200,37 @@ void AOBLootContainer::Interact_Implementation(AOBPlayerController* PC)
 AOBLootContainer* AOBLootContainer::SpawnWithContents(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
 	const FTransform& SpawnTransform, const TArray<FOBItemStack>& Items)
 {
+	return SpawnWithItemInstances(
+		World,
+		ContainerClass,
+		SpawnTransform,
+		ConvertStacksToInstances(Items));
+}
+
+AOBLootContainer* AOBLootContainer::SpawnWithItemInstances(
+	UWorld* World,
+	TSubclassOf<AOBLootContainer> ContainerClass,
+	const FTransform& SpawnTransform,
+	const TArray<FInventoryData>& Items)
+{
 	if (!World || !ContainerClass) return nullptr;
 	if (World->GetNetMode() == NM_Client) return nullptr;	// 스폰은 서버 권위
 	if (Items.IsEmpty()) return nullptr;					// 빈 시체/ 빈 자루를 남기지 않음
+
+	TArray<FInventoryData> ValidItems = Items;
+	ValidItems.RemoveAll(
+		[](const FInventoryData& Item)
+		{
+			return !Item.ItemTag.IsValid() || Item.ItemStack <= 0;
+		});
+	for (FInventoryData& Item : ValidItems)
+	{
+		if (!Item.InstanceId.IsValid())
+		{
+			Item.InstanceId = FGuid::NewGuid();
+		}
+	}
+	if (ValidItems.IsEmpty()) return nullptr;
 	
 	AOBLootContainer* LootContainer = World->SpawnActorDeferred<AOBLootContainer>(
 		ContainerClass, SpawnTransform, nullptr, nullptr,
@@ -144,7 +239,7 @@ AOBLootContainer* AOBLootContainer::SpawnWithContents(UWorld* World, TSubclassOf
 	
 	// BeginPlay가 드랍테이블로 덮어쓰지 않도록 먼저 끈 뒤 내용물을 넣는다.
 	LootContainer->bRollOnBeginPlay = false;
-	LootContainer->Contents = Items;
+	LootContainer->Contents = MoveTemp(ValidItems);
 	
 	LootContainer->FinishSpawning(SpawnTransform);
 	
@@ -169,35 +264,35 @@ int32 AOBLootContainer::TryTakeItem(UPlayerInventoryComponent* Inventory, const 
 {
 	if (!HasAuthority() || !Inventory || Count <= 0) return 0;
 
-	FOBItemStack* Found = Contents.FindByPredicate(
-		[&ItemTag](const FOBItemStack& S)
+	FInventoryData* Found = Contents.FindByPredicate(
+		[&ItemTag](const FInventoryData& Item)
 		{
-			return S.ItemTag == ItemTag;
+			return Item.ItemTag == ItemTag;
 		});
-	if (!Found || Found->Count <= 0) return 0;
+	if (!Found || Found->ItemStack <= 0) return 0;
 
 	// 클라가 수량을 부풀려 보내도 상자에 있는 만큼이 상한이다.
-	const int32 Requested = FMath::Min(Count, Found->Count);
+	const int32 Requested = FMath::Min(Count, Found->ItemStack);
 
-	// AddItemByTag는 "넣고 남은 수량"을 인자에 되돌려준다(가방이 꽉 차면 부분 적재).
-	int32 Remaining = Requested;
-	Inventory->AddItemByTag(ItemTag, Remaining);
-
-	const int32 Moved = Requested - Remaining;
+	FInventoryData RequestedInstance = *Found;
+	RequestedInstance.ItemStack = Requested;
+	const int32 Moved = Inventory->TryAddItemInstance(RequestedInstance);
 	if (Moved <= 0) return 0;
 
-	Found->Count -= Moved;
+	Found->ItemStack -= Moved;
 	Found = nullptr; // 아래 RemoveAll이 배열을 재배치한다. 다시 쓰지 않는다.
 
 	Contents.RemoveAll(
-		[](const FOBItemStack& S)
+		[](const FInventoryData& Item)
 		{
-			return S.Count <= 0;
+			return Item.ItemStack <= 0;
 		});
 
 	OnRep_Contents(); // OnRep은 서버에서 안 불린다. 호스트 화면을 위해 직접 호출.
 	
-	return Moved;
+	return Moved + (Moved == Requested && Count > Moved
+		? TryTakeItem(Inventory, ItemTag, Count - Moved)
+		: 0);
 }
 
 int32 AOBLootContainer::TryTakeAll(UPlayerInventoryComponent* Inventory)
@@ -205,12 +300,12 @@ int32 AOBLootContainer::TryTakeAll(UPlayerInventoryComponent* Inventory)
 	if (!HasAuthority() || !Inventory) return 0;
 
 	// 복사본을 돈다. TryTakeItem이 Contents를 건드린다.
-	const TArray<FOBItemStack> Snapshot = Contents;
+	const TArray<FInventoryData> Snapshot = Contents;
 
 	int32 Total = 0;
-	for (const FOBItemStack& Stack : Snapshot)
+	for (const FInventoryData& Item : Snapshot)
 	{
-		Total += TryTakeItem(Inventory, Stack.ItemTag, Stack.Count);
+		Total += TryTakeItem(Inventory, Item.ItemTag, Item.ItemStack);
 	}
 	
 	return Total;

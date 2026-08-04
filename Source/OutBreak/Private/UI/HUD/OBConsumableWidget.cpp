@@ -2,9 +2,9 @@
 
 #include "UI/HUD/OBConsumableWidget.h"
 
+#include "Inventory/Components/PlayerInventoryComponent.h"+
 #include "Ability/Tags/OBGameplayTags.h"
 #include "Components/TextBlock.h"
-#include "Inventory/Components/PlayerInventoryComponent.h"
 
 void UOBConsumableWidget::SetInventory(UPlayerInventoryComponent* InInventory)
 {

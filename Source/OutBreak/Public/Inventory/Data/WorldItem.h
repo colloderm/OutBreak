@@ -3,12 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "Interaction/OBInteractableActor.h"
 #include "Inventory/Data/InventoryData.h"
 #include "WorldItem.generated.h"
 
+class AOBPlayerController;
+
 UCLASS()
-class OUTBREAK_API AWorldItem : public AActor
+class OUTBREAK_API AWorldItem : public AOBInteractableActor
 {
 	GENERATED_BODY()
 
@@ -17,7 +19,6 @@ public:
 	AWorldItem();
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
-	FWorldItemData* GetWorldItemData() { return &ItemData; }
 	const FInventoryData& GetItemInstance() const { return ItemInstance; }
 	const TArray<FInventoryData>& GetContainedInventory() const { return ContainedInventory; }
 	bool HasItemInstance() const { return ItemInstance.ItemStack > 0 && ItemInstance.InstanceId.IsValid(); }
@@ -25,6 +26,9 @@ public:
 	void InitializeDroppedItem(
 		const FInventoryData& InItemInstance,
 		const TArray<FInventoryData>& InContainedInventory);
+
+	virtual void Interact_Implementation(AOBPlayerController* PC) override;
+	virtual FText GetInteractPromptText_Implementation() const override;
 
 
 
@@ -41,14 +45,11 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	
 private:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
-	FWorldItemData ItemData;
-
-	// Exact runtime instance preserved across drop/pickup (GUID, magazine, asset reference).
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Replicated, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
+	// Editor-placed and dropped items use the same runtime representation.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
 	FInventoryData ItemInstance;
 
 	// Used by dropped backpacks. Empty for ordinary world items.
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Replicated, Category = "Inventory", meta = (AllowPrivateAccess = "true"))
 	TArray<FInventoryData> ContainedInventory;
 };

@@ -44,10 +44,6 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category = "Capacity",
 		meta = (ClampMin = "0", UIMin = "0"))
-	int32 DefaultContainerSlotCount = 20;
-
-	UPROPERTY(Config, EditAnywhere, Category = "Capacity",
-		meta = (ClampMin = "0", UIMin = "0"))
 	int32 DefaultQuickSlotCount = 6;
 
 	UPROPERTY(Config, EditAnywhere, Category = "World Drop",

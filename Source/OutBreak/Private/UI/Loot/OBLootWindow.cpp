@@ -65,7 +65,11 @@ void UOBLootWindow::Rebuild()
 
 	Box_Entries->ClearChildren();
 
-	TArray<FOBItemStack> Items = Bound->GetContents();
+	TArray<FOBItemStack> Items;
+	for (const FInventoryData& Item : Bound->GetContents())
+	{
+		OBItemStacks::Add(Items, Item.ItemTag, Item.ItemStack);
+	}
 
 	// 정렬 기준은 창고·상점과 같다: 카테고리 → SortOrder → 태그.
 	Items.Sort(

@@ -112,6 +112,10 @@
 		{
 			"Name": "InteriorPCG",
 			"Enabled": true
+		},
+		{
+			"Name": "ChaosVehiclesPlugin",
+			"Enabled": true
 		}
 	]
 }

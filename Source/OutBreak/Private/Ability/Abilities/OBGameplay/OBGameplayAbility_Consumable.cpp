@@ -68,7 +68,7 @@ void UOBGameplayAbility_Consumable::OnReleased()
 		ApplyConsumableEffect();                 // 투척 / 회복 등
 		if (UPlayerInventoryComponent* Inv = GetInventory())
 		{
-			Inv->ConsumeItem(ItemTag, 1);
+			Inv->TryRemoveItem(ItemTag, 1);
 		}
 	}
 

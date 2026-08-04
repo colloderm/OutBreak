@@ -11,7 +11,6 @@
 
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Inventory/Widget/InventoryDragDropOperation.h"
-#include "Item/Data/OBItemDefinition.h"
 #include "Item/OBItemRegistry.h"
 
 void UInventorySlot::Update()
@@ -27,8 +26,14 @@ void UInventorySlot::Update()
 		return;
 	}
 
-	const FOBItemDefinitionRow* ItemRow = InventoryData.GetDefinition();
-	if (!ItemRow)
+	// 이름/아이콘의 단일 조회 경로를 사용한다. 무기 행의 Icon이 비어 있으면
+	// GetItemDisplay가 WeaponData의 WeaponIcon으로 fallback한다.
+	FText DisplayName;
+	UTexture2D* Icon = nullptr;
+	if (!UOBItemRegistry::GetItemDisplay(
+		InventoryData.ItemTag,
+		DisplayName,
+		Icon))
 	{
 		// 표에서 행이 사라졌거나 태그 오타. 조용히 비면 원인을 못 찾는다.
 		UE_LOG(
@@ -42,8 +47,7 @@ void UInventorySlot::Update()
 		return;
 	}
 
-	// 아이콘은 소프트 참조라 표가 로드돼도 자동으로 올라오지 않는다.
-	SetSlotMetaData(ItemRow->Icon.LoadSynchronous(), InventoryData.ItemStack);
+	SetSlotMetaData(Icon, InventoryData.ItemStack);
 }
 
 void UInventorySlot::SetSlotData(const FInventoryData& Data)
@@ -155,7 +159,10 @@ void UInventorySlot::SetSlotMetaData(UTexture2D* Image, int Stack)
 	}
 
 	ItemImage->SetBrushFromTexture(Image);
-	
+	ItemImage->SetVisibility(
+		Image
+			? ESlateVisibility::HitTestInvisible
+			: ESlateVisibility::Hidden);
 
 	if (Stack > 1)
 	{
@@ -172,6 +179,7 @@ void UInventorySlot::ClearSlot()
 	if (IsValid(ItemImage))
 	{
 		ItemImage->SetBrushFromTexture(nullptr);
+		ItemImage->SetVisibility(ESlateVisibility::Hidden);
 	}
 
 	if (IsValid(ItemStack))

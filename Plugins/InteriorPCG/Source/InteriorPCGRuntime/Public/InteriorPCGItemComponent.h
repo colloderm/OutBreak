@@ -34,6 +34,12 @@ public:
 	EInteriorPCGAssetKind AssetKind = EInteriorPCGAssetKind::StaticMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interior PCG")
+	EInteriorPCGItemRole Role = EInteriorPCGItemRole::FurnitureOrProp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interior PCG")
+	int32 FloorIndex = INDEX_NONE;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interior PCG")
 	bool bUserAdded = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Interior PCG")

@@ -27,7 +27,6 @@
 #include "TimerManager.h"
 #include "AI/EnemyController.h"
 #include "Item/Loot/OBLootContainer.h"
-#include "Item/OBItemRegistry.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
@@ -200,13 +199,33 @@ void AOBCharacterBase::DropCorpseLoot()
 		//   InventoryComponent->GetBagContents(Bag);
 		//   for (const FOBItemStack& S : Bag) OBItemStacks::Add(Items, S.ItemTag, S.Count);
 		//   InventoryComponent->ClearBag();
+
+		TArray<FInventoryData> Items;
+		if (PlayerInventoryComponent)
+		{
+			PlayerInventoryComponent->GetLootableItemInstances(Items);
+		}
+		if (Items.IsEmpty())
+		{
+			bCorpseDropped = true;
+			return;
+		}
+
+		const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
+		const FVector DropLoc = GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
+
+		AOBLootContainer* CorpseContainer =
+			AOBLootContainer::SpawnWithItemInstances(
+				W,
+				CorpseContainerClass,
+				FTransform(FRotator::ZeroRotator, DropLoc),
+				Items);
+		if (CorpseContainer && PlayerInventoryComponent)
+		{
+			PlayerInventoryComponent->ClearLootableItemInstances();
+			bCorpseDropped = true;
+		}
 	}
-
-	const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
-	const FVector DropLoc = GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
-
-	AOBLootContainer::SpawnWithContents(W, CorpseContainerClass,
-		FTransform(FRotator::ZeroRotator, DropLoc), Items);
 }
 
 void AOBCharacterBase::DisablePawnForDeath()
@@ -635,7 +654,7 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 		{
 			for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
 			{
-				PlayerInventoryComponent->AddItem(Item.Key, Item.Value);
+				PlayerInventoryComponent->TryAddItem(Item.Key, Item.Value);
 			}
 		}
 		PlayerInventoryComponent->EquipDefaultSlot();
