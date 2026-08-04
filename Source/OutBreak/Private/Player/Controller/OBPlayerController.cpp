@@ -25,6 +25,7 @@
 #include "TimerManager.h"
 #include "Game/GameMode/OBExpeditionGameMode.h"
 #include "Item/Loot/OBLootContainer.h"
+#include "UI/Widgets/Expedition/OBExpeditionResultWidget.h"
 
 
 AOBPlayerController::AOBPlayerController()
@@ -683,6 +684,12 @@ void AOBPlayerController::ShowResultScreen()
 		if (ActiveResultWidget)
 		{
 			ActiveResultWidget->AddToViewport(100); // 최상단
+
+			// 사망 시에는 LastExtractionHaul이 비어 있어서 "가져온 것 없음"이 뜬다.
+			if (UOBExpeditionResultWidget* Result = Cast<UOBExpeditionResultWidget>(ActiveResultWidget))
+			{
+				Result->SetHaul(LastExtractionHaul);
+			}
 		}
 	}
 	
@@ -691,6 +698,21 @@ void AOBPlayerController::ShowResultScreen()
 	{
 		GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AOBPlayerController::ReturnToHome, AutoReturnSeconds, false);
 	}
+}
+
+void AOBPlayerController::Client_ApplyExtractionResult_Implementation(const TArray<FOBItemStack>& Haul)
+{
+	LastExtractionHaul = Haul;
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->AddStashItems(Haul);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] 탈출 정산: %d종 창고 반영"), Haul.Num());
 }
 
 void AOBPlayerController::ReturnToHome()
@@ -711,6 +733,15 @@ void AOBPlayerController::ReturnToHome()
 void AOBPlayerController::TravelToHome()
 {
 	if (HomeLevel.IsNull()) return;
+
+	// 레벨을 열기 전에 UI를 스스로 정리한다. 월드 정리에 맡기면
+	// 참조가 남았을 때 엉뚱한 곳에서 World Leak으로 터진다.
+	if (ActiveResultWidget)
+	{
+		ActiveResultWidget->RemoveFromParent();
+		ActiveResultWidget = nullptr;
+	}
+	CloseInteractionWidget();   // 루팅 창 등이 열린 채 나가는 경우
 
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] 홈 복귀: %s"), *HomeLevel.ToString());
 

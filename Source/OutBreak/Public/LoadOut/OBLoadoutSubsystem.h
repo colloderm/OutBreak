@@ -63,6 +63,10 @@ public:
 	// 창고 입출고. 각각 즉시 저장한다(추출 정산/판매가 이걸 쓴다).
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	void AddStashItem(const FGameplayTag& ItemTag, int32 Count);
+	
+	// 정산용 일괄 추가. 파일 쓰기를 한 번만 한다.
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	void AddStashItems(const TArray<FOBItemStack>& Items);
 
 	// 수량이 부족하면 아무것도 빼지 않고 false. 부분 차감은 하지 않는다.
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
@@ -127,6 +131,9 @@ public:
 private:
 	void AppendBuyItems(FShopWindowViewData& View, TSet<EOBItemCategory>& OutCategories) const;
 	void AppendSellItems(FShopWindowViewData& View, TSet<EOBItemCategory>& OutCategories) const;
+	
+	// 저장 없이 메모리만 갱신. 실제로 늘었으면 true.
+	bool AddStashItemInternal(const FGameplayTag& ItemTag, int32 Count);
 	
 private:
 	// 런타임 권위값(로드/편집 대상).

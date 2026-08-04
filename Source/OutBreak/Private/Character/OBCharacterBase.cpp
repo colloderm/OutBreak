@@ -10,7 +10,6 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
-#include "Inventory/Components/OBInventoryComponent.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Character/Data/OBPawnData.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
@@ -26,6 +25,7 @@
 #include "Character/Components/OBCharacterMovementComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "TimerManager.h"
+#include "AI/EnemyController.h"
 #include "Item/Loot/OBLootContainer.h"
 #include "Item/OBItemRegistry.h"
 #include "Game/GameState/OBExpeditionGameState.h"
@@ -58,7 +58,6 @@ AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
 	
 	EquipmentComponent = CreateDefaultSubobject<UOBEquipmentComponent>(TEXT("EquipmentComponent"));
 	
-	InventoryComponent = CreateDefaultSubobject<UOBInventoryComponent>(TEXT("InventoryComponent"));
 	PlayerInventoryComponent = CreateDefaultSubobject<UPlayerInventoryComponent>(TEXT("PlayerInventoryComponent"));
 
 	bUseControllerRotationYaw = false;
@@ -183,13 +182,13 @@ void AOBCharacterBase::DropCorpseLoot()
 
 	TArray<FOBItemStack> Items;
 
-	if (InventoryComponent)
+	if (PlayerInventoryComponent)
 	{
 		// 장착 슬롯의 무기는 사망 시 전부 잃고 시체로 넘어간다.
 		for (EOBWeaponSlot Slot : { EOBWeaponSlot::Primary, EOBWeaponSlot::Secondary, EOBWeaponSlot::Melee })
 		{
 			const FGameplayTag Tag =
-				UOBItemRegistry::FindTagForWeaponClass(InventoryComponent->GetWeaponInSlot(Slot));
+				UOBItemRegistry::FindTagForWeaponClass(PlayerInventoryComponent->GetWeaponInSlot(Slot));
 			if (Tag.IsValid())
 			{
 				OBItemStacks::Add(Items, Tag, 1);
@@ -408,6 +407,11 @@ void AOBCharacterBase::HandleExtracted()
 	{
 		EquipmentComponent->UnequipWeapon();
 	}
+	
+	// 탈출한 플레이어는 AI에게 존재하지 않는다.
+	// 폰을 숨기고 충돌을 꺼도 Sight는 그대로 보므로 인지 소스에서 빼야 한다.
+	AEnemyController::ForgetActorForAll(GetWorld(), this);
+	
 	// (폰 숨김/충돌·이동 정지는 GameMode가 처리)
 }
 
@@ -635,16 +639,9 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 			}
 		}
 		PlayerInventoryComponent->EquipDefaultSlot();
-	}
-
-	// Transitional compatibility for consumable abilities/widgets that have not
-	// moved yet. Weapons are intentionally no longer added or equipped here.
-	if (InventoryComponent && PawnData)
-	{
-		for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
-		{
-			InventoryComponent->AddItem(Item.Key, Item.Value);
-		}
+		
+		// 초기 지급이 끝난 이 시점이 기준선이다. 이후 늘어난 것만 "주운 것"으로 친다.
+		SpawnBagSnapshot = GetBagContentsAsStacks();
 	}
 }
 
@@ -725,5 +722,46 @@ void AOBCharacterBase::InitAbilitySystemComponent()
 	
 	// UI 등 구독자에게 ASC 준비 완료를 알린다.
 	OnAbilitySystemInitialized.Broadcast();
+}
+
+TArray<FOBItemStack> AOBCharacterBase::GetBagContentsAsStacks() const
+{
+	TArray<FOBItemStack> Stacks;
+	if (!PlayerInventoryComponent) return Stacks;
+
+	for (const FInventoryData& Slot : PlayerInventoryComponent->GetBackpackItems())
+	{
+		if (Slot.ItemTag.IsValid() && Slot.ItemStack > 0)
+		{
+			OBItemStacks::Add(Stacks, Slot.ItemTag, Slot.ItemStack);
+		}
+	}
+	return Stacks;
+}
+
+TArray<FOBItemStack> AOBCharacterBase::GetBagGainsSinceSpawn() const
+{
+	TArray<FOBItemStack> Gains = GetBagContentsAsStacks();
+
+	for (const FOBItemStack& Base : SpawnBagSnapshot)
+	{
+		const int32 Index = Gains.IndexOfByPredicate(
+			[&Base](const FOBItemStack& S)
+			{
+				return S.ItemTag == Base.ItemTag;
+			});
+		if (Index == INDEX_NONE) continue;
+
+		Gains[Index].Count -= Base.Count;
+	}
+
+	// 쓰고 남은 양이 초기 지급보다 적으면 음수가 된다. 그건 획득이 아니다.
+	// (탄약 300발 중 100발 쏘고 30발 주웠다 → 순증 0)
+	Gains.RemoveAll(
+		[](const FOBItemStack& S)
+		{
+			return S.Count <= 0;
+		});
 	
+	return Gains;
 }

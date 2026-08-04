@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Game/Expedition/OBExpeditionTypes.h"
+#include "Item/Data/OBItemTypes.h"
 #include "OBPlayerController.generated.h"
 
 class AOBLootContainer;
@@ -55,14 +56,18 @@ private:
 
 	FTimerHandle InteractRefreshTimer;
 
+	// 현재 열려있는 상호작용 위젯(중복 오픈 방지 + 닫기용).
+	UPROPERTY()
+	TObjectPtr<UUserWidget> ActiveInteractionWidget;
+	
+	// 이번 판 수확물. 결과창 표시용(클라 전용).
+	TArray<FOBItemStack> LastExtractionHaul;
+
+private:
 	void RefreshInteractTarget();
 	
 	// 눈높이에서 대상까지 막혀 있는가. 벽 너머 상자에 프롬프트가 뜨지 않게 한다.
 	bool IsInteractableOccluded(const FVector& ViewLocation, const AOBInteractableActor* Candidate) const;
-
-	// 현재 열려있는 상호작용 위젯(중복 오픈 방지 + 닫기용).
-	UPROPERTY()
-	TObjectPtr<UUserWidget> ActiveInteractionWidget;
 	
 protected:
 	//~ APlayerController interface
@@ -106,12 +111,6 @@ protected:
 	
 	void ShowSpectatorHUD();
 	void HideSpectatorHUD();
-	
-	//~ Expedition 세션 종료(결과 → Home 복귀) --------------------
-	void BindToGameStatePhase();   // GameState 준비 대기 후 페이즈 구독
-	UFUNCTION()
-	void HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase);
-	void ShowResultScreen();
 	
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -295,4 +294,15 @@ public:
 	// 자동 복귀까지 남은 초(올림). 결과창 버튼 텍스트 "복귀하기 (N)"용.
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	int32 GetReturnCountdown() const;
+	
+	//~ Expedition 세션 종료(결과 → Home 복귀) --------------------
+	void BindToGameStatePhase();   // GameState 준비 대기 후 페이즈 구독
+	UFUNCTION()
+	void HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase);
+	void ShowResultScreen();
+	
+	// 서버가 탈출 시점에 찍은 가방을 소유 클라로 보낸다.
+	// 창고는 GameInstance 서브시스템이라 서버가 직접 못 건드린다. 이 경로가 유일하다.
+	UFUNCTION(Client, Reliable)
+	void Client_ApplyExtractionResult(const TArray<FOBItemStack>& Haul);
 };

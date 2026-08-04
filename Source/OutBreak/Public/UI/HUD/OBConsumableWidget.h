@@ -6,8 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "OBConsumableWidget.generated.h"
 
+class UPlayerInventoryComponent;
 class UTextBlock;
-class UOBInventoryComponent;
 
 UCLASS()
 class OUTBREAK_API UOBConsumableWidget : public UUserWidget
@@ -15,7 +15,7 @@ class OUTBREAK_API UOBConsumableWidget : public UUserWidget
 	GENERATED_BODY()
 	
 public:
-	void SetInventory(UOBInventoryComponent* InInventory);
+	void SetInventory(UPlayerInventoryComponent* InInventory);
 	
 protected:
 	virtual void NativeDestruct() override;
@@ -27,6 +27,6 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> GrenadeCountText;
 	
-	TWeakObjectPtr<UOBInventoryComponent> Inventory;
+	TWeakObjectPtr<UPlayerInventoryComponent> Inventory;
 	FDelegateHandle ChangedHandle;
 };

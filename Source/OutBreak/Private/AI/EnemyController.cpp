@@ -2,11 +2,13 @@
 
 #include "AI/EnemyController.h"
 
+#include "EngineUtils.h"
 #include "AI/Components/EnemyMemoryComponent.h"
 #include "AI/EnemyCharacter.h"
 #include "Ability/Tags/OBGameplayTags.h"
 #include "Character/OBCharacterBase.h"
 #include "Components/StateTreeAIComponent.h"
+#include "Perception/AIPerceptionSystem.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISenseConfig_Damage.h"
@@ -303,5 +305,25 @@ void AEnemyController::StopStateTreeLogic(const FString& Reason)
 		StateTreeComponent->IsRunning())
 	{
 		StateTreeComponent->StopLogic(Reason);
+	}
+}
+
+void AEnemyController::ForgetActorForAll(UWorld* World, AActor* Actor)
+{
+	if (!World || !Actor) return;
+
+	// 1) 인지 소스에서 제거. 이게 없으면 다음 시야 갱신에 곧바로 다시 인지한다.
+	if (UAIPerceptionSystem* Perception = UAIPerceptionSystem::GetCurrent(World))
+	{
+		Perception->UnregisterSource(*Actor);
+	}
+
+	// 2) 이미 기억하고 있는 적들은 만료를 기다리지 않고 지금 지운다.
+	for (TActorIterator<AEnemyController> It(World); It; ++It)
+	{
+		if (UEnemyMemoryComponent* Memory = It->GetEnemyMemoryComponent())
+		{
+			Memory->ForgetTarget(Actor);
+		}
 	}
 }
