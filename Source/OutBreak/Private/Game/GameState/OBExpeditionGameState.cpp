@@ -18,6 +18,7 @@ void AOBExpeditionGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(AOBExpeditionGameState, TimeRemaining);
 	DOREPLIFETIME(AOBExpeditionGameState, SessionLength);
 	DOREPLIFETIME(AOBExpeditionGameState, bFinalMinute);
+	DOREPLIFETIME(AOBExpeditionGameState, LootSeed);
 }
 
 //~ 서버 세터 ---------------------------------------------------------------
@@ -56,6 +57,13 @@ void AOBExpeditionGameState::SetFinalMinute(bool bInFinalMinute)
 	bFinalMinute = bInFinalMinute;
 	// 현재는 별도 델리게이트 없이 bFinalMinute 값을 위젯이 폴링/바인딩으로 읽음.
 	// Step 9(호드 어그로)에서 서버측 트리거 로직을 GameMode에 추가 예정.
+}
+
+void AOBExpeditionGameState::SetLootSeed(int32 InSeed)
+{
+	if (!HasAuthority()) return;
+	
+	LootSeed = InSeed;
 }
 
 TArray<AOBPlayerStateBase*> AOBExpeditionGameState::GetExpeditionPlayers() const

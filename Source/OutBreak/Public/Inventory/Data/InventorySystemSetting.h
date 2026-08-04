@@ -20,8 +20,8 @@ class OUTBREAK_API UInventorySystemSetting : public UDeveloperSettings
 	GENERATED_BODY()
 	
 public:
-	UPROPERTY(Config, EditAnywhere, Category = "Item Data")
-	TSoftObjectPtr<UDataTable> ItemDataTable;
+	// 아이템 표는 Project Settings > Game > OutBreak Items 가 소유한다(UOBItemRegistry).
+	// 여기에 또 두면 두 곳을 맞춰야 해서 제거했다.
 
 	UPROPERTY(Config, EditAnywhere, Category = "Widget")
 	TSoftClassPtr<UInventoryWindow> InventoryWindowWidgetClass;

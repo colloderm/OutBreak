@@ -69,6 +69,8 @@ public:
 	
 protected:
 	virtual void StartPlay() override;
+	
+	virtual void PreInitializeComponents() override;
 
 	// 진입 플레이어 공통 초기화(신규 접속 + 심리스 트래블 양쪽에서 호출됨).
 	// - TeamId 부여 + ExpeditionStatus=Alive 리셋.

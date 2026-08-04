@@ -40,6 +40,9 @@ public:
 	// "마지막 1분" 진입 플래그 :: HUD 경고 연출.
 	void SetFinalMinute(bool bInFinalMinute);
 	
+	// 루팅 시드(세션마다 1회 결정). 컨테이너가 이걸로 난수 스트림을 만든다.
+	void SetLootSeed(int32 InSeed);
+	
 	//~ 읽기 접근자 (클라/서버 공용) ------------------------------------------
 	
 	UFUNCTION(BlueprintPure, Category = "Expedition")
@@ -66,6 +69,9 @@ public:
 	// HUD용 "mm:ss" 문자열.
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	FText GetTimeRemainingText() const;
+	
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	int32 GetLootSeed() const { return LootSeed; }
 	
 public:
 	//~ HUD 구독용 델리게이트 인스턴스 ----------------------------------------
@@ -102,4 +108,8 @@ protected:
 	// [복제] 막바지 1분 여부. 현재는 HUD 연출용. (Step 9에서 호드 어그로 트리거로 확장)
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
 	bool bFinalMinute = false;
+	
+	// [복제] 세션 루팅 시드. 시작 시 1회 세팅되므로 OnRep 불필요.
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	int32 LootSeed = 0;
 };

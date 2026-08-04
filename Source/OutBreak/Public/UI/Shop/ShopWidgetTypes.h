@@ -15,6 +15,16 @@ enum class EShopActionType : uint8
 	Exchange
 };
 
+// 상점 상단 탭. 열거 순서가 곧 화면 순서이자 WidgetSwitcher 인덱스다.
+UENUM(BlueprintType)
+enum class EShopTab : uint8
+{
+	Buy       UMETA(DisplayName = "구매"),
+	Sell      UMETA(DisplayName = "판매"),
+	Trade     UMETA(DisplayName = "교환"),
+	Requests  UMETA(DisplayName = "의뢰")
+};
+
 USTRUCT(BlueprintType)
 struct OUTBREAK_API FShopkeeperViewData
 {
@@ -221,3 +231,4 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FShopWindowCategorySelectionChanged
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FShopWindowItemSelectionChangedSignature, FName, ShopId, FName, ItemId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_FourParams(FShopWindowActionRequestedSignature, FName, ShopId, FName, ItemId, FName, ActionId, int32, Quantity);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FShopWindowCloseRequestedSignature, FName, ShopId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FShopWindowTabChangedSignature, FName, ShopId, EShopTab, Tab);

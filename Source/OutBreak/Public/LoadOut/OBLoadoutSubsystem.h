@@ -101,15 +101,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Currency")
 	void AddCurrency(int32 Amount);
 
-	// --- 상점(무기 전용. 아이템 판매 탭은 L8에서) ---
-	UFUNCTION(BlueprintCallable, Category = "Shop")
-	FShopWindowViewData BuildShopView(UOBWeaponCatalog* Catalog) const;
+	// --- 상점 ---
 
+	// 탭별 뷰 구성. 구매/판매 모두 ItemDefinition 기반이라 무기 카탈로그를 쓰지 않는다.
 	UFUNCTION(BlueprintCallable, Category = "Shop")
-	bool TryPurchase(UOBWeaponCatalog* Catalog, FName ItemId);
+	FShopWindowViewData BuildShopView(EShopTab Tab) const;
 
-	UFUNCTION(BlueprintPure, Category = "Shop")
-	static int32 GetWeaponPrice(TSubclassOf<AOBWeaponBase> WeaponClass);
+	// 아이템 구매. 비매품(BuyPrice<=0)이거나 잔액이 모자라면 false.
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	bool TryPurchaseItem(const FGameplayTag& ItemTag, int32 Count);
+
+	// 창고의 아이템을 판다. 비매품(SellPrice<=0)이거나 수량이 모자라면 false.
+	// 장착 중인 무기는 창고에 없으므로 자동으로 걸러진다(창고/슬롯 불변식).
+	UFUNCTION(BlueprintCallable, Category = "Shop")
+	bool TrySell(const FGameplayTag& ItemTag, int32 Count);
 
 	// 아이템 태그 → 무기 클래스(동기 로드). 무기 아이템이 아니면 null.
 	UFUNCTION(BlueprintPure, Category = "Loadout")
@@ -119,6 +124,10 @@ public:
 	void SaveToDisk();
 	void LoadFromDisk();
 
+private:
+	void AppendBuyItems(FShopWindowViewData& View, TSet<EOBItemCategory>& OutCategories) const;
+	void AppendSellItems(FShopWindowViewData& View, TSet<EOBItemCategory>& OutCategories) const;
+	
 private:
 	// 런타임 권위값(로드/편집 대상).
 	FOBLoadout CurrentLoadout;

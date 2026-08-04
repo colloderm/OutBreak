@@ -3,6 +3,8 @@
 #include "UI/Shop/ShopWindow.h"
 
 #include "InputCoreTypes.h"
+#include "Components/Button.h"
+#include "Components/WidgetSwitcher.h"
 #include "UI/Shop/ShopCategory.h"
 #include "UI/Shop/ShopItemInspector.h"
 #include "UI/Shop/ShopItemList.h"
@@ -15,6 +17,32 @@ void UShopWindow::NativeConstruct()
 
 	SetIsFocusable(true);
 	BindChildDelegates();
+
+	// AddDynamic은 매크로라 호출 지점에 함수 이름이 리터럴로 있어야 한다.
+	// 함수 포인터 변수를 넘기면 이름을 못 뽑아 런타임 어서션으로 죽는다(람다로 묶지 말 것).
+	if (BTN_Buy)
+	{
+		BTN_Buy->OnClicked.RemoveAll(this);
+		BTN_Buy->OnClicked.AddDynamic(this, &UShopWindow::HandleBuyTabClicked);
+	}
+	if (BTN_Sell)
+	{
+		BTN_Sell->OnClicked.RemoveAll(this);
+		BTN_Sell->OnClicked.AddDynamic(this, &UShopWindow::HandleSellTabClicked);
+	}
+	if (BTN_Trade)
+	{
+		BTN_Trade->OnClicked.RemoveAll(this);
+		BTN_Trade->OnClicked.AddDynamic(this, &UShopWindow::HandleTradeTabClicked);
+	}
+	if (BTN_Requests)
+	{
+		BTN_Requests->OnClicked.RemoveAll(this);
+		BTN_Requests->OnClicked.AddDynamic(this, &UShopWindow::HandleRequestsTabClicked);
+	}
+
+	ApplySwitcherSlot();
+	RefreshTabVisuals();
 }
 
 void UShopWindow::NativeDestruct()
@@ -25,6 +53,10 @@ void UShopWindow::NativeDestruct()
 
 FReply UShopWindow::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
+	// 목업의 Q/E 힌트. 액션 키(F/G)보다 먼저 본다.
+	if (InKeyEvent.GetKey() == EKeys::Q) { CycleTab(-1); return FReply::Handled(); }
+	if (InKeyEvent.GetKey() == EKeys::E) { CycleTab(+1); return FReply::Handled(); }
+	
 	if (const FShopItemViewData* SelectedItem = FindDisplayedItem(CurrentSelectedItemId))
 	{
 		for (const FShopActionViewData& Action : SelectedItem->Actions)
@@ -38,6 +70,115 @@ FReply UShopWindow::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent
 	}
 
 	return Super::NativeOnKeyDown(InGeometry, InKeyEvent);
+}
+
+bool UShopWindow::IsTabAvailable(EShopTab Tab)
+{
+	// 교환/의뢰는 아직 내용이 없다. 생기면 여기만 열어주면 된다.
+	return Tab == EShopTab::Buy || Tab == EShopTab::Sell;
+}
+
+int32 UShopWindow::GetSwitcherIndexForTab(EShopTab Tab)
+{
+	switch (Tab)
+	{
+	case EShopTab::Buy:
+	case EShopTab::Sell:     
+		return 0;   // 같은 화면, 데이터만 다름
+	case EShopTab::Trade:    
+		return 1;
+	case EShopTab::Requests: 
+		return 2;
+	}
+	return 0;
+}
+
+void UShopWindow::ApplySwitcherSlot()
+{
+	if (!WS_ShopBody) return;
+
+	// 슬롯을 덜 만든 WBP에서도 죽지 않게 범위를 묶는다.
+	const int32 Last = FMath::Max(0, WS_ShopBody->GetNumWidgets() - 1);
+	WS_ShopBody->SetActiveWidgetIndex(FMath::Clamp(GetSwitcherIndexForTab(ActiveTab), 0, Last));
+}
+
+void UShopWindow::SetActiveTab(EShopTab NewTab)
+{
+	if (!IsTabAvailable(NewTab) || NewTab == ActiveTab) return;
+
+	ActiveTab = NewTab;
+	
+	ApplySwitcherSlot();
+	RefreshTabVisuals();
+
+	// 목록은 NPC가 다시 만들어 넣는다(창고/잔액이 실시간이므로).
+	OnTabChanged.Broadcast(CurrentViewData.ShopId, ActiveTab);
+}
+
+void UShopWindow::CycleTab(int32 Delta)
+{
+	const int32 Count = static_cast<int32>(EShopTab::Requests) + 1;
+	int32 Index = static_cast<int32>(ActiveTab);
+
+	// 사용 불가 탭은 건너뛴다. 한 바퀴 돌아도 못 찾으면 아무것도 안 한다.
+	for (int32 Step = 0; Step < Count; ++Step)
+	{
+		Index = (Index + Delta + Count) % Count;
+		const EShopTab Candidate = static_cast<EShopTab>(Index);
+		if (IsTabAvailable(Candidate))
+		{
+			SetActiveTab(Candidate);
+			return;
+		}
+	}
+}
+
+void UShopWindow::RefreshTabVisuals()
+{
+	// 현재 탭은 재클릭을 막고, 사용 불가 탭은 아예 잠근다.
+	auto ApplyButton = [this](UButton* Btn, EShopTab Tab)
+	{
+		if (Btn) Btn->SetIsEnabled(IsTabAvailable(Tab) && Tab != ActiveTab);
+	};
+	ApplyButton(BTN_Buy,      EShopTab::Buy);
+	ApplyButton(BTN_Sell,     EShopTab::Sell);
+	ApplyButton(BTN_Trade,    EShopTab::Trade);
+	ApplyButton(BTN_Requests, EShopTab::Requests);
+
+	// 강조 배경은 선택된 탭에만. HitTestInvisible이라 버튼 클릭을 가로채지 않는다.
+	auto ApplyHighlight = [this](UWidget* Highlight, EShopTab Tab)
+	{
+		if (Highlight)
+		{
+			Highlight->SetVisibility(Tab == ActiveTab ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
+		}
+	};
+	ApplyHighlight(BG_TabBuySelected,      EShopTab::Buy);
+	ApplyHighlight(BG_TabSellSelected,     EShopTab::Sell);
+	ApplyHighlight(BG_TabTradeSelected,    EShopTab::Trade);
+	ApplyHighlight(BG_TabRequestsSelected, EShopTab::Requests);
+
+	OnTabVisualChanged(ActiveTab);   // WBP에서 추가 연출
+}
+
+void UShopWindow::HandleBuyTabClicked()
+{
+	SetActiveTab(EShopTab::Buy);
+}
+
+void UShopWindow::HandleSellTabClicked()
+{
+	SetActiveTab(EShopTab::Sell);
+}
+
+void UShopWindow::HandleTradeTabClicked()
+{
+	SetActiveTab(EShopTab::Trade);
+}
+
+void UShopWindow::HandleRequestsTabClicked()
+{
+	SetActiveTab(EShopTab::Requests);
 }
 
 void UShopWindow::InitializeShop(const FShopWindowViewData& InData)

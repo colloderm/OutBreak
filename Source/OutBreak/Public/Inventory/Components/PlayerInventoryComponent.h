@@ -15,9 +15,9 @@
 class AWorldItem;
 class AOBWeaponBase;
 class UOBEquipmentComponent;
-class UOBItemDefinition;
 class UOBWeaponData;
 class UInventoryWindow;
+struct FOBItemDefinitionRow;
 
 DECLARE_MULTICAST_DELEGATE(FOnPlayerInventoryChanged);
 DECLARE_MULTICAST_DELEGATE(FOnPlayerAmmoPoolChanged);
@@ -35,7 +35,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	
-	FInventoryQueryResult QueryHasItem(const FName QueryItemName) const;
+	FInventoryQueryResult QueryHasItem(const FGameplayTag& QueryItemTag) const;
 	bool QueryItemEnough(
 		const FInventoryQueryResult& Result,
 		int32 QueryItemStack) const;
@@ -43,9 +43,10 @@ public:
 	
 	void PickUpWorldItem(AWorldItem* WorldItem);
 
-	// Asset-based inventory API. UOBItemDefinition is the source of static item data.
+	// 아이템 정적 스펙의 원본은 DT_Items(FOBItemDefinitionRow)다.
+	// BP에서도 태그 드롭다운으로 고를 수 있어 에셋 참조보다 다루기 쉽다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	bool AddItemDefinition(UOBItemDefinition* ItemDefinition, UPARAM(ref) int32& ItemStack);
+	bool AddItemByTag(const FGameplayTag& ItemTag, UPARAM(ref) int32& ItemStack);
 
 	int32 GetItemCount(const FGameplayTag& ItemTag) const;
 	void AddItem(const FGameplayTag& ItemTag, int32 Amount);
@@ -59,7 +60,7 @@ public:
 
 	// Weapon inventory owns selection and magazine state. Equipment only spawns/attaches.
 	bool AddWeapon(TSubclassOf<AOBWeaponBase> WeaponClass);
-	bool EquipStartingBackpack(UOBItemDefinition* BackpackDefinition);
+	bool EquipStartingBackpack(const FGameplayTag& BackpackItemTag);
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
 	void EquipSlot(EOBWeaponSlot Slot);
@@ -197,13 +198,6 @@ protected:
 	void UpdateInventoryWidget();
 	
 	
-	/*
-	 * @brief 현재 인벤토리에 지정된 아이템명과 아이템 개수만큼 추가를 시도합니다.
-	 * @param ItemName : Code identification based on item data table
-	 * @param ItemStack : Want Stack Number;
-	 * @return bool : 현재 아이템 스택이 인벤토리에 전부 추가 됬으면 true 아니면 false를 반환 합니다. 
-	 */
-	bool AddItem(const FName ItemName, int32& ItemStack);
 	void RemoveItem(int RemoveIndex);
 
 	UFUNCTION()
@@ -228,12 +222,12 @@ public:
 	
 	
 private:
-	bool AddItemDefinitionInternal(
-		const UOBItemDefinition* ItemDefinition,
+	bool AddItemRowInternal(
+		const FOBItemDefinitionRow* ItemRow,
 		int32& ItemStack,
 		FGuid* OutFirstAddedInstanceId = nullptr);
 	bool ResolveWeaponDefinition(
-		const UOBItemDefinition* ItemDefinition,
+		const FOBItemDefinitionRow* ItemRow,
 		TSubclassOf<AOBWeaponBase>& OutWeaponClass,
 		const UOBWeaponData*& OutWeaponData) const;
 	bool ResolveEquipmentSlot(
@@ -295,7 +289,7 @@ private:
 	void SetSwitching(bool bEnable);
 	void EndSwitching();
 	void NotifyInventoryChanged();
-	static EItemType ResolveItemType(const UOBItemDefinition* ItemDefinition);
+	static EItemType ResolveItemType(const FOBItemDefinitionRow* ItemRow);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryWindow> InventoryWidget;

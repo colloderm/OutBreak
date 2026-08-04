@@ -26,6 +26,9 @@
 #include "Character/Components/OBCharacterMovementComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "TimerManager.h"
+#include "Item/Loot/OBLootContainer.h"
+#include "Item/OBItemRegistry.h"
+#include "Game/GameState/OBExpeditionGameState.h"
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
 {
@@ -129,6 +132,8 @@ void AOBCharacterBase::HandleDeath()
 	
 	// --- 즉시 사망 ---
 	bIsDead = true;
+	DropCorpseLoot();   // 장비를 잃는 것 = 다른 사람이 주울 수 있게 남기는 것
+	
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->CancelAbilities();
@@ -163,6 +168,46 @@ void AOBCharacterBase::OnRep_IsDead()
 	{
 		StartDeath();
 	}
+}
+
+void AOBCharacterBase::DropCorpseLoot()
+{
+	// 다운→사망 경로에서도 불릴 수 있어 중복을 막는다.
+	if (!HasAuthority() || bCorpseDropped || !CorpseContainerClass) return;
+
+	// 홈/로비에서의 사망(테스트 등)은 시체를 남기지 않는다.
+	UWorld* W = GetWorld();
+	if (!W || !W->GetGameState<AOBExpeditionGameState>()) return;
+
+	bCorpseDropped = true;
+
+	TArray<FOBItemStack> Items;
+
+	if (InventoryComponent)
+	{
+		// 장착 슬롯의 무기는 사망 시 전부 잃고 시체로 넘어간다.
+		for (EOBWeaponSlot Slot : { EOBWeaponSlot::Primary, EOBWeaponSlot::Secondary, EOBWeaponSlot::Melee })
+		{
+			const FGameplayTag Tag =
+				UOBItemRegistry::FindTagForWeaponClass(InventoryComponent->GetWeaponInSlot(Slot));
+			if (Tag.IsValid())
+			{
+				OBItemStacks::Add(Items, Tag, 1);
+			}
+		}
+
+		// TODO(개발자B의 가방이 들어오면 주석 해제): 가방 내용물도 함께 넘긴다.
+		//   TArray<FOBItemStack> Bag;
+		//   InventoryComponent->GetBagContents(Bag);
+		//   for (const FOBItemStack& S : Bag) OBItemStacks::Add(Items, S.ItemTag, S.Count);
+		//   InventoryComponent->ClearBag();
+	}
+
+	const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
+	const FVector DropLoc = GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
+
+	AOBLootContainer::SpawnWithContents(W, CorpseContainerClass,
+		FTransform(FRotator::ZeroRotator, DropLoc), Items);
 }
 
 void AOBCharacterBase::DisablePawnForDeath()
@@ -291,6 +336,25 @@ void AOBCharacterBase::SetSprintCameraLag(bool bSprinting)
 	SetActorTickEnabled(true);
 }
 
+void AOBCharacterBase::SetSprintInput(bool bNewSprinting)
+{
+	if (bSprintInputHeld == bNewSprinting) return;
+
+	bSprintInputHeld = bNewSprinting;
+	SetSprintCameraLag(bNewSprinting);
+
+	// 발사 차단은 서버에서도 같은 결론이 나와야 예측이 롤백되지 않는다.
+	if (!HasAuthority() && IsLocallyControlled())
+	{
+		Server_SetSprintInput(bNewSprinting);
+	}
+}
+
+void AOBCharacterBase::Server_SetSprintInput_Implementation(bool bNewSprinting)
+{
+	bSprintInputHeld = bNewSprinting;
+}
+
 void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
 {
 	// 로컬 전용
@@ -390,6 +454,9 @@ void AOBCharacterBase::FinishDeathFromDowned()
 	if (!HasAuthority()) return;
 	bIsDowned = false;
 	bIsDead = true;
+	
+	DropCorpseLoot();
+	
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(OBGameplayTags::State_Downed);
@@ -548,10 +615,10 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 
 	if (PlayerInventoryComponent)
 	{
-		if (PawnData && PawnData->DefaultBackpack)
+		if (PawnData && PawnData->DefaultBackpackTag.IsValid())
 		{
 			PlayerInventoryComponent->EquipStartingBackpack(
-				PawnData->DefaultBackpack);
+				PawnData->DefaultBackpackTag);
 		}
 		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Loadout)
 		{

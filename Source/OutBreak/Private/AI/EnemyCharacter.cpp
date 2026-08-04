@@ -25,6 +25,7 @@
 #include "AI/System/ModularSkeletalMeshActor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/AudioComponent.h"
+#include "Item/Loot/OBLootContainer.h"
 
 
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
@@ -373,6 +374,16 @@ void AEnemyCharacter::Dead()
 
 	StopCharacterMovement();
 	GetMesh()->SetSimulatePhysics(true);
+	
+	// 처치 보상. Destroy 분기보다 먼저 굴려야 시체가 사라지기 전에 드랍이 남는다.
+	if (HasAuthority() && !DeathLootRow.IsNull() && LootContainerClass)
+	{
+		const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
+		const FVector DropLoc = GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
+
+		AOBLootContainer::SpawnFromTable(GetWorld(), LootContainerClass,
+			FTransform(FRotator::ZeroRotator, DropLoc), DeathLootRow);
+	}
 
 	if (DeathCleanupDelay <= 0.0f)
 	{

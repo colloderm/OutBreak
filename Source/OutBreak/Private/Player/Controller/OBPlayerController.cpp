@@ -44,20 +44,21 @@ void AOBPlayerController::BeginPlay()
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, InputMappingPriority);
 		}
-		
-		if (IsLocalController() && ExtractionProgressWidgetClass)
+	}
+
+	// 탈출 진행 게이지. 상시 존재하고 Visibility 바인딩이 알아서 숨긴다.
+	if (ExtractionProgressWidgetClass)
+	{
+		if (UUserWidget* W = CreateWidget<UUserWidget>(this, ExtractionProgressWidgetClass))
 		{
-			UUserWidget* W = CreateWidget<UUserWidget>(this, ExtractionProgressWidgetClass);
-			// 상시 존재, Visibility 바인딩이 알아서 숨김
-			if (W)
-			{
-				W->AddToViewport(10);
-			}
-			
-			BindToGameStatePhase(); // 세션 종료(결과창)
+			W->AddToViewport(10);
 		}
 	}
-	
+
+	// 세션 종료(결과창) 구독. 다른 위젯 설정과 무관하게 항상 걸어야 한다.
+	// 예전에는 ExtractionProgressWidgetClass 검사 안쪽에 있어서, 그게 비면 결과창이 영구히 안 떴다.
+	BindToGameStatePhase();
+
 	// GameInstance에 저장된 Loadout을 서버로 push(비seamless travel이라 PS가 새로 생성되므로 필요).
 	if (UGameInstance* GI = GetGameInstance())
 	{
@@ -69,13 +70,13 @@ void AOBPlayerController::BeginPlay()
 				Server_ApplyLoadout(Classes);
 			}
 		}
-		
+
 		if (UOBPartySubsystem* Party = GI->GetSubsystem<UOBPartySubsystem>())
 		{
 			Server_SetPartyLeader(Party->IsLocalLeader());
 		}
 	}
-	
+
 	BindToExpeditionStatus();
 }
 
@@ -624,6 +625,15 @@ void AOBPlayerController::BindToGameStatePhase()
 	AOBExpeditionGameState* GS = GetWorld() ? GetWorld()->GetGameState<AOBExpeditionGameState>() : nullptr;
 	if (!GS)
 	{
+		if (++PhaseBindAttempts > MaxPhaseBindAttempts)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Expedition] OBExpeditionGameState를 %.0f초간 못 찾아 결과창 구독을 포기한다. "
+					 "(홈/로비 맵이면 정상. 원정 맵이면 GameMode의 GameState Class 확인)"),
+				MaxPhaseBindAttempts * 0.25f);
+			return;
+		}
+
 		// GameState 아직 복제 전 -> 잠시 후 재시도
 		GetWorldTimerManager().SetTimer(PhaseBindRetryTimer, this, &AOBPlayerController::BindToGameStatePhase, 0.25f, false);
 		return;
@@ -693,6 +703,17 @@ void AOBPlayerController::ReturnToHome()
 		return;
 	}
 	
+	// 위젯 버튼 콜백 안에서 바로 레벨을 열면 월드/위젯 정리가 콜백 스택 위에서 일어나
+	// 호출자(WBP_ExpeditionResult)가 파괴된 채로 반환된다. 다음 틱으로 미뤄 안전하게 나간다.
+	GetWorldTimerManager().SetTimerForNextTick(this, &AOBPlayerController::TravelToHome);
+}
+
+void AOBPlayerController::TravelToHome()
+{
+	if (HomeLevel.IsNull()) return;
+
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] 홈 복귀: %s"), *HomeLevel.ToString());
+
 	// 데디 접속 종료 후 각 클라가 로컬 Home 로드(개별 복귀).
 	UGameplayStatics::OpenLevelBySoftObjectPtr(this, HomeLevel);
 }

@@ -4,10 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Equipment/Data/OBEquipmentTypes.h"
+#include "GameplayTagContainer.h"
+#include "Item/OBItemRegistry.h"
 #include "UObject/Object.h"
 #include "InventoryData.generated.h"
-
-class UOBItemDefinition;
 
 /**
  * 
@@ -19,7 +19,7 @@ struct OUTBREAK_API FInventoryQueryResult
 {
 	GENERATED_BODY()
 	
-	FName QueryItemName;
+	FGameplayTag QueryItemTag;
 	
 	bool HasItem = false;
 	
@@ -31,22 +31,8 @@ struct OUTBREAK_API FInventoryQueryResult
 };
 
 
-USTRUCT(Blueprintable)
-struct OUTBREAK_API FItemMetaData : public FTableRowBase
-{
-	GENERATED_BODY()
-	
-	UPROPERTY(EditAnywhere)
-	TObjectPtr<UTexture2D> ItemTexture;
-	
-	// 현재 Complier Error를 피하기 위해 Actor Class 사용 추후 전용 클래스로 변경. 
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<AActor> WorldItemClass;
-	
-	UPROPERTY(EditAnywhere)
-	int32 MaxItemStack = 1;
-	
-};
+// 아이템 정적 스펙 표는 DT_Items(FOBItemDefinitionRow)로 통합됐다.
+// 아이콘=Icon, 최대 스택=MaxStack, 월드 드랍 액터=WorldItemClass 가 각각 대체한다.
 
 USTRUCT(BlueprintType)
 struct OUTBREAK_API FWorldItemData
@@ -54,11 +40,7 @@ struct OUTBREAK_API FWorldItemData
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UOBItemDefinition> ItemDefinition;
-	
-	// Legacy data-table identifier. Used only when ItemDefinition is not assigned.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName ItemName;
+	FGameplayTag ItemTag;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 ItemStack = 1;
@@ -88,13 +70,8 @@ struct OUTBREAK_API FInventoryData
 {
 	GENERATED_BODY()
 
-	// Existing project item asset. WeaponClass is resolved through this asset,
-	// and the weapon slot is resolved from the class default object's UOBWeaponData.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UOBItemDefinition> ItemDefinition;
-	
-	UPROPERTY(BlueprintReadWrite)
-	FName ItemName = NAME_None;
+	FGameplayTag ItemTag;
 	
 	UPROPERTY(BlueprintReadWrite)
 	EItemType ItemType = EItemType::Consumable;
@@ -109,6 +86,12 @@ struct OUTBREAK_API FInventoryData
 	// Per-item runtime state. -1 means that the weapon has not been equipped yet.
 	UPROPERTY(BlueprintReadOnly)
 	int32 MagazineAmmo = -1;
+	
+	// 스펙은 표에서 그때그때 조회한다. 포인터를 들고 있지 않는다.
+	const FOBItemDefinitionRow* GetDefinition() const
+	{
+		return UOBItemRegistry::FindItem(ItemTag);
+	}
 };
 
 // UI drag/drop locations. SlotIndex is only a hint; mutations re-resolve by InstanceId.
@@ -139,14 +122,13 @@ struct OUTBREAK_API FInventoryItemHandle
 	UPROPERTY(BlueprintReadWrite)
 	EOBEquipmentSlot EquipmentSlot = EOBEquipmentSlot::None;
 
-	// Quick slots reference an item type rather than a concrete inventory instance.
 	UPROPERTY(BlueprintReadWrite)
-	TObjectPtr<UOBItemDefinition> ItemDefinition;
+	FGameplayTag ItemTag;
 
 	bool HasItem() const
 	{
 		return InstanceId.IsValid() ||
-			(Location == EInventoryItemLocation::QuickSlot && ItemDefinition);
+			(Location == EInventoryItemLocation::QuickSlot && ItemTag.IsValid());
 	}
 };
 
@@ -175,7 +157,7 @@ struct OUTBREAK_API FQuickSlotData
 	// A quick slot intentionally stores only the static item type. It keeps
 	// working after stacks move, merge, run out, or are acquired again.
 	UPROPERTY(BlueprintReadOnly)
-	TObjectPtr<UOBItemDefinition> ItemDefinition;
+	FGameplayTag ItemTag;
 
-	bool IsAssigned() const { return ItemDefinition != nullptr; }
+	bool IsAssigned() const { return ItemTag.IsValid(); }
 };

@@ -181,6 +181,10 @@ protected:
 	FTimerHandle PhaseBindRetryTimer;      // GameState 대기 재시도
 	FTimerHandle AutoReturnTimer;          // 자동 복귀
 	FTimerHandle ResultDelayTimer;         // 사망/탈출 화면 → 결과창 전환 지연
+	
+	// 결과창 구독 재시도 횟수. 원정 GameState가 없는 맵에서 4Hz 타이머가 영원히 도는 걸 막는다(0.25초 × 40 = 10초).
+	int32 PhaseBindAttempts = 0;
+	static constexpr int32 MaxPhaseBindAttempts = 40;
 
 	// 현재 떠 있는 사망 위젯(중복 방지/제거).
 	UPROPERTY()
@@ -261,6 +265,9 @@ public:
 	// 결과창 버튼/자동타이머가 호출 → 데디 종료 후 로컬 Home 로드.
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
 	void ReturnToHome();
+	
+	// 실제 레벨 전환. ReturnToHome이 다음 틱으로 미뤄서 호출한다.
+	void TravelToHome();
 	
 	// 자동 복귀까지 남은 초(올림). 결과창 버튼 텍스트 "복귀하기 (N)"용.
 	UFUNCTION(BlueprintPure, Category = "Expedition")
