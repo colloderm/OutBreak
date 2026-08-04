@@ -13,6 +13,7 @@
 #include "LyraInspired/Input/OBInputConfig.h"
 #include "Camera/PlayerCameraManager.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
+#include "Inventory/Data/WorldItem.h"
 #include "Inventory/Widget/InventoryWindow.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Game/GameMode/OBLobbyGameMode.h"
@@ -178,8 +179,7 @@ void AOBPlayerController::SetupInputComponent()
 
 	if (InventoryAction)
 	{
-		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_InventoryStarted);
-		EIC->BindAction(InventoryAction, ETriggerEvent::Completed, this, &AOBPlayerController::Input_InventoryCompleted);
+		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_InventoryKey);
 	}
 
 	if (InputConfig)
@@ -280,7 +280,20 @@ void AOBPlayerController::Input_JumpCompleted()
 	}
 }
 
-void AOBPlayerController::Input_InventoryStarted()
+void AOBPlayerController::Input_InventoryKey()
+{
+	if (!bInventoryToggle)
+	{
+		InventoryStarted();
+	}
+	else
+	{
+		InventoryCompleted();
+	}
+	bInventoryToggle = !bInventoryToggle;
+}
+
+void AOBPlayerController::InventoryStarted()
 {
 	AOBCharacterBase* CharacterBase = Cast<AOBCharacterBase>(GetPawn());
 	if (!IsValid(CharacterBase))
@@ -317,7 +330,7 @@ void AOBPlayerController::Input_InventoryStarted()
 	SetShowMouseCursor(true);
 }
 
-void AOBPlayerController::Input_InventoryCompleted()
+void AOBPlayerController::InventoryCompleted()
 {
 	if (AOBCharacterBase* CharacterBase =
 		Cast<AOBCharacterBase>(GetPawn()))
@@ -918,7 +931,7 @@ bool AOBPlayerController::IsInteractableOccluded(const FVector& ViewLocation, co
 namespace
 {
 	// 상호작용 반경(기본 200)보다 넉넉히 잡는다. 지연 때문에 서버 위치가 조금 다르다.
-	constexpr float OBMaxLootDistanceSq = 500.f * 500.f;
+	constexpr float OBMaxInteractionDistanceSq = 500.f * 500.f;
 }
 
 void AOBPlayerController::Server_TakeLoot_Implementation(AOBLootContainer* Container, FGameplayTag ItemTag, int32 Count)
@@ -929,7 +942,7 @@ void AOBPlayerController::Server_TakeLoot_Implementation(AOBLootContainer* Conta
 	if (!MyChar || MyChar->IsDead()) return;
 
 	// 클라가 보낸 걸 믿지 않는다. 실제로 그 앞에 서 있는지 서버가 확인한다.
-	if (FVector::DistSquared(MyChar->GetActorLocation(), Container->GetActorLocation()) > OBMaxLootDistanceSq)
+	if (FVector::DistSquared(MyChar->GetActorLocation(), Container->GetActorLocation()) > OBMaxInteractionDistanceSq)
 	{
 		return;
 	}
@@ -947,7 +960,7 @@ void AOBPlayerController::Server_TakeAllLoot_Implementation(AOBLootContainer* Co
 	AOBCharacterBase* MyChar = Cast<AOBCharacterBase>(GetPawn());
 	if (!MyChar || MyChar->IsDead()) return;
 
-	if (FVector::DistSquared(MyChar->GetActorLocation(), Container->GetActorLocation()) > OBMaxLootDistanceSq)
+	if (FVector::DistSquared(MyChar->GetActorLocation(), Container->GetActorLocation()) > OBMaxInteractionDistanceSq)
 	{
 		return;
 	}
@@ -955,5 +968,29 @@ void AOBPlayerController::Server_TakeAllLoot_Implementation(AOBLootContainer* Co
 	if (UPlayerInventoryComponent* Inv = MyChar->GetPlayerInventoryComponent())
 	{
 		Container->TryTakeAll(Inv);
+	}
+}
+
+void AOBPlayerController::Server_PickUpWorldItem_Implementation(
+	AWorldItem* WorldItem)
+{
+	if (!IsValid(WorldItem) || !WorldItem->HasItemInstance())
+	{
+		return;
+	}
+
+	AOBCharacterBase* MyChar = Cast<AOBCharacterBase>(GetPawn());
+	if (!MyChar || MyChar->IsDead() ||
+		FVector::DistSquared(
+			MyChar->GetActorLocation(),
+			WorldItem->GetActorLocation()) > OBMaxInteractionDistanceSq)
+	{
+		return;
+	}
+
+	if (UPlayerInventoryComponent* Inventory =
+		MyChar->GetPlayerInventoryComponent())
+	{
+		Inventory->PickUpWorldItem(WorldItem);
 	}
 }

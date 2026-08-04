@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Interaction/OBInteractableActor.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/Data/OBItemTypes.h"
 #include "Engine/DataTable.h"
 #include "OBLootContainer.generated.h"
@@ -36,6 +37,10 @@ public:
 	// 시체 / 바닥에 버린 아이템처럼 내용이 이미 정해진 경우.
 	static AOBLootContainer* SpawnWithContents(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
 		const FTransform& SpawnTransform, const TArray<FOBItemStack>& Items);
+	static AOBLootContainer* SpawnWithItemInstances(UWorld* World,
+		TSubclassOf<AOBLootContainer> ContainerClass,
+		const FTransform& SpawnTransform,
+		const TArray<FInventoryData>& Items);
 
 	// 서버 전용. 즉석에서 굴려 스폰한다(좀비 처치 등 매번 달라야 하는 드랍).
 	static AOBLootContainer* SpawnFromTable(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
@@ -48,10 +53,11 @@ public:
 	
 	// 서버: 내용물을 직접 지정/추가(좀비 드랍·시체·바닥 버리기가 쓴다).
 	void SetContents(const TArray<FOBItemStack>& InItems);
+	void SetItemInstances(const TArray<FInventoryData>& InItems);
 	void AddContent(const FGameplayTag& ItemTag, int32 Count);
 	
 	// GetContents를 const 함수로 고친다(위젯이 const 포인터로도 읽어야 한다)
-	const TArray<FOBItemStack>& GetContents() const { return Contents; }
+	const TArray<FInventoryData>& GetContents() const { return Contents; }
 	
 	UFUNCTION(BlueprintPure, Category = "Loot")
 	bool IsEmptyContainer() const { return Contents.IsEmpty(); }
@@ -95,7 +101,7 @@ protected:
 	FTimerHandle DespawnTimer;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_Contents)
-	TArray<FOBItemStack> Contents;
+	TArray<FInventoryData> Contents;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Loot")
 	TObjectPtr<UStaticMeshComponent> StaticMeshComp;

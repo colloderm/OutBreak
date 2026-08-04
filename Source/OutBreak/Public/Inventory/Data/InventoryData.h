@@ -14,56 +14,8 @@
  */
 
 
-USTRUCT(BlueprintType)
-struct OUTBREAK_API FInventoryQueryResult
-{
-	GENERATED_BODY()
-	
-	FGameplayTag QueryItemTag;
-	
-	bool HasItem = false;
-	
-	TArray<int32> BackpackIndices;
-	TArray<int32> ContainerIndices;
-	
-	int32 TotalStack = 0;
-	
-};
-
-
 // 아이템 정적 스펙 표는 DT_Items(FOBItemDefinitionRow)로 통합됐다.
 // 아이콘=Icon, 최대 스택=MaxStack, 월드 드랍 액터=WorldItemClass 가 각각 대체한다.
-
-USTRUCT(BlueprintType)
-struct OUTBREAK_API FWorldItemData
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FGameplayTag ItemTag;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 ItemStack = 1;
-	
-	
-};
-
-
-UENUM(BlueprintType)
-enum class EItemType : uint8
-{
-	// Primary/Secondary/Melee is resolved from UOBWeaponData::WeaponSlot.
-	// Inventory only needs to know that the item is a weapon.
-	Weapon,
-	// Head/Chest/Hands/Legs/Feet is resolved from UOBEquipmentData.
-	Equipment,
-	Consumable,
-	Ammo,
-	
-};
-
-
-
 
 USTRUCT(BlueprintType)
 struct OUTBREAK_API FInventoryData
@@ -73,10 +25,7 @@ struct OUTBREAK_API FInventoryData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FGameplayTag ItemTag;
 	
-	UPROPERTY(BlueprintReadWrite)
-	EItemType ItemType = EItemType::Consumable;
-	
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 ItemStack = 0;
 
 	// Stable identity for equipment state. Array indices can change when slots move.
@@ -98,11 +47,12 @@ struct OUTBREAK_API FInventoryData
 UENUM(BlueprintType)
 enum class EInventoryItemLocation : uint8
 {
-	None,
-	Backpack,
-	Container,
-	Equipment,
-	QuickSlot
+	None = 0,
+	Backpack = 1,
+	// Value 2 was the removed player-owned external container. Keep the later
+	// numeric values stable so existing Blueprint handles remain compatible.
+	Equipment = 3,
+	QuickSlot = 4
 };
 
 USTRUCT(BlueprintType)

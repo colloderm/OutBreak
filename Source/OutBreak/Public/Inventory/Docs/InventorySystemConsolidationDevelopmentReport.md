@@ -2,7 +2,8 @@
 
 - 작성일: 2026-08-04
 - 기준 브랜치: `ZombieSystem`
-- 기준 커밋: `0764c373` (`Merge branch 'KJH' into ZombieSystem`)
+- 분석 기준 커밋: `68152840` (`Merge branch 'KJH' into ZombieSystem`)
+- 구현 기준일: 2026-08-04
 - 대상 모듈: 플레이어 인벤토리, 장비/무기, 월드 아이템, 루팅 컨테이너, 소비 아이템 HUD
 - 문서 목적: 중복 컴포넌트·자료형·저장소·API를 하나의 런타임 인벤토리 모델로 통합하기 위한 구현 기준과 진행 순서를 확정한다.
 
@@ -83,8 +84,8 @@ int32 TryRemoveItem(const FGameplayTag& ItemTag, int32 RequestedAmount);
 GUID·탄창·배낭 내용물이 있는 드랍 아이템에는 수량 API와 분리된 다음 계약을 사용한다.
 
 ```cpp
-bool TryAddItemInstance(const FInventoryData& ItemInstance);
-bool TryExtractItemInstance(const FGuid& InstanceId, FInventoryData& OutItem);
+int32 TryAddItemInstance(const FInventoryData& ItemInstance);
+bool TryExtractItemInstance(const FGuid& InstanceId, FInventoryData& OutItemInstance);
 ```
 
 정적 정의 행을 받는 함수는 private 구현으로 제한한다. Blueprint나 다른 시스템이 DataTable 행 포인터를 보관하지 못하게 한다.
@@ -356,3 +357,32 @@ rg "UOBInventoryComponent|FOBWeaponSlotEntry|FOBCountEntry|FWorldItemData|FInven
 7. Listen/Dedicated 멀티플레이에서 드랍·루팅·동시 접근 검증을 통과한다.
 8. Blueprint, DataTable 원본, 설정, 기술 문서가 최종 구조와 일치한다.
 
+## 13. 2026-08-04 구현 진행 결과
+
+### 완료된 통합 작업
+
+- 플레이어 인벤토리의 진실 원본을 `UPlayerInventoryComponent` 하나로 통합했다.
+- 구형 `UOBInventoryComponent`와 해당 소스 파일을 제거하고 HUD, 소비품 어빌리티, 시작 아이템, 사망 루팅 사용처를 신형 컴포넌트로 이관했다.
+- 태그 수량 작업은 `TryAddItem`, `TryRemoveItem`, `GetItemCount`로, 런타임 상태가 있는 아이템 작업은 `TryAddItemInstance`, `TryExtractItemInstance`로 통합했다.
+- `FInventoryQueryResult`, `FWorldItemData`, `EItemType` 및 `FInventoryData::ItemType` 중복 정의를 제거했다.
+- 플레이어 컴포넌트 내부에 복사 보관하던 외부 컨테이너 배열과 Container 위치 분기를 제거했다.
+- `AWorldItem`을 공통 상호작용 액터로 전환하고 서버 거리 검증을 거쳐 아이템 인스턴스를 획득하도록 변경했다.
+- `AOBLootContainer`의 내용물을 `FInventoryData` 인스턴스로 변경해 무기 GUID와 탄창 등 런타임 상태를 보존했다.
+- 상자 루팅은 플레이어에 실제로 추가된 수량만 원본에서 차감하며, 사망 루팅은 컨테이너 생성 성공 뒤 플레이어 원본을 비우도록 트랜잭션 순서를 통일했다.
+- 플레이어 캐릭터 블루프린트를 재저장해 삭제된 네이티브 컴포넌트의 직렬화 흔적을 정리했다.
+- 인벤토리 슬롯 아이콘 조회를 `UOBItemRegistry::GetItemDisplay`로 통일해, `DT_Items.Icon`이 비어 있는 무기도 WeaponData의 `WeaponIcon`을 정상 상속하도록 수정했다.
+- `WBP_InventoryWindow`의 고정 1920 기준 그리드 배치를 우측 앵커 기반으로 변경하고 최소 슬롯 크기를 지정해, 작은 PIE 뷰포트에서도 슬롯과 아이콘이 화면 밖으로 밀리거나 0 크기로 축소되지 않도록 수정했다.
+
+### 자동 검증 결과
+
+- UnrealHeaderTool 및 `OutBreakEditor Win64 Development` C++ 빌드 통과.
+- 플레이어 캐릭터 블루프린트 대상 `ResavePackages` 통과: 오류 0건.
+- 인벤토리·루팅 직접 관련 Blueprint 4개(`BP_SandboxCharacter_Player`, `BP_Corpse`, `BP_LootContainer`, `BP_LootDrop`) 선별 컴파일 통과: 오류 0건, 경고 0건, 로드 실패 0건.
+- 프로젝트 전체 Blueprint 검사에서는 관련 블루프린트를 포함해 수백 개 에셋이 컴파일됐으나, 대규모 외부 콘텐츠 때문에 전체 완료 전 중단했다. 외부 에셋의 빈 엔진 버전 등 기존 경고는 이 작업 범위에서 변경하지 않았다.
+
+### 남은 수동 검증
+
+- Listen Server와 Dedicated Server에서 2개 클라이언트가 같은 컨테이너를 동시에 루팅하는 경쟁 조건을 확인한다.
+- 무기 드랍/재획득, 재장전 탄창 보존, 배낭 용량 및 내부 아이템 보존을 실제 플레이로 확인한다.
+- `DT_Items` 태그 유일성, 기본 배낭 행의 카테고리·슬롯·용량 값, 시작 아이템 중복 지급 여부를 데이터 에디터에서 확인한다.
+- 위 수동 검증까지 통과하면 12절의 완료 정의 중 멀티플레이와 데이터 검증 항목을 최종 완료 처리한다.

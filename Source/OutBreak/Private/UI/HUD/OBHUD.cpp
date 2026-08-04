@@ -9,7 +9,6 @@
 #include "Blueprint/UserWidget.h"
 #include "UI/ViewModels/OBAmmoViewModel.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
-#include "Inventory/Components/OBInventoryComponent.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "UI/HUD/OBConsumableWidget.h"
 #include "View/MVVMView.h"
@@ -142,7 +141,8 @@ void AOBHUD::BindConsumablesToCharacter(AOBCharacterBase* Character)
 {
 	if (!Character || !ConsumableWidgetClass) return;
 	
-	UOBInventoryComponent* Inventory = Character->FindComponentByClass<UOBInventoryComponent>();
+	UPlayerInventoryComponent* Inventory =
+		Character->GetPlayerInventoryComponent();
 	if (!Inventory) return;
 	
 	if (!ConsumableWidget)

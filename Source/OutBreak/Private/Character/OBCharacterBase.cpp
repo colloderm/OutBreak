@@ -10,7 +10,6 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
-#include "Inventory/Components/OBInventoryComponent.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Character/Data/OBPawnData.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
@@ -27,7 +26,6 @@
 #include "Weapon/Data/OBWeaponData.h"
 #include "TimerManager.h"
 #include "Item/Loot/OBLootContainer.h"
-#include "Item/OBItemRegistry.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
@@ -58,7 +56,6 @@ AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
 	
 	EquipmentComponent = CreateDefaultSubobject<UOBEquipmentComponent>(TEXT("EquipmentComponent"));
 	
-	InventoryComponent = CreateDefaultSubobject<UOBInventoryComponent>(TEXT("InventoryComponent"));
 	PlayerInventoryComponent = CreateDefaultSubobject<UPlayerInventoryComponent>(TEXT("PlayerInventoryComponent"));
 
 	bUseControllerRotationYaw = false;
@@ -179,35 +176,31 @@ void AOBCharacterBase::DropCorpseLoot()
 	UWorld* W = GetWorld();
 	if (!W || !W->GetGameState<AOBExpeditionGameState>()) return;
 
-	bCorpseDropped = true;
-
-	TArray<FOBItemStack> Items;
-
-	if (InventoryComponent)
+	TArray<FInventoryData> Items;
+	if (PlayerInventoryComponent)
 	{
-		// 장착 슬롯의 무기는 사망 시 전부 잃고 시체로 넘어간다.
-		for (EOBWeaponSlot Slot : { EOBWeaponSlot::Primary, EOBWeaponSlot::Secondary, EOBWeaponSlot::Melee })
-		{
-			const FGameplayTag Tag =
-				UOBItemRegistry::FindTagForWeaponClass(InventoryComponent->GetWeaponInSlot(Slot));
-			if (Tag.IsValid())
-			{
-				OBItemStacks::Add(Items, Tag, 1);
-			}
-		}
-
-		// TODO(개발자B의 가방이 들어오면 주석 해제): 가방 내용물도 함께 넘긴다.
-		//   TArray<FOBItemStack> Bag;
-		//   InventoryComponent->GetBagContents(Bag);
-		//   for (const FOBItemStack& S : Bag) OBItemStacks::Add(Items, S.ItemTag, S.Count);
-		//   InventoryComponent->ClearBag();
+		PlayerInventoryComponent->GetLootableItemInstances(Items);
+	}
+	if (Items.IsEmpty())
+	{
+		bCorpseDropped = true;
+		return;
 	}
 
 	const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
 	const FVector DropLoc = GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
 
-	AOBLootContainer::SpawnWithContents(W, CorpseContainerClass,
-		FTransform(FRotator::ZeroRotator, DropLoc), Items);
+	AOBLootContainer* CorpseContainer =
+		AOBLootContainer::SpawnWithItemInstances(
+			W,
+			CorpseContainerClass,
+			FTransform(FRotator::ZeroRotator, DropLoc),
+			Items);
+	if (CorpseContainer && PlayerInventoryComponent)
+	{
+		PlayerInventoryComponent->ClearLootableItemInstances();
+		bCorpseDropped = true;
+	}
 }
 
 void AOBCharacterBase::DisablePawnForDeath()
@@ -631,21 +624,12 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 		{
 			for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
 			{
-				PlayerInventoryComponent->AddItem(Item.Key, Item.Value);
+				PlayerInventoryComponent->TryAddItem(Item.Key, Item.Value);
 			}
 		}
 		PlayerInventoryComponent->EquipDefaultSlot();
 	}
 
-	// Transitional compatibility for consumable abilities/widgets that have not
-	// moved yet. Weapons are intentionally no longer added or equipped here.
-	if (InventoryComponent && PawnData)
-	{
-		for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
-		{
-			InventoryComponent->AddItem(Item.Key, Item.Value);
-		}
-	}
 }
 
 void AOBCharacterBase::OnRep_PlayerState()

@@ -35,22 +35,29 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	
-	FInventoryQueryResult QueryHasItem(const FGameplayTag& QueryItemTag) const;
-	bool QueryItemEnough(
-		const FInventoryQueryResult& Result,
-		int32 QueryItemStack) const;
-	void ConsumeItem(const FInventoryQueryResult& Result, const int32 WantItemStack);
-	
 	void PickUpWorldItem(AWorldItem* WorldItem);
 
 	// 아이템 정적 스펙의 원본은 DT_Items(FOBItemDefinitionRow)다.
 	// BP에서도 태그 드롭다운으로 고를 수 있어 에셋 참조보다 다루기 쉽다.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	bool AddItemByTag(const FGameplayTag& ItemTag, UPARAM(ref) int32& ItemStack);
+	int32 TryAddItem(const FGameplayTag& ItemTag, int32 RequestedAmount);
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 TryAddItemInstance(const FInventoryData& ItemInstance);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool TryExtractItemInstance(
+		const FGuid& InstanceId,
+		FInventoryData& OutItemInstance);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 TryRemoveItem(const FGameplayTag& ItemTag, int32 RequestedAmount);
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
 	int32 GetItemCount(const FGameplayTag& ItemTag) const;
-	void AddItem(const FGameplayTag& ItemTag, int32 Amount);
-	int32 ConsumeItem(const FGameplayTag& ItemTag, int32 Amount);
+
+	void GetLootableItemInstances(TArray<FInventoryData>& OutItems);
+	void ClearLootableItemInstances();
 
 	// Ammo is stored as ordinary item stacks whose ItemTag matches WeaponData::AmmoType.
 	UFUNCTION(BlueprintPure, Category = "Inventory|Ammo")
@@ -97,9 +104,6 @@ public:
 	FInventoryItemHandle MakeBackpackHandle(int32 BackpackIndex) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
-	FInventoryItemHandle MakeContainerHandle(int32 ContainerIndex) const;
-
-	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
 	FInventoryItemHandle MakeEquipmentHandle(EOBEquipmentSlot EquipmentSlot) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
@@ -119,9 +123,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	TArray<FInventoryData> GetBackpackItemsForUI() const { return InventoryBackPackArray; }
-
-	UFUNCTION(BlueprintPure, Category = "Inventory")
-	TArray<FInventoryData> GetContainerItemsForUI() const { return InventoryContrainerArray; }
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|QuickSlot")
 	TArray<FQuickSlotData> GetQuickSlotsForUI() const { return InventoryQuickSlotsArray; }
@@ -177,9 +178,6 @@ public:
 
 	TSubclassOf<AOBWeaponBase> GetWeaponInSlot(EOBWeaponSlot Slot) const;
 	const TArray<FInventoryData>& GetBackpackItems() const { return InventoryBackPackArray; }
-	
-	void SetInventoryBackPackSize(int NewSize);
-	void SetInventoryContainerSize(int NewSize);
 
 	FOnPlayerInventoryChanged OnInventoryChanged;
 	FOnPlayerAmmoPoolChanged OnAmmoPoolChanged;
@@ -197,14 +195,8 @@ protected:
 	void UpdateInventory();
 	void UpdateInventoryWidget();
 	
-	
-	void RemoveItem(int RemoveIndex);
-
 	UFUNCTION()
 	void OnRep_BackpackItems();
-
-	UFUNCTION()
-	void OnRep_ContainerItems();
 
 	UFUNCTION()
 	void OnRep_ActiveWeapon();
@@ -215,17 +207,12 @@ protected:
 	UFUNCTION()
 	void OnRep_QuickSlots();
 
-public:
-	// Called every frame
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
-	                           FActorComponentTickFunction* ThisTickFunction) override;
-	
-	
 private:
-	bool AddItemRowInternal(
+	int32 AddItemRowInternal(
 		const FOBItemDefinitionRow* ItemRow,
-		int32& ItemStack,
-		FGuid* OutFirstAddedInstanceId = nullptr);
+		int32 RequestedAmount,
+		FGuid* OutFirstAddedInstanceId = nullptr,
+		const FInventoryData* SourceInstance = nullptr);
 	bool ResolveWeaponDefinition(
 		const FOBItemDefinitionRow* ItemRow,
 		TSubclassOf<AOBWeaponBase>& OutWeaponClass,
@@ -289,14 +276,10 @@ private:
 	void SetSwitching(bool bEnable);
 	void EndSwitching();
 	void NotifyInventoryChanged();
-	static EItemType ResolveItemType(const FOBItemDefinitionRow* ItemRow);
-
 	UPROPERTY(Transient)
 	TObjectPtr<UInventoryWindow> InventoryWidget;
 	
 	int32 InventoryBackPackSize = 0;
-	
-	int32 InventoryContainerSize = 0;
 	
 	
 	/* 고정 값 */
@@ -304,9 +287,6 @@ private:
 	
 	UPROPERTY(ReplicatedUsing = OnRep_BackpackItems, meta = (AllowPrivateAccess = "true"))
 	TArray<FInventoryData> InventoryBackPackArray;
-	
-	UPROPERTY(ReplicatedUsing = OnRep_ContainerItems, meta = (AllowPrivateAccess = "true"))
-	TArray<FInventoryData> InventoryContrainerArray;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_QuickSlots,
 		meta = (AllowPrivateAccess = "true"))
