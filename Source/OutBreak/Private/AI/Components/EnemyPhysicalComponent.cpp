@@ -114,6 +114,8 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 
 	const auto PhysicalReact = EnemyAsset->GetPhysicalReact();
 	const auto LimbMeshes = EnemyAsset->GetLimbMeshes();
+	const float BlendWeight = PhysicalReact->BlendWeight_Anim_Physics;
+	
 	TWeakObjectPtr<UPhysicalMaterial> PhyMtrl = HitResult.PhysMaterial;
 	
 	const FName BoneName = HitResult.BoneName;
@@ -180,6 +182,7 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 		return;
 	}
 	
+	TargetMesh->SetAllBodiesBelowPhysicsBlendWeight(BoneName, BlendWeight);
 	TargetMesh->SetAllBodiesBelowSimulatePhysics(BoneName, true, true);
 	TargetMesh->AddImpulse(HitDirection.GetSafeNormal() * PhysicalReact->ReactScale, BoneName, true);
 	

@@ -15,6 +15,10 @@ class OUTBREAK_API UOBGameplayAbility_Consumable : public UOBGameplayAbility
 	
 public:
 	UOBGameplayAbility_Consumable(const FObjectInitializer& ObjectInitializer);
+
+	// Lets metadata-only quick slots find an already granted consumable
+	// ability even when DT_Items does not provide an explicit UseAbility.
+	const FGameplayTag& GetConsumableItemTag() const { return ItemTag; }
 	
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, 
 		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;

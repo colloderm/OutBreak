@@ -9,22 +9,11 @@
 #include "Inventory/Widget/InventorySlot.h"
 #include "Inventory/Data/InventorySystemSetting.h"
 
-
-void UInventoryWindow::SetInventoryArray(
-	const TArray<FInventoryData>& ArrayRef)
-{
-	InventoryArray = ArrayRef;
-	Update();
-}
-
 void UInventoryWindow::SetInventorySource(
-	UPlayerInventoryComponent* InInventory,
-	const EInventoryItemLocation InLocation,
-	const TArray<FInventoryData>& ArrayRef)
+	UPlayerInventoryComponent* InInventory)
 {
 	InventoryComponent = InInventory;
-	InventoryLocation = InLocation;
-	SetInventoryArray(ArrayRef);
+	Update();
 }
 
 bool UInventoryWindow::NativeOnDrop(
@@ -34,7 +23,8 @@ bool UInventoryWindow::NativeOnDrop(
 {
 	const UInventoryDragDropOperation* Operation =
 		Cast<UInventoryDragDropOperation>(InOperation);
-	if (!Operation || !Operation->Inventory)
+	if (!Operation || !Operation->Inventory ||
+		Operation->Inventory != InventoryComponent)
 	{
 		return Super::NativeOnDrop(
 			InGeometry,
@@ -48,25 +38,51 @@ bool UInventoryWindow::NativeOnDrop(
 
 void UInventoryWindow::Update()
 {
-	if (!IsValid(InventorySlots))
+	if (!IsValid(InventoryComponent))
+	{
+		return;
+	}
+
+	const TArray<FInventoryData> BackpackItems =
+		InventoryComponent->GetBackpackItemsForUI();
+	const TArray<FInventoryData> ContainerItems =
+		InventoryComponent->GetContainerItemsForUI();
+	const TArray<FQuickSlotData> QuickSlots =
+		InventoryComponent->GetQuickSlotsForUI();
+
+	UpdateItemGrid(
+		InventoryBackPackSlots,
+		EInventoryItemLocation::Backpack,
+		BackpackItems);
+	UpdateItemGrid(
+		InventoryContainterSlots,
+		EInventoryItemLocation::Container,
+		ContainerItems);
+	UpdateQuickSlotGrid(QuickSlots.Num());
+}
+
+bool UInventoryWindow::SynchronizeGridSlots(
+	UUniformGridPanel* Grid,
+	const int32 DesiredSlotCount)
+{
+	if (!IsValid(Grid))
 	{
 		UE_LOG(
 			LogTemp,
 			Error,
-			TEXT("%s::%s : InventorySlots is invalid."),
+			TEXT("%s::%s : Required inventory grid is invalid."),
 			*GetClass()->GetName(),
 			TEXT(__FUNCTION__));
-
-		return;
+		return false;
 	}
 
-	const int32 InventorySize = InventoryArray.Num();
+	const int32 SlotCount = FMath::Max(0, DesiredSlotCount);
 	const UInventorySystemSetting* Settings =
 		GetDefault<UInventorySystemSetting>();
 	const int32 GridColumns = Settings
 		? FMath::Max(1, Settings->InventoryGridColumns)
 		: 1;
-	int32 WidgetSlotCount = InventorySlots->GetChildrenCount();
+	int32 WidgetSlotCount = Grid->GetChildrenCount();
 
 	/*
 	 * 현재 패널에 들어 있는 자식들이 모두
@@ -75,7 +91,7 @@ void UInventoryWindow::Update()
 	for (int32 Index = 0; Index < WidgetSlotCount; ++Index)
 	{
 		UInventorySlot* InventorySlot =
-			Cast<UInventorySlot>(InventorySlots->GetChildAt(Index));
+			Cast<UInventorySlot>(Grid->GetChildAt(Index));
 
 		if (!IsValid(InventorySlot))
 		{
@@ -89,7 +105,7 @@ void UInventoryWindow::Update()
 				TEXT(__FUNCTION__),
 				Index);
 
-			return;
+			return false;
 		}
 	}
 
@@ -97,9 +113,9 @@ void UInventoryWindow::Update()
 	 * 위젯 슬롯이 인벤토리 크기보다 많으면
 	 * 뒤쪽 슬롯부터 실제 패널에서 제거합니다.
 	 */
-	while (WidgetSlotCount > InventorySize)
+	while (WidgetSlotCount > SlotCount)
 	{
-		InventorySlots->RemoveChildAt(WidgetSlotCount - 1);
+		Grid->RemoveChildAt(WidgetSlotCount - 1);
 		--WidgetSlotCount;
 	}
 
@@ -107,7 +123,7 @@ void UInventoryWindow::Update()
 	 * 위젯 슬롯이 부족하면 생성하여
 	 * 실제 패널에 추가합니다.
 	 */
-	if (WidgetSlotCount < InventorySize)
+	if (WidgetSlotCount < SlotCount)
 	{
 		if (!IsValid(Settings))
 		{
@@ -118,7 +134,7 @@ void UInventoryWindow::Update()
 				*GetClass()->GetName(),
 				TEXT(__FUNCTION__));
 
-			return;
+			return false;
 		}
 
 		if (Settings->InventorySlotWidgetClass.IsNull())
@@ -130,14 +146,14 @@ void UInventoryWindow::Update()
 				*GetClass()->GetName(),
 				TEXT(__FUNCTION__));
 
-			return;
+			return false;
 		}
 
 		TSubclassOf<UInventorySlot> SlotWidgetClass =
 			Settings->InventorySlotWidgetClass.LoadSynchronous();
 		if (!SlotWidgetClass)
 		{
-			return;
+			return false;
 		}
 
 		APlayerController* Controller = GetOwningPlayer();
@@ -151,10 +167,10 @@ void UInventoryWindow::Update()
 				*GetClass()->GetName(),
 				TEXT(__FUNCTION__));
 
-			return;
+			return false;
 		}
 
-		while (WidgetSlotCount < InventorySize)
+		while (WidgetSlotCount < SlotCount)
 		{
 			UInventorySlot* NewSlotWidget =
 				CreateWidget<UInventorySlot>(
@@ -170,10 +186,10 @@ void UInventoryWindow::Update()
 					*GetClass()->GetName(),
 					TEXT(__FUNCTION__));
 
-				return;
+				return false;
 			}
 
-			InventorySlots->AddChildToUniformGrid(
+			Grid->AddChildToUniformGrid(
 				NewSlotWidget,
 				WidgetSlotCount / GridColumns,
 				WidgetSlotCount % GridColumns);
@@ -185,29 +201,62 @@ void UInventoryWindow::Update()
 	 * 개수 동기화가 끝난 뒤 전체 슬롯을 갱신합니다.
 	 * 이렇게 해야 새로 생성된 슬롯도 같은 호출에서 갱신됩니다.
 	 */
-	for (int32 Index = 0; Index < InventorySize; ++Index)
+	for (int32 Index = 0; Index < SlotCount; ++Index)
 	{
 		UInventorySlot* InventorySlot =
 			CastChecked<UInventorySlot>(
-				InventorySlots->GetChildAt(Index));
+				Grid->GetChildAt(Index));
 		if (UUniformGridSlot* GridSlot =
 			Cast<UUniformGridSlot>(InventorySlot->Slot))
 		{
 			GridSlot->SetRow(Index / GridColumns);
 			GridSlot->SetColumn(Index % GridColumns);
 		}
+	}
+	return true;
+}
 
+void UInventoryWindow::UpdateItemGrid(
+	UUniformGridPanel* Grid,
+	const EInventoryItemLocation Location,
+	const TArray<FInventoryData>& Items)
+{
+	if (!SynchronizeGridSlots(Grid, Items.Num()))
+	{
+		return;
+	}
+
+	for (int32 Index = 0; Index < Items.Num(); ++Index)
+	{
 		FInventoryItemHandle Handle;
-		if (InventoryComponent)
+		if (Location == EInventoryItemLocation::Backpack)
 		{
-			if (InventoryLocation == EInventoryItemLocation::Backpack)
-			{
-				Handle = InventoryComponent->MakeBackpackHandle(Index);
-			}
+			Handle = InventoryComponent->MakeBackpackHandle(Index);
 		}
-		InventorySlot->SetSlotContext(
+		else if (Location == EInventoryItemLocation::Container)
+		{
+			Handle = InventoryComponent->MakeContainerHandle(Index);
+		}
+
+		CastChecked<UInventorySlot>(Grid->GetChildAt(Index))->SetSlotContext(
 			InventoryComponent,
 			Handle,
-			InventoryArray[Index]);
+			Items[Index]);
+	}
+}
+
+void UInventoryWindow::UpdateQuickSlotGrid(const int32 QuickSlotCount)
+{
+	if (!SynchronizeGridSlots(InventoryQuickSlots, QuickSlotCount))
+	{
+		return;
+	}
+
+	for (int32 Index = 0; Index < QuickSlotCount; ++Index)
+	{
+		CastChecked<UInventorySlot>(
+			InventoryQuickSlots->GetChildAt(Index))->SetQuickSlotContext(
+				InventoryComponent,
+				Index);
 	}
 }

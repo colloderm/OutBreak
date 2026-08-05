@@ -104,6 +104,9 @@ public:
 	FInventoryItemHandle MakeBackpackHandle(int32 BackpackIndex) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
+	FInventoryItemHandle MakeContainerHandle(int32 ContainerIndex) const;
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
 	FInventoryItemHandle MakeEquipmentHandle(EOBEquipmentSlot EquipmentSlot) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
@@ -124,6 +127,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	TArray<FInventoryData> GetBackpackItemsForUI() const { return InventoryBackPackArray; }
 
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	TArray<FInventoryData> GetContainerItemsForUI() const { return InventoryContainerArray; }
+
 	UFUNCTION(BlueprintPure, Category = "Inventory|QuickSlot")
 	TArray<FQuickSlotData> GetQuickSlotsForUI() const { return InventoryQuickSlotsArray; }
 
@@ -132,6 +138,11 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|QuickSlot")
 	int32 GetQuickSlotItemCount(int32 QuickSlotIndex) const;
+
+	// Resolves the first concrete inventory stack represented by the quick
+	// slot's metadata-only ItemTag. Backpack storage has deterministic priority.
+	UFUNCTION(BlueprintPure, Category = "Inventory|QuickSlot")
+	bool ResolveQuickSlotItem(int32 QuickSlotIndex, FInventoryData& OutItem) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|QuickSlot")
 	void AssignQuickSlot(int32 QuickSlotIndex, const FInventoryItemHandle& Source);
@@ -148,6 +159,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|QuickSlot")
 	void UseQuickSlot(int32 QuickSlotIndex);
 
+	// Result-returning entry point for Blueprint and external classes that need
+	// to react when a quick-slot request cannot be resolved or activated.
+	UFUNCTION(BlueprintCallable, Category = "Inventory|QuickSlot")
+	bool TryUseQuickSlot(int32 QuickSlotIndex);
+
 	// Local UI lifetime. Inventory state itself remains server authoritative.
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	UInventoryWindow* OpenInventory();
@@ -157,6 +173,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	bool IsInventoryOpen() const;
+
+	bool IsPointInsideInventoryWindow(const FVector2D& ScreenSpacePosition) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
 	void UnequipWeapon();
@@ -197,6 +215,9 @@ protected:
 	
 	UFUNCTION()
 	void OnRep_BackpackItems();
+
+	UFUNCTION()
+	void OnRep_ContainerItems();
 
 	UFUNCTION()
 	void OnRep_ActiveWeapon();
@@ -280,6 +301,8 @@ private:
 	TObjectPtr<UInventoryWindow> InventoryWidget;
 	
 	int32 InventoryBackPackSize = 0;
+
+	int32 InventoryContainerSize = 0;
 	
 	
 	/* 고정 값 */
@@ -287,6 +310,10 @@ private:
 	
 	UPROPERTY(ReplicatedUsing = OnRep_BackpackItems, meta = (AllowPrivateAccess = "true"))
 	TArray<FInventoryData> InventoryBackPackArray;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ContainerItems,
+		meta = (AllowPrivateAccess = "true"))
+	TArray<FInventoryData> InventoryContainerArray;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_QuickSlots,
 		meta = (AllowPrivateAccess = "true"))
