@@ -130,10 +130,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition", meta = (ClampMin = "0"))
 	int32 FinalMinuteThreshold = 60;
 
-	// 파티(공유팀) 여부. true=전원 같은 TeamId(협동), false=개인전(고유 TeamId).
-	// - 알파: 3인 협동이므로 기본 true. 로비에서 팀 편성 붙이면 이 값 대신 사용.
+	// 파티코드 없는 접속자를 전원 같은 TeamId로 묶을지.
+	// 파티 시스템이 ?party= 코드를 붙여 주므로 기본은 false다.
+	// true면 각자 솔로로 들어온 플레이어끼리 한 팀이 되어 아군 판정·관전·팀전멸이 전부 어긋난다.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
-	bool bUseSharedTeam = true;
+	bool bUseSharedTeam = false;
 	
 	// 단일 GameMode로 여러 맵을 쓰기 위한 카탈로그. 현재 레벨과 매칭해 MapData 결정.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
