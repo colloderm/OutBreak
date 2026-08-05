@@ -144,8 +144,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Weapon")
 	TObjectPtr<UInputAction> SlotMeleeAction;
 
-	// Array index is the quick-slot index. Assign IA_QuickSlot1..N in order.
-	UPROPERTY(EditDefaultsOnly, Category = "Input|QuickSlot")
+	/*
+	 * Fixed input order for the six default quick slots:
+	 * [0] = keyboard 4, [1] = 5, ... [5] = 9.
+	 * Create the Input Action assets and map them to those keys in the active
+	 * Input Mapping Context, then assign the actions here in the same order.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Input|QuickSlot",
+		meta = (EditFixedSize))
 	TArray<TObjectPtr<UInputAction>> QuickSlotActions;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")

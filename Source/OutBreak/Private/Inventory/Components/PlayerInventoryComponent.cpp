@@ -6,6 +6,7 @@
 #include "Ability/Tags/OBGameplayTags.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Ability/Abilities/OBGameplay/OBGameplayAbility_Consumable.h"
 #include "Animation/AnimMontage.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Equipment/Data/OBEquipmentData.h"
@@ -34,12 +35,16 @@ UPlayerInventoryComponent::UPlayerInventoryComponent()
 		InventoryBackPackSize = FMath::Max(
 			0,
 			Settings->FallbackBackpackSlotCount);
+		InventoryContainerSize = FMath::Max(
+			0,
+			Settings->DefaultContainerSlotCount);
 		QuickSlotSize = FMath::Max(
 			0,
 			Settings->DefaultQuickSlotCount);
 	}
 
 	InventoryBackPackArray.SetNum(FMath::Max(InventoryBackPackSize, 0));
+	InventoryContainerArray.SetNum(FMath::Max(InventoryContainerSize, 0));
 	InventoryQuickSlotsArray.SetNum(FMath::Max(QuickSlotSize, 0));
 	InitializeEquipmentSlots();
 }
@@ -52,6 +57,10 @@ void UPlayerInventoryComponent::GetLifetimeReplicatedProps(
 	DOREPLIFETIME_CONDITION(
 		UPlayerInventoryComponent,
 		InventoryBackPackArray,
+		COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(
+		UPlayerInventoryComponent,
+		InventoryContainerArray,
 		COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(
 		UPlayerInventoryComponent,
@@ -279,11 +288,23 @@ bool UPlayerInventoryComponent::IsInventoryOpen() const
 	return IsValid(InventoryWidget) && InventoryWidget->IsInViewport();
 }
 
+bool UPlayerInventoryComponent::IsPointInsideInventoryWindow(
+	const FVector2D& ScreenSpacePosition) const
+{
+	return IsInventoryOpen() &&
+		InventoryWidget->GetCachedGeometry().IsUnderLocation(ScreenSpacePosition);
+}
+
 void UPlayerInventoryComponent::UpdateInventory()
 {
 	if (InventoryBackPackArray.Num() != InventoryBackPackSize)
 	{
 		InventoryBackPackArray.SetNum(FMath::Max(InventoryBackPackSize, 0));
+	}
+
+	if (InventoryContainerArray.Num() != InventoryContainerSize)
+	{
+		InventoryContainerArray.SetNum(FMath::Max(InventoryContainerSize, 0));
 	}
 
 	if (InventoryQuickSlotsArray.Num() != QuickSlotSize)
@@ -309,10 +330,7 @@ void UPlayerInventoryComponent::UpdateInventoryWidget()
 		return;
 	}
 
-	InventoryWidget->SetInventorySource(
-		this,
-		EInventoryItemLocation::Backpack,
-		InventoryBackPackArray);
+	InventoryWidget->SetInventorySource(this);
 }
 
 int32 UPlayerInventoryComponent::TryAddItem(
@@ -346,6 +364,24 @@ bool UPlayerInventoryComponent::TryExtractItemInstance(
 	}
 
 	for (FInventoryData& Item : InventoryBackPackArray)
+	{
+		if (Item.InstanceId != InstanceId)
+		{
+			continue;
+		}
+
+		OutItemInstance = Item;
+		Item = FInventoryData();
+		NotifyInventoryChanged();
+		const FOBItemDefinitionRow* ItemRow = OutItemInstance.GetDefinition();
+		if (ItemRow && ItemRow->Category == EOBItemCategory::Ammo)
+		{
+			OnAmmoPoolChanged.Broadcast();
+		}
+		return true;
+	}
+
+	for (FInventoryData& Item : InventoryContainerArray)
 	{
 		if (Item.InstanceId != InstanceId)
 		{
@@ -506,7 +542,9 @@ int32 UPlayerInventoryComponent::AddItemRowInternal(
 		};
 
 	FillExistingStacks(InventoryBackPackArray);
+	FillExistingStacks(InventoryContainerArray);
 	FillEmptySlots(InventoryBackPackArray);
+	FillEmptySlots(InventoryContainerArray);
 
 	const int32 AddedAmount = RequestedAmount - RemainingStack;
 	if (AddedAmount > 0)
@@ -530,6 +568,13 @@ int32 UPlayerInventoryComponent::GetItemCount(const FGameplayTag& ItemTag) const
 
 	int32 Total = 0;
 	for (const FInventoryData& Slot : InventoryBackPackArray)
+	{
+		if (Slot.ItemTag == ItemTag && Slot.ItemStack > 0)
+		{
+			Total += Slot.ItemStack;
+		}
+	}
+	for (const FInventoryData& Slot : InventoryContainerArray)
 	{
 		if (Slot.ItemTag == ItemTag && Slot.ItemStack > 0)
 		{
@@ -570,10 +615,43 @@ int32 UPlayerInventoryComponent::TryRemoveItem(
 			Slot = FInventoryData();
 		}
 	}
+	for (FInventoryData& Slot : InventoryContainerArray)
+	{
+		if (Remaining <= 0)
+		{
+			break;
+		}
+		if (Slot.ItemTag != ItemTag || Slot.ItemStack <= 0)
+		{
+			continue;
+		}
+
+		const int32 Removed = FMath::Min(Remaining, Slot.ItemStack);
+		Slot.ItemStack -= Removed;
+		Remaining -= Removed;
+		if (Slot.ItemStack == 0)
+		{
+			Slot = FInventoryData();
+		}
+	}
 
 	const int32 RemovedAmount = RequestedAmount - Remaining;
 	if (RemovedAmount > 0)
 	{
+		// A completed consumption can remove the final concrete stack. In that
+		// case every quick slot pointing at the now-missing item type is stale
+		// and must be cleared together with the inventory update.
+		if (GetItemCount(ItemTag) <= 0)
+		{
+			for (FQuickSlotData& QuickSlot : InventoryQuickSlotsArray)
+			{
+				if (QuickSlot.ItemTag == ItemTag)
+				{
+					QuickSlot = FQuickSlotData();
+				}
+			}
+		}
+
 		NotifyInventoryChanged();
 		const FOBItemDefinitionRow* ItemRow = UOBItemRegistry::FindItem(ItemTag);
 		if (ItemRow && ItemRow->Category == EOBItemCategory::Ammo)
@@ -609,6 +687,13 @@ void UPlayerInventoryComponent::GetLootableItemInstances(
 			OutItems.Add(Item);
 		}
 	}
+	for (const FInventoryData& Item : InventoryContainerArray)
+	{
+		if (Item.ItemTag.IsValid() && Item.ItemStack > 0)
+		{
+			OutItems.Add(Item);
+		}
+	}
 }
 
 void UPlayerInventoryComponent::ClearLootableItemInstances()
@@ -636,6 +721,11 @@ void UPlayerInventoryComponent::ClearLootableItemInstances()
 		: 0;
 	InventoryBackPackArray.Reset();
 	InventoryBackPackArray.SetNum(InventoryBackPackSize);
+	InventoryContainerSize = Settings
+		? FMath::Max(0, Settings->DefaultContainerSlotCount)
+		: 0;
+	InventoryContainerArray.Reset();
+	InventoryContainerArray.SetNum(InventoryContainerSize);
 	NotifyInventoryChanged();
 	OnAmmoPoolChanged.Broadcast();
 }
@@ -933,6 +1023,10 @@ FInventoryData* UPlayerInventoryComponent::FindItemInInventory(
 	{
 		Inventory = &InventoryBackPackArray;
 	}
+	else if (Location == EInventoryItemLocation::Container)
+	{
+		Inventory = &InventoryContainerArray;
+	}
 	if (!Inventory || !InstanceId.IsValid())
 	{
 		return nullptr;
@@ -960,6 +1054,10 @@ const FInventoryData* UPlayerInventoryComponent::FindItemInInventory(
 	if (Location == EInventoryItemLocation::Backpack)
 	{
 		Inventory = &InventoryBackPackArray;
+	}
+	else if (Location == EInventoryItemLocation::Container)
+	{
+		Inventory = &InventoryContainerArray;
 	}
 	if (!Inventory || !InstanceId.IsValid())
 	{
@@ -989,6 +1087,20 @@ FInventoryItemHandle UPlayerInventoryComponent::MakeBackpackHandle(
 	{
 		Handle.InstanceId = InventoryBackPackArray[BackpackIndex].InstanceId;
 		Handle.ItemTag = InventoryBackPackArray[BackpackIndex].ItemTag;
+	}
+	return Handle;
+}
+
+FInventoryItemHandle UPlayerInventoryComponent::MakeContainerHandle(
+	const int32 ContainerIndex) const
+{
+	FInventoryItemHandle Handle;
+	Handle.Location = EInventoryItemLocation::Container;
+	Handle.SlotIndex = ContainerIndex;
+	if (InventoryContainerArray.IsValidIndex(ContainerIndex))
+	{
+		Handle.InstanceId = InventoryContainerArray[ContainerIndex].InstanceId;
+		Handle.ItemTag = InventoryContainerArray[ContainerIndex].ItemTag;
 	}
 	return Handle;
 }
@@ -1090,6 +1202,49 @@ int32 UPlayerInventoryComponent::GetQuickSlotItemCount(
 	return GetItemCount(InventoryQuickSlotsArray[QuickSlotIndex].ItemTag);
 }
 
+bool UPlayerInventoryComponent::ResolveQuickSlotItem(
+	const int32 QuickSlotIndex,
+	FInventoryData& OutItem) const
+{
+	OutItem = FInventoryData();
+	if (!InventoryQuickSlotsArray.IsValidIndex(QuickSlotIndex))
+	{
+		return false;
+	}
+
+	const FGameplayTag ItemTag =
+		InventoryQuickSlotsArray[QuickSlotIndex].ItemTag;
+	if (!ItemTag.IsValid())
+	{
+		return false;
+	}
+
+	auto FindConcreteItem =
+		[&ItemTag](const TArray<FInventoryData>& Inventory)
+			-> const FInventoryData*
+		{
+			return Inventory.FindByPredicate(
+				[&ItemTag](const FInventoryData& Item)
+				{
+					return Item.ItemTag == ItemTag && Item.ItemStack > 0;
+				});
+		};
+
+	const FInventoryData* ResolvedItem =
+		FindConcreteItem(InventoryBackPackArray);
+	if (!ResolvedItem)
+	{
+		ResolvedItem = FindConcreteItem(InventoryContainerArray);
+	}
+	if (!ResolvedItem)
+	{
+		return false;
+	}
+
+	OutItem = *ResolvedItem;
+	return true;
+}
+
 void UPlayerInventoryComponent::AssignQuickSlot(
 	const int32 QuickSlotIndex,
 	const FInventoryItemHandle& Source)
@@ -1131,9 +1286,11 @@ bool UPlayerInventoryComponent::AssignQuickSlotInternal(
 		return false;
 	}
 
-	// 퀵슬롯은 "사용 가능한 아이템 종류"만 가리킨다. 사용 어빌리티가 없으면 등록 불가.
+	// A quick slot owns metadata only. Assignment must not depend on the
+	// current execution mechanism: an ability or an external caller may use
+	// the represented item later.
 	const FOBItemDefinitionRow* ItemRow = Item.GetDefinition();
-	if (!ItemRow || !ItemRow->ItemTag.IsValid() || !ItemRow->UseAbility)
+	if (!ItemRow || !ItemRow->ItemTag.IsValid())
 	{
 		return false;
 	}
@@ -1181,7 +1338,12 @@ bool UPlayerInventoryComponent::ClearQuickSlotInternal(
 
 void UPlayerInventoryComponent::UseQuickSlot(const int32 QuickSlotIndex)
 {
-	UseQuickSlotInternal(QuickSlotIndex);
+	TryUseQuickSlot(QuickSlotIndex);
+}
+
+bool UPlayerInventoryComponent::TryUseQuickSlot(const int32 QuickSlotIndex)
+{
+	return UseQuickSlotInternal(QuickSlotIndex);
 }
 
 bool UPlayerInventoryComponent::UseQuickSlotInternal(
@@ -1193,18 +1355,46 @@ bool UPlayerInventoryComponent::UseQuickSlotInternal(
 		return false;
 	}
 
-	const FOBItemDefinitionRow* ItemRow = UOBItemRegistry::FindItem(
-		InventoryQuickSlotsArray[QuickSlotIndex].ItemTag);
-	if (!ItemRow || !ItemRow->ItemTag.IsValid() ||
-		!ItemRow->UseAbility ||
-		GetItemCount(ItemRow->ItemTag) <= 0)
+	FInventoryData ResolvedItem;
+	if (!ResolveQuickSlotItem(QuickSlotIndex, ResolvedItem))
+	{
+		return false;
+	}
+
+	const FOBItemDefinitionRow* ItemRow = ResolvedItem.GetDefinition();
+	if (!ItemRow || !ItemRow->ItemTag.IsValid())
 	{
 		return false;
 	}
 
 	UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
-	return ASC && ASC->TryActivateAbilityByClass(ItemRow->UseAbility);
+	if (!ASC)
+	{
+		return false;
+	}
+
+	// DT_Items may explicitly select the behavior for this item type.
+	if (ItemRow->UseAbility)
+	{
+		return ASC->TryActivateAbilityByClass(ItemRow->UseAbility);
+	}
+
+	// Otherwise locate a granted consumable ability by its metadata ItemTag.
+	// GA_Heal and GA_Grenade already declare Item.Bandage/Item.Grenade, so
+	// quick-slot use remains data driven even while DT_Items.UseAbility is None.
+	for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+	{
+		const UOBGameplayAbility_Consumable* ConsumableAbility =
+			Cast<UOBGameplayAbility_Consumable>(AbilitySpec.Ability);
+		if (ConsumableAbility &&
+			ConsumableAbility->GetConsumableItemTag() == ResolvedItem.ItemTag)
+		{
+			return ASC->TryActivateAbility(AbilitySpec.Handle);
+		}
+	}
+
+	return false;
 }
 
 bool UPlayerInventoryComponent::GetEquippedItem(
@@ -1377,6 +1567,10 @@ bool UPlayerInventoryComponent::MoveEquipmentItemToInventory(
 	{
 		TargetArray = &InventoryBackPackArray;
 	}
+	else if (TargetLocation == EInventoryItemLocation::Container)
+	{
+		TargetArray = &InventoryContainerArray;
+	}
 	if (!TargetArray)
 	{
 		return false;
@@ -1548,7 +1742,8 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 			return true;
 		}
 
-		if (Source.Location != EInventoryItemLocation::Backpack)
+		if (Source.Location != EInventoryItemLocation::Backpack &&
+			Source.Location != EInventoryItemLocation::Container)
 		{
 			return false;
 		}
@@ -1591,7 +1786,8 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 	}
 
 	if (Source.Location == EInventoryItemLocation::Equipment &&
-		Target.Location == EInventoryItemLocation::Backpack)
+		(Target.Location == EInventoryItemLocation::Backpack ||
+		 Target.Location == EInventoryItemLocation::Container))
 	{
 		const FEquipmentSlotEntry* Entry = FindEquipmentSlot(Source.EquipmentSlot);
 		if (!Entry || Entry->Item.InstanceId != Source.InstanceId ||
@@ -1625,6 +1821,10 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 			if (Location == EInventoryItemLocation::Backpack)
 			{
 				return &InventoryBackPackArray;
+			}
+			if (Location == EInventoryItemLocation::Container)
+			{
+				return &InventoryContainerArray;
 			}
 			return nullptr;
 		};
@@ -2201,6 +2401,13 @@ void UPlayerInventoryComponent::NotifyInventoryChanged()
 void UPlayerInventoryComponent::OnRep_BackpackItems()
 {
 	InventoryBackPackSize = InventoryBackPackArray.Num();
+	NotifyInventoryChanged();
+	OnAmmoPoolChanged.Broadcast();
+}
+
+void UPlayerInventoryComponent::OnRep_ContainerItems()
+{
+	InventoryContainerSize = InventoryContainerArray.Num();
 	NotifyInventoryChanged();
 	OnAmmoPoolChanged.Broadcast();
 }

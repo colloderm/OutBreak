@@ -31,7 +31,9 @@
 
 AOBPlayerController::AOBPlayerController()
 {
-
+	// Default quick-slot keys are 4..9. The actual key mappings remain in the
+	// Enhanced Input Mapping Context; this array exposes the six IA properties.
+	QuickSlotActions.SetNum(6);
 }
 
 void AOBPlayerController::BeginPlay()
@@ -393,7 +395,7 @@ void AOBPlayerController::Input_UseQuickSlot(const int32 QuickSlotIndex)
 		if (UPlayerInventoryComponent* Inventory =
 			ControlledPawn->FindComponentByClass<UPlayerInventoryComponent>())
 		{
-			Inventory->UseQuickSlot(QuickSlotIndex);
+			Inventory->TryUseQuickSlot(QuickSlotIndex);
 		}
 	}
 }

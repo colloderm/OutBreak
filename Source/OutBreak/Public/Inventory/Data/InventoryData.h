@@ -49,8 +49,9 @@ enum class EInventoryItemLocation : uint8
 {
 	None = 0,
 	Backpack = 1,
-	// Value 2 was the removed player-owned external container. Keep the later
-	// numeric values stable so existing Blueprint handles remain compatible.
+	// Player-owned secondary storage. World loot containers remain separate
+	// actors and never use this location.
+	Container = 2,
 	Equipment = 3,
 	QuickSlot = 4
 };
@@ -104,8 +105,8 @@ struct OUTBREAK_API FQuickSlotData
 {
 	GENERATED_BODY()
 
-	// A quick slot intentionally stores only the static item type. It keeps
-	// working after stacks move, merge, run out, or are acquired again.
+	// A quick slot intentionally stores only the static item type. It survives
+	// stack moves and merges, but is cleared when the final item is consumed.
 	UPROPERTY(BlueprintReadOnly)
 	FGameplayTag ItemTag;
 
