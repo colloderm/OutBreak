@@ -79,6 +79,25 @@ public:
 
 	// 현재 Loadout 읽기.
 	const FOBLoadout& GetLoadout() const { return CurrentLoadout; }
+	
+	// --- 반입 ---
+
+	// 창고 → 반입 목록. 창고 수량이 모자라면 아무것도 안 옮기고 false.
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	bool AddCarryItem(const FGameplayTag& ItemTag, int32 Count);
+
+	// 반입 목록 → 창고(선택 취소).
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	bool RemoveCarryItem(const FGameplayTag& ItemTag, int32 Count);
+
+	// 탐사 종료 시 항상 비운다. 사망이면 손실, 탈출이면 이미 정산으로 창고에 들어갔다.
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	void ClearCarryItems();
+
+	UFUNCTION(BlueprintPure, Category = "Loadout")
+	int32 GetCarryCount(const FGameplayTag& ItemTag) const;
+
+	const TArray<FOBItemStack>& GetCarryItems() const { return CurrentLoadout.CarryItems; }
 
 	// --- 스타터킷 ---
 

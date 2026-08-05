@@ -631,3 +631,53 @@ void UOBLoadoutSubsystem::LoadFromDisk()
 		CurrentCurrency = Save->Currency;
 	}
 }
+
+bool UOBLoadoutSubsystem::AddCarryItem(const FGameplayTag& ItemTag, int32 Count)
+{
+	// 창고에서 먼저 뺀다. 부분 차감을 안 하므로 실패하면 아무 일도 안 일어난다.
+	if (!RemoveStashItem(ItemTag, Count)) return false;
+
+	OBItemStacks::Add(CurrentLoadout.CarryItems, ItemTag, Count);
+	SaveToDisk();
+	return true;
+}
+
+bool UOBLoadoutSubsystem::RemoveCarryItem(const FGameplayTag& ItemTag, int32 Count)
+{
+	if (!ItemTag.IsValid() || Count <= 0) return false;
+
+	const int32 Index = CurrentLoadout.CarryItems.IndexOfByPredicate(
+		[&ItemTag](const FOBItemStack& S)
+		{
+			return S.ItemTag == ItemTag;
+		});
+	if (Index == INDEX_NONE || CurrentLoadout.CarryItems[Index].Count < Count) return false;
+
+	CurrentLoadout.CarryItems[Index].Count -= Count;
+	if (CurrentLoadout.CarryItems[Index].Count <= 0)
+	{
+		CurrentLoadout.CarryItems.RemoveAt(Index);
+	}
+
+	AddStashItemInternal(ItemTag, Count);   // 창고로 되돌린다
+	SaveToDisk();
+	return true;
+}
+
+void UOBLoadoutSubsystem::ClearCarryItems()
+{
+	if (CurrentLoadout.CarryItems.IsEmpty()) return;
+
+	CurrentLoadout.CarryItems.Empty();
+	SaveToDisk();
+}
+
+int32 UOBLoadoutSubsystem::GetCarryCount(const FGameplayTag& ItemTag) const
+{
+	const FOBItemStack* Found = CurrentLoadout.CarryItems.FindByPredicate(
+		[&ItemTag](const FOBItemStack& S)
+		{
+			return S.ItemTag == ItemTag;
+		});
+	return Found ? Found->Count : 0;
+}

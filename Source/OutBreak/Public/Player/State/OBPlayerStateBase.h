@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
 #include "Game/Expedition/OBExpeditionTypes.h"
+#include "Item/Data/OBItemTypes.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "OBPlayerStateBase.generated.h"
 
@@ -33,17 +34,15 @@ public:
 	void SetReady(bool bInReady);
 
 	const TArray<TSubclassOf<AOBWeaponBase>>& GetSelectedWeapons() const { return SelectedWeapons; }
+	const TArray<FOBItemStack>& GetSelectedCarryItems() const { return SelectedCarryItems; }
 	bool IsReady() const { return bReady; }
 	
 	EOBPlayerExpeditionStatus GetExpeditionStatus() const { return ExpeditionStatus; }
-	bool IsAliveInExpedition() const { return ExpeditionStatus == EOBPlayerExpeditionStatus::Alive; }
 	uint8 GetTeamId() const { return TeamId; }
 
 	void SetExpeditionStatus(EOBPlayerExpeditionStatus NewStatus);
 	void SetTeamId(uint8 NewTeamId);
 	
-	float GetExtractionProgress() const { return ExtractionProgress; }
-	bool IsExtracting() const { return bIsExtracting; }
 	// 서버: 탈출 진행도 갱신(ExtractionZone이 매 틱 호출).
 	void SetExtractionProgress(float InProgress01, bool bInExtracting);
 	
@@ -52,6 +51,8 @@ public:
 	
 	// 클라가 GameInstance Loadout을 한 번에 밀어넣을 때 사용(세션 진입 시).
 	void SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeaponBase>>& InWeapons);
+	
+	void SetCarryItemsBulk(const TArray<FOBItemStack>& InItems);
 	
 	// 프렌들리 파이어 판정: 두 액터가 모두 플레이어이고 같은 팀(TeamId>0)이면 true.
 	// - AI/적(플레이어 아님)은 항상 false → 정상 피해.
@@ -92,6 +93,10 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_SelectedWeapons, BlueprintReadOnly, Category = "Lobby")
 	TArray<TSubclassOf<AOBWeaponBase>> SelectedWeapons;
+	
+	// 반입 아이템. 클라가 push하고 서버가 스폰 시 가방에 채운다.
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Lobby")
+	TArray<FOBItemStack> SelectedCarryItems;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Ready, BlueprintReadOnly, Category = "Lobby")
 	bool bReady = false;

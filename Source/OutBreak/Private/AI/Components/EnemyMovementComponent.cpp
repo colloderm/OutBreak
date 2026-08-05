@@ -8,6 +8,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Animation/AnimMontage.h"
 #include "MotionWarpingComponent.h"
+#include "AI/Data/EnemyAsset.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "AI/Data/EnemyState.h"
 

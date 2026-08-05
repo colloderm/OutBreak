@@ -66,10 +66,10 @@ public:
 	
 	// 가방 내용을 태그+수량으로 요약한다(같은 종류가 여러 칸이면 합친다).
 	// 탈출 정산과 사망 시 시체 드랍이 같은 요약을 쓴다.
-	TArray<FOBItemStack> GetBagContentsAsStacks() const;
+	TArray<FOBItemStack> GetBagContentsAsStacks();
 	
 	// 스폰 이후 늘어난 것만. 정산은 "레벨에서 주운 것"만 창고로 보낸다.
-	TArray<FOBItemStack> GetBagGainsSinceSpawn() const;
+	TArray<FOBItemStack> GetBagGainsSinceSpawn();
 	
 	// 조준 상태(서버). 이동 감속 + 복제 상태
 	void SetAiming(bool bnewAiming);
@@ -120,6 +120,9 @@ public:
 	
 	// 스폰 직후 바닥(스트리밍 셀)이 올라올 때까지 공중에 고정. 서버 전용.
 	void HoldUntilGrounded();
+	
+	// 서버: 반입 아이템을 가방에 채운다. 한 번만 실행된다.
+	void ApplyCarryItems();
 	
 public:
 	/*
@@ -251,6 +254,9 @@ protected:
 	
 	// 초기 지급이 끝난 시점의 가방(서버 전용). 정산에서 빼는 기준선.
 	TArray<FOBItemStack> SpawnBagSnapshot;
+	
+	// 반입 지급 중복 방지(PossessedBy와 PS push 양쪽에서 불릴 수 있다).
+	bool bCarryItemsApplied = false;
 	
 private:
 	void PollGround();

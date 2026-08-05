@@ -228,6 +228,13 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyLoadout(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
 	
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyCarryItems(const TArray<FOBItemStack>& Items);
+	
+	// 가방에 다 못 들어간 반입분을 창고로 되돌린다.
+	UFUNCTION(Client, Reliable)
+	void Client_ReturnCarryLeftover(const TArray<FOBItemStack>& Items);
+	
 	// 파티 리더십을 서버 PlayerState에 반영(게이팅용).
 	UFUNCTION(Server, Reliable)
 	void Server_SetPartyLeader(bool bLeader);

@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AI/Interface/EnemyComponentInterface.h"
 #include "AI/Nav/EnemyGenNavLinksProxy.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Navigation/PathFollowingComponent.h"
@@ -12,6 +11,7 @@
 #include "EnemyMovementComponent.generated.h"
 
 
+class UEnemyAsset;
 class UAnimMontage;
 
 class AEnemyCharacter;

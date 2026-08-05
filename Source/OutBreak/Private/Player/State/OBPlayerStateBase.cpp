@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
+#include "Character/OBCharacterBase.h"
 #include "GameFramework/PlayerController.h"
 #include "LoadOut/OBLoadoutSubsystem.h"
 #include "Weapon/OBWeaponBase.h"
@@ -36,6 +37,7 @@ void AOBPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AOBPlayerStateBase, ExpeditionStatus);
 	DOREPLIFETIME(AOBPlayerStateBase, TeamId);
 	DOREPLIFETIME(AOBPlayerStateBase, bIsPartyLeader);
+	DOREPLIFETIME(AOBPlayerStateBase, SelectedCarryItems);
 	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, ExtractionProgress, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, bIsExtracting,      COND_OwnerOnly);
 }
@@ -109,6 +111,19 @@ void AOBPlayerStateBase::SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeap
 	OnLobbyStateChanged.Broadcast();
 }
 
+void AOBPlayerStateBase::SetCarryItemsBulk(const TArray<FOBItemStack>& InItems)
+{
+	if (!HasAuthority()) return;
+
+	SelectedCarryItems = InItems;
+
+	// 폰이 먼저 스폰됐을 수 있다(클라 push가 늦게 도착하는 경우). 그때 여기서 채운다.
+	if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(GetPawn()))
+	{
+		Char->ApplyCarryItems();
+	}
+}
+
 bool AOBPlayerStateBase::AreSameTeam(const AActor* A, const AActor* B)
 {
 	auto GetTeam = [](const AActor* Actor, uint8& OutTeam) -> bool 
@@ -162,9 +177,12 @@ void AOBPlayerStateBase::ApplyExpeditionStatusToLoadout()
 	{
 	case EOBPlayerExpeditionStatus::Dead:      
 		Loadout->ClearLoadout();
+		Loadout->ClearCarryItems();   // 반입분도 잃는다(시체로 넘어갔다)
 		break;
 	case EOBPlayerExpeditionStatus::Extracted: 
 		Loadout->AddCurrency(ExtractReward); 
+		// 반입분은 가방째 정산되어 이미 창고에 들어왔다. 여기 남기면 다음 판에 복사된다.
+		Loadout->ClearCarryItems();
 		break;
 	default: 
 		break;
@@ -178,6 +196,7 @@ void AOBPlayerStateBase::CopyProperties(APlayerState* NewPlayerState)
 	if (AOBPlayerStateBase* PS = Cast<AOBPlayerStateBase>(NewPlayerState))
 	{
 		PS->SelectedWeapons = SelectedWeapons;
+		PS->SelectedCarryItems = SelectedCarryItems;
 		PS->bReady = bReady;
 	}
 }

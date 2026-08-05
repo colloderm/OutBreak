@@ -70,6 +70,12 @@ void AOBPlayerController::BeginPlay()
 			if (Classes.Num() > 0)
 			{
 				Server_ApplyLoadout(Classes);
+				
+				const TArray<FOBItemStack>& Carry = Loadout->GetCarryItems();
+				if (Carry.Num() > 0)
+				{
+					Server_ApplyCarryItems(Carry);
+				}
 			}
 		}
 
@@ -1023,5 +1029,26 @@ void AOBPlayerController::Server_PickUpWorldItem_Implementation(
 		MyChar->GetPlayerInventoryComponent())
 	{
 		Inventory->PickUpWorldItem(WorldItem);
+	}
+}
+
+void AOBPlayerController::Server_ApplyCarryItems_Implementation(const TArray<FOBItemStack>& Items)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetCarryItemsBulk(Items);
+	}
+}
+
+void AOBPlayerController::Client_ReturnCarryLeftover_Implementation(const TArray<FOBItemStack>& Items)
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->AddStashItems(Items);
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Carry] 가방이 모자라 %d종을 창고로 되돌렸다."), Items.Num());
+		}
 	}
 }

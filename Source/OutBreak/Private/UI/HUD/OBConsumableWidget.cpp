@@ -2,7 +2,7 @@
 
 #include "UI/HUD/OBConsumableWidget.h"
 
-#include "Inventory/Components/PlayerInventoryComponent.h"+
+#include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Ability/Tags/OBGameplayTags.h"
 #include "Components/TextBlock.h"
 

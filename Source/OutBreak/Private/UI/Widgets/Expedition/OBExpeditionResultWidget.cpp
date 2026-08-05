@@ -26,8 +26,8 @@ void UOBExpeditionResultWidget::SetHaul(const TArray<FOBItemStack>& InHaul)
 		UOBLootEntryWidget* Entry = CreateWidget<UOBLootEntryWidget>(this, EntryWidgetClass);
 		if (!Entry) continue;
 
-		// 소유 창이 없다 = 클릭해도 아무 일 없다. 결과창은 읽기 전용이다.
-		Entry->SetEntry(nullptr, Stack.ItemTag, Stack.Count);
+		// 클릭 바인딩 없음 = 결과창은 읽기 전용이다.
+		Entry->SetEntry(Stack.ItemTag, Stack.Count);
 		Box_Haul->AddChild(Entry);
 	}
 }

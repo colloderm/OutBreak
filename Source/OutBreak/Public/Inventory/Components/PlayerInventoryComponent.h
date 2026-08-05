@@ -177,7 +177,6 @@ public:
 	EOBWeaponSlot GetActiveSlot() const { return ActiveWeaponSlot; }
 
 	TSubclassOf<AOBWeaponBase> GetWeaponInSlot(EOBWeaponSlot Slot) const;
-	const TArray<FInventoryData>& GetBackpackItems() const { return InventoryBackPackArray; }
 
 	FOnPlayerInventoryChanged OnInventoryChanged;
 	FOnPlayerAmmoPoolChanged OnAmmoPoolChanged;

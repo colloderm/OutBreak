@@ -766,7 +766,7 @@ void AOBExpeditionGameMode::NotifyPlayerExtracted(AController* Controller)
 	if (!PS || PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive) return;
 	
 	// 폰을 정리하기 전에 가방을 찍는다. HandleExtracted가 장비를 해제한다.
-	if (const AOBCharacterBase* Char = Cast<AOBCharacterBase>(Controller->GetPawn()))
+	if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(Controller->GetPawn()))
 	{
 		if (AOBPlayerController* OwningPC = Cast<AOBPlayerController>(Controller))
 		{

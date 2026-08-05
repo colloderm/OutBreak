@@ -72,19 +72,7 @@ void UOBLootWindow::Rebuild()
 	}
 
 	// 정렬 기준은 창고·상점과 같다: 카테고리 → SortOrder → 태그.
-	Items.Sort(
-		[](const FOBItemStack& A, const FOBItemStack& B)
-		{
-			const FOBItemDefinitionRow* RowA = UOBItemRegistry::FindItem(A.ItemTag);
-			const FOBItemDefinitionRow* RowB = UOBItemRegistry::FindItem(B.ItemTag);
-
-			// 표에 없는 건 맨 뒤로. 눈에 띄어야 CSV를 고친다.
-			if (!RowA || !RowB) return RowA != nullptr;
-
-			if (RowA->Category  != RowB->Category)  return RowA->Category  < RowB->Category;
-			if (RowA->SortOrder != RowB->SortOrder) return RowA->SortOrder < RowB->SortOrder;
-			return A.ItemTag.ToString() < B.ItemTag.ToString();
-		});
+	UOBItemRegistry::SortStacks(Items);
 
 	if (!EntryWidgetClass)
 	{
@@ -99,7 +87,8 @@ void UOBLootWindow::Rebuild()
 		UOBLootEntryWidget* Entry = CreateWidget<UOBLootEntryWidget>(this, EntryWidgetClass);
 		if (!Entry) continue;
 
-		Entry->SetEntry(this, Stack.ItemTag, Stack.Count);
+		Entry->SetEntry(Stack.ItemTag, Stack.Count);
+		Entry->OnEntryClicked.BindUObject(this, &UOBLootWindow::RequestTake);
 		Box_Entries->AddChild(Entry);
 	}
 }

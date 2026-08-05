@@ -25,4 +25,9 @@ struct FOBLoadout
 	// 칸 개념이 없어서 MaxStack을 적용하지 않고 태그당 한 항목으로 합친다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Loadout")
 	TArray<FOBItemStack> StashItems;
+	
+	// 이번 탐사에 들고 들어갈 물건. 고르는 순간 창고에서 빠져나온다.
+	// 죽으면 그대로 잃고, 탈출하면 가방째 정산되어 창고로 돌아온다.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Category = "Loadout")
+	TArray<FOBItemStack> CarryItems;
 };
