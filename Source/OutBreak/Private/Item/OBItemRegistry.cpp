@@ -6,9 +6,43 @@
 #include "Item/Data/OBItemDefinition.h"
 #include "Weapon/OBWeaponBase.h"
 #include "Weapon/Data/OBWeaponData.h"
+#include "UObject/GCObject.h"
 
 namespace
 {
+	/**
+	왜 CDO가 아니라 여기서 표를 드는가?
+	 - UOBItemRegistry는 UDeveloperSettings라 CDO가 엔진 초기화 때 생성되어
+	   "Disregard for GC" 집합에 들어간다. 그 집합의 객체가 나중에 로드된 객체를
+	   참조하면 GarbageCollectionVerification이 Fatal로 잡는다.
+	 - 에디터는 이 집합을 끄기 때문에 패키징 빌드에서만 터진다.
+	 - 쉬핑은 검증이 빠져서 대신 표가 수거되고 ItemCache가 죽은 메모리를 가리킨다.
+	*/
+	class FOBItemTableKeeper : public FGCObject
+	{
+	public:
+		virtual void AddReferencedObjects(FReferenceCollector& Collector) override
+		{
+			Collector.AddReferencedObject(ItemTable);
+			Collector.AddReferencedObject(LootTable);
+		}
+
+		virtual FString GetReferencerName() const override
+		{
+			return TEXT("FOBItemTableKeeper");
+		}
+
+		TObjectPtr<UDataTable> ItemTable;
+		TObjectPtr<UDataTable> LootTable;
+	};
+
+	// 함수 지역 static. 파일 스코프에 두면 GC 시스템보다 먼저 생성될 수 있다.
+	FOBItemTableKeeper& GetTableKeeper()
+	{
+		static FOBItemTableKeeper Keeper;
+		return Keeper;
+	}
+
 	// 캐시를 채우려면 const가 아닌 CDO가 필요하다(설정을 바꾸는 게 아니라 캐시만 채운다).
 	UOBItemRegistry* GetReadyRegistry()
 	{
@@ -102,8 +136,8 @@ bool UOBItemRegistry::GetItemDisplay(const FGameplayTag& ItemTag, FText& OutName
 
 UDataTable* UOBItemRegistry::GetLootTable()
 {
-	UOBItemRegistry* Registry = GetReadyRegistry();
-	return Registry ? Registry->LoadedLootTable.Get() : nullptr;
+	GetReadyRegistry(); // 캐시 보장
+	return GetTableKeeper().LootTable;
 }
 
 void UOBItemRegistry::EnsureCache()
@@ -120,20 +154,21 @@ void UOBItemRegistry::RebuildCache()
 	WeaponPathToTag.Reset();
 	bCacheBuilt = true;
 
-	// 드랍 테이블은 컨테이너의 RowHandle이 참조하므로 여기서 붙잡아 두기만 한다.
-	LoadedLootTable = LootTable.LoadSynchronous();
+	FOBItemTableKeeper& Keeper = GetTableKeeper();
 
-	LoadedItemTable = ItemTable.LoadSynchronous();
-	if (!LoadedItemTable)
+	// 드랍 테이블은 컨테이너의 RowHandle이 참조하므로 여기서 붙잡아 두기만 한다.
+	Keeper.LootTable = LootTable.LoadSynchronous();
+
+	Keeper.ItemTable = ItemTable.LoadSynchronous();
+	if (!Keeper.ItemTable)
 	{
 		UE_LOG(LogTemp, Warning,
-			TEXT("[OBItemRegistry] 아이템 표가 없다. Project Settings > Game > OutBreak Items 의 "
-				 "Item Table에 DT_Items를 지정할 것."));
+			TEXT("[OBItemRegistry] 아이템 표가 없다. Project Settings > Game > OutBreak Items 의 Item Table에 DT_Items를 지정할 것."));
 		return;
 	}
 
-	// 캐시는 표의 행 메모리를 직접 가리킨다. 표를 하드 참조로 붙잡아 두므로 언로드되지 않는다.
-	for (const TPair<FName, uint8*>& Pair : LoadedItemTable->GetRowMap())
+	// 캐시는 표의 행 메모리를 직접 가리킨다. Keeper가 GC로부터 표를 지킨다.
+	for (const TPair<FName, uint8*>& Pair : Keeper.ItemTable->GetRowMap())
 	{
 		const FOBItemDefinitionRow* Row = reinterpret_cast<const FOBItemDefinitionRow*>(Pair.Value);
 		if (!Row) continue;

@@ -91,6 +91,9 @@ public:
 	
 	void Dead();
 	bool IsDead() const { return bIsDead; }
+	
+	// 서버: 마지막 피격 방향/부위. Dead()에서 래그돌 임펄스로 쓴다.
+	void NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection);
 
 protected:
 	virtual void BeginPlay() override;
@@ -130,6 +133,10 @@ protected:
 		meta = (AllowPrivateAccess = "true"))
 	bool bIsDead = false;
 	
+	// UObject가 아니라 UPROPERTY 불필요. 좀비는 복제를 안 하므로 서버에서만 의미가 있다.
+	FVector LastHitDirection = FVector::ZeroVector;
+	FName LastHitBoneName = NAME_None;
+	
 	// 처치 시 남길 드랍 테이블. 비우면 아무것도 안 떨어진다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot", Meta = (RowType = "/Script/OutBreak.OBLootTableRow"))
 	FDataTableRowHandle DeathLootRow;
@@ -137,6 +144,10 @@ protected:
 	// 드랍을 담을 컨테이너 클래스(BP_LootDrop).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")
 	TSubclassOf<AOBLootContainer> LootContainerClass;
+	
+	// 좀비 질량에 맞춰 BP에서 조정한다. 플레이어보다 가볍게 잡으면 더 과장되게 날아간다.
+	UPROPERTY(EditDefaultsOnly, Category = "Death", Meta = (ClampMin = "0.0"))
+	float RagdollImpulseStrength = 12000.f;
 	
 	/* ================================================== Components ============================================= */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))

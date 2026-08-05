@@ -5,6 +5,7 @@
 
 #include "Net/UnrealNetwork.h"
 #include "Player/Controller/OBPlayerController.h"
+#include "Item/OBItemRegistry.h"
 
 
 // Sets default values
@@ -46,6 +47,14 @@ void AWorldItem::Interact_Implementation(AOBPlayerController* PC)
 
 FText AWorldItem::GetInteractPromptText_Implementation() const
 {
+	FText ItemName;
+	UTexture2D* Icon = nullptr;
+	if (UOBItemRegistry::GetItemDisplay(ItemInstance.ItemTag, ItemName, Icon))
+	{
+		// "붕대 줍기". 바닥에 여러 개 떨어져 있을 때 뭘 줍는지 보여야 한다.
+		return FText::Format(
+			NSLOCTEXT("OBInventory", "PickUpNamed", "{0} 줍기"), ItemName);
+	}
 	return NSLOCTEXT("OBInventory", "PickUpWorldItem", "줍기");
 }
 
