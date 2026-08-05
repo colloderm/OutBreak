@@ -10,77 +10,44 @@
 #include "InputCoreTypes.h"
 
 #include "Inventory/Components/PlayerInventoryComponent.h"
-#include "Inventory/Subsystem/ItemDataSubsystem.h"
 #include "Inventory/Widget/InventoryDragDropOperation.h"
-#include "Item/Data/OBItemDefinition.h"
+#include "Item/OBItemRegistry.h"
 
 void UInventorySlot::Update()
 {
+	// 퀵슬롯은 수량이 0이어도 "등록된 종류"를 계속 보여준다.
 	const bool bAssignedQuickSlot =
 		SlotHandle.Location == EInventoryItemLocation::QuickSlot &&
-		InventoryData.ItemDefinition;
+		InventoryData.ItemTag.IsValid();
 	if ((!bAssignedQuickSlot && InventoryData.ItemStack <= 0) ||
-		(!InventoryData.ItemDefinition && InventoryData.ItemName.IsNone()))
+		!InventoryData.ItemTag.IsValid())
 	{
 		ClearSlot();
 		return;
 	}
 
-	if (InventoryData.ItemDefinition)
+	// 이름/아이콘의 단일 조회 경로를 사용한다. 무기 행의 Icon이 비어 있으면
+	// GetItemDisplay가 WeaponData의 WeaponIcon으로 fallback한다.
+	FText DisplayName;
+	UTexture2D* Icon = nullptr;
+	if (!UOBItemRegistry::GetItemDisplay(
+		InventoryData.ItemTag,
+		DisplayName,
+		Icon))
 	{
-		SetSlotMetaData(
-			InventoryData.ItemDefinition->Icon,
-			InventoryData.ItemStack);
-		return;
-	}
-
-	const UGameInstance* GameInstance = GetGameInstance();
-	if (!IsValid(GameInstance))
-	{
+		// 표에서 행이 사라졌거나 태그 오타. 조용히 비면 원인을 못 찾는다.
 		UE_LOG(
 			LogTemp,
 			Error,
-			TEXT("%s::%s : GameInstance is invalid."),
-			*GetClass()->GetName(),
-			TEXT(__FUNCTION__));
-		return;
-	}
-	
-	const UItemDataSubsystem* ItemDataSubsystem =
-		GameInstance->GetSubsystem<UItemDataSubsystem>();
-
-	if (!IsValid(ItemDataSubsystem))
-	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("%s::%s : ItemDataSubsystem is invalid."),
-			*GetClass()->GetName(),
-			TEXT(__FUNCTION__));
-		return;
-	}
-
-	const FItemMetaData* ItemMetaDataRow =
-		ItemDataSubsystem->FindItemRow(
-			InventoryData.ItemName,
-			TEXT("UInventorySlot::Update"));
-
-	if (ItemMetaDataRow == nullptr)
-	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("%s::%s : Item row \"%s\" was not found."),
+			TEXT("%s::%s : DT_Items에 \"%s\" 행이 없다."),
 			*GetClass()->GetName(),
 			TEXT(__FUNCTION__),
-			*InventoryData.ItemName.ToString());
+			*InventoryData.ItemTag.ToString());
 		ClearSlot();
 		return;
 	}
-	
-	SetSlotMetaData(
-		ItemMetaDataRow->ItemTexture,
-		InventoryData.ItemStack);
+
+	SetSlotMetaData(Icon, InventoryData.ItemStack);
 }
 
 void UInventorySlot::SetSlotData(const FInventoryData& Data)
@@ -192,7 +159,10 @@ void UInventorySlot::SetSlotMetaData(UTexture2D* Image, int Stack)
 	}
 
 	ItemImage->SetBrushFromTexture(Image);
-	
+	ItemImage->SetVisibility(
+		Image
+			? ESlateVisibility::HitTestInvisible
+			: ESlateVisibility::Hidden);
 
 	if (Stack > 1)
 	{
@@ -209,6 +179,7 @@ void UInventorySlot::ClearSlot()
 	if (IsValid(ItemImage))
 	{
 		ItemImage->SetBrushFromTexture(nullptr);
+		ItemImage->SetVisibility(ESlateVisibility::Hidden);
 	}
 
 	if (IsValid(ItemStack))

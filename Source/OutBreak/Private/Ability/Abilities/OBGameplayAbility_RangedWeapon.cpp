@@ -13,7 +13,6 @@
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
-#include "Character/Components/OBCharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
@@ -129,6 +128,14 @@ bool UOBGameplayAbility_RangedWeapon::CanActivateAbility(const FGameplayAbilityS
 
 void UOBGameplayAbility_RangedWeapon::FireOneShot()
 {
+	// 발사 도중 스프린트를 누르면 연사/점사를 즉시 끊는다.
+	// CanActivateAbility는 시작만 막으므로 매 발마다 여기서 다시 본다.
+	if (IsOwnerSprinting())
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return;
+	}
+	
 	AOBWeaponBase* Weapon = GetEquippedWeapon();
 
 	// 탄약 없음 → 발사 중단(연사/점사 종료). 탄약은 복제되어 클라도 인지.
@@ -236,13 +243,8 @@ bool UOBGameplayAbility_RangedWeapon::IsOwnerSprinting() const
 {
 	const AOBCharacterBase* Char = GetOBCharacterFromActorInfo();
 	if (!Char) return false;
-	
-	// 기동성과 ADS가 최고속도를 통째로 내리므로 임계값도 같은 배율로 내린다.
-	// 그래야 무기·조준 조합과 무관하게 "스프린트 게이트"에서만 걸린다.
-	const UOBCharacterMovementComponent* Move = Cast<UOBCharacterMovementComponent>(Char->GetCharacterMovement());
-	const float Scale = Move ? Move->GetEffectiveSpeedMultiplier() : 1.f;
 
-	return Char->GetVelocity().SizeSquared2D() > FMath::Square(SprintBlockSpeed * Scale);
+	return Char->IsSprintInputHeld() && Char->GetVelocity().SizeSquared2D() > 1.f;
 }
 
 void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()

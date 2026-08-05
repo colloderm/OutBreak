@@ -204,10 +204,6 @@ void UInventoryWindow::Update()
 			{
 				Handle = InventoryComponent->MakeBackpackHandle(Index);
 			}
-			else if (InventoryLocation == EInventoryItemLocation::Container)
-			{
-				Handle = InventoryComponent->MakeContainerHandle(Index);
-			}
 		}
 		InventorySlot->SetSlotContext(
 			InventoryComponent,

@@ -77,7 +77,7 @@ void AEnemyController::InitializeAIPerception()
 	HearingConfig =
 		CreateDefaultSubobject<UAISenseConfig_Hearing>(
 			TEXT("HearingConfig"));
-	HearingConfig->HearingRange = 3500.0f;
+	HearingConfig->HearingRange = 10000.0f;
 	HearingConfig->SetMaxAge(5.0f);
 	HearingConfig->DetectionByAffiliation.bDetectEnemies = true;
 	HearingConfig->DetectionByAffiliation.bDetectFriendlies = true;

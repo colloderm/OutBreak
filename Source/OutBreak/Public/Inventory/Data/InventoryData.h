@@ -4,102 +4,28 @@
 
 #include "CoreMinimal.h"
 #include "Equipment/Data/OBEquipmentTypes.h"
+#include "GameplayTagContainer.h"
+#include "Item/OBItemRegistry.h"
 #include "UObject/Object.h"
 #include "InventoryData.generated.h"
-
-class UOBItemDefinition;
 
 /**
  * 
  */
 
 
-USTRUCT(BlueprintType)
-struct OUTBREAK_API FInventoryQueryResult
-{
-	GENERATED_BODY()
-	
-	FName QueryItemName;
-	
-	bool HasItem = false;
-	
-	TArray<int32> BackpackIndices;
-	TArray<int32> ContainerIndices;
-	
-	int32 TotalStack = 0;
-	
-};
-
-
-USTRUCT(Blueprintable)
-struct OUTBREAK_API FItemMetaData : public FTableRowBase
-{
-	GENERATED_BODY()
-	
-	UPROPERTY(EditAnywhere)
-	TObjectPtr<UTexture2D> ItemTexture;
-	
-	// 현재 Complier Error를 피하기 위해 Actor Class 사용 추후 전용 클래스로 변경. 
-	UPROPERTY(EditAnywhere)
-	TSubclassOf<AActor> WorldItemClass;
-	
-	UPROPERTY(EditAnywhere)
-	int32 MaxItemStack = 1;
-	
-};
-
-USTRUCT(BlueprintType)
-struct OUTBREAK_API FWorldItemData
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UOBItemDefinition> ItemDefinition;
-	
-	// Legacy data-table identifier. Used only when ItemDefinition is not assigned.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName ItemName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 ItemStack = 1;
-	
-	
-};
-
-
-UENUM(BlueprintType)
-enum class EItemType : uint8
-{
-	// Primary/Secondary/Melee is resolved from UOBWeaponData::WeaponSlot.
-	// Inventory only needs to know that the item is a weapon.
-	Weapon,
-	// Head/Chest/Hands/Legs/Feet is resolved from UOBEquipmentData.
-	Equipment,
-	Consumable,
-	Ammo,
-	
-};
-
-
-
+// 아이템 정적 스펙 표는 DT_Items(FOBItemDefinitionRow)로 통합됐다.
+// 아이콘=Icon, 최대 스택=MaxStack, 월드 드랍 액터=WorldItemClass 가 각각 대체한다.
 
 USTRUCT(BlueprintType)
 struct OUTBREAK_API FInventoryData
 {
 	GENERATED_BODY()
 
-	// Existing project item asset. WeaponClass is resolved through this asset,
-	// and the weapon slot is resolved from the class default object's UOBWeaponData.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UOBItemDefinition> ItemDefinition;
+	FGameplayTag ItemTag;
 	
-	UPROPERTY(BlueprintReadWrite)
-	FName ItemName = NAME_None;
-	
-	UPROPERTY(BlueprintReadWrite)
-	EItemType ItemType = EItemType::Consumable;
-	
-	UPROPERTY(BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 ItemStack = 0;
 
 	// Stable identity for equipment state. Array indices can change when slots move.
@@ -109,17 +35,24 @@ struct OUTBREAK_API FInventoryData
 	// Per-item runtime state. -1 means that the weapon has not been equipped yet.
 	UPROPERTY(BlueprintReadOnly)
 	int32 MagazineAmmo = -1;
+	
+	// 스펙은 표에서 그때그때 조회한다. 포인터를 들고 있지 않는다.
+	const FOBItemDefinitionRow* GetDefinition() const
+	{
+		return UOBItemRegistry::FindItem(ItemTag);
+	}
 };
 
 // UI drag/drop locations. SlotIndex is only a hint; mutations re-resolve by InstanceId.
 UENUM(BlueprintType)
 enum class EInventoryItemLocation : uint8
 {
-	None,
-	Backpack,
-	Container,
-	Equipment,
-	QuickSlot
+	None = 0,
+	Backpack = 1,
+	// Value 2 was the removed player-owned external container. Keep the later
+	// numeric values stable so existing Blueprint handles remain compatible.
+	Equipment = 3,
+	QuickSlot = 4
 };
 
 USTRUCT(BlueprintType)
@@ -139,14 +72,13 @@ struct OUTBREAK_API FInventoryItemHandle
 	UPROPERTY(BlueprintReadWrite)
 	EOBEquipmentSlot EquipmentSlot = EOBEquipmentSlot::None;
 
-	// Quick slots reference an item type rather than a concrete inventory instance.
 	UPROPERTY(BlueprintReadWrite)
-	TObjectPtr<UOBItemDefinition> ItemDefinition;
+	FGameplayTag ItemTag;
 
 	bool HasItem() const
 	{
 		return InstanceId.IsValid() ||
-			(Location == EInventoryItemLocation::QuickSlot && ItemDefinition);
+			(Location == EInventoryItemLocation::QuickSlot && ItemTag.IsValid());
 	}
 };
 
@@ -175,7 +107,7 @@ struct OUTBREAK_API FQuickSlotData
 	// A quick slot intentionally stores only the static item type. It keeps
 	// working after stacks move, merge, run out, or are acquired again.
 	UPROPERTY(BlueprintReadOnly)
-	TObjectPtr<UOBItemDefinition> ItemDefinition;
+	FGameplayTag ItemTag;
 
-	bool IsAssigned() const { return ItemDefinition != nullptr; }
+	bool IsAssigned() const { return ItemTag.IsValid(); }
 };

@@ -10,7 +10,6 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
-#include "Inventory/Components/OBInventoryComponent.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Character/Data/OBPawnData.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
@@ -26,6 +25,8 @@
 #include "Character/Components/OBCharacterMovementComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "TimerManager.h"
+#include "Item/Loot/OBLootContainer.h"
+#include "Game/GameState/OBExpeditionGameState.h"
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
 {
@@ -55,7 +56,6 @@ AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
 	
 	EquipmentComponent = CreateDefaultSubobject<UOBEquipmentComponent>(TEXT("EquipmentComponent"));
 	
-	InventoryComponent = CreateDefaultSubobject<UOBInventoryComponent>(TEXT("InventoryComponent"));
 	PlayerInventoryComponent = CreateDefaultSubobject<UPlayerInventoryComponent>(TEXT("PlayerInventoryComponent"));
 
 	bUseControllerRotationYaw = false;
@@ -129,6 +129,8 @@ void AOBCharacterBase::HandleDeath()
 	
 	// --- 즉시 사망 ---
 	bIsDead = true;
+	DropCorpseLoot();   // 장비를 잃는 것 = 다른 사람이 주울 수 있게 남기는 것
+	
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->CancelAbilities();
@@ -162,6 +164,42 @@ void AOBCharacterBase::OnRep_IsDead()
 	if (bIsDead)
 	{
 		StartDeath();
+	}
+}
+
+void AOBCharacterBase::DropCorpseLoot()
+{
+	// 다운→사망 경로에서도 불릴 수 있어 중복을 막는다.
+	if (!HasAuthority() || bCorpseDropped || !CorpseContainerClass) return;
+
+	// 홈/로비에서의 사망(테스트 등)은 시체를 남기지 않는다.
+	UWorld* W = GetWorld();
+	if (!W || !W->GetGameState<AOBExpeditionGameState>()) return;
+
+	TArray<FInventoryData> Items;
+	if (PlayerInventoryComponent)
+	{
+		PlayerInventoryComponent->GetLootableItemInstances(Items);
+	}
+	if (Items.IsEmpty())
+	{
+		bCorpseDropped = true;
+		return;
+	}
+
+	const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
+	const FVector DropLoc = GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
+
+	AOBLootContainer* CorpseContainer =
+		AOBLootContainer::SpawnWithItemInstances(
+			W,
+			CorpseContainerClass,
+			FTransform(FRotator::ZeroRotator, DropLoc),
+			Items);
+	if (CorpseContainer && PlayerInventoryComponent)
+	{
+		PlayerInventoryComponent->ClearLootableItemInstances();
+		bCorpseDropped = true;
 	}
 }
 
@@ -291,6 +329,25 @@ void AOBCharacterBase::SetSprintCameraLag(bool bSprinting)
 	SetActorTickEnabled(true);
 }
 
+void AOBCharacterBase::SetSprintInput(bool bNewSprinting)
+{
+	if (bSprintInputHeld == bNewSprinting) return;
+
+	bSprintInputHeld = bNewSprinting;
+	SetSprintCameraLag(bNewSprinting);
+
+	// 발사 차단은 서버에서도 같은 결론이 나와야 예측이 롤백되지 않는다.
+	if (!HasAuthority() && IsLocallyControlled())
+	{
+		Server_SetSprintInput(bNewSprinting);
+	}
+}
+
+void AOBCharacterBase::Server_SetSprintInput_Implementation(bool bNewSprinting)
+{
+	bSprintInputHeld = bNewSprinting;
+}
+
 void AOBCharacterBase::AddFireFocusPulse(float PulseAmount)
 {
 	// 로컬 전용
@@ -390,6 +447,9 @@ void AOBCharacterBase::FinishDeathFromDowned()
 	if (!HasAuthority()) return;
 	bIsDowned = false;
 	bIsDead = true;
+	
+	DropCorpseLoot();
+	
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->RemoveLooseGameplayTag(OBGameplayTags::State_Downed);
@@ -548,10 +608,10 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 
 	if (PlayerInventoryComponent)
 	{
-		if (PawnData && PawnData->DefaultBackpack)
+		if (PawnData && PawnData->DefaultBackpackTag.IsValid())
 		{
 			PlayerInventoryComponent->EquipStartingBackpack(
-				PawnData->DefaultBackpack);
+				PawnData->DefaultBackpackTag);
 		}
 		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Loadout)
 		{
@@ -564,21 +624,12 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 		{
 			for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
 			{
-				PlayerInventoryComponent->AddItem(Item.Key, Item.Value);
+				PlayerInventoryComponent->TryAddItem(Item.Key, Item.Value);
 			}
 		}
 		PlayerInventoryComponent->EquipDefaultSlot();
 	}
 
-	// Transitional compatibility for consumable abilities/widgets that have not
-	// moved yet. Weapons are intentionally no longer added or equipped here.
-	if (InventoryComponent && PawnData)
-	{
-		for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
-		{
-			InventoryComponent->AddItem(Item.Key, Item.Value);
-		}
-	}
 }
 
 void AOBCharacterBase::OnRep_PlayerState()

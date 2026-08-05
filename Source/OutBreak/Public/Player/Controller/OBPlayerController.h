@@ -7,6 +7,8 @@
 #include "Game/Expedition/OBExpeditionTypes.h"
 #include "OBPlayerController.generated.h"
 
+class AOBLootContainer;
+class AWorldItem;
 class UWorld;
 class AOBInteractableActor;
 class UUserWidget;
@@ -47,11 +49,23 @@ private:
 	
 	// 현재 상호작용 가능한 대상(범위 안). 약참조.
 	TWeakObjectPtr<AOBInteractableActor> CurrentInteractable;
+	
+	// 범위 안에 있는 전부. 상자가 겹쳐 있을 때 "나중에 들어온 것"이 아니라
+	// "가장 가까운 것"을 골라야 해서 목록으로 든다.
+	TArray<TWeakObjectPtr<AOBInteractableActor>> NearbyInteractables;
+
+	FTimerHandle InteractRefreshTimer;
+
+	void RefreshInteractTarget();
+	
+	// 눈높이에서 대상까지 막혀 있는가. 벽 너머 상자에 프롬프트가 뜨지 않게 한다.
+	bool IsInteractableOccluded(const FVector& ViewLocation, const AOBInteractableActor* Candidate) const;
 
 	// 현재 열려있는 상호작용 위젯(중복 오픈 방지 + 닫기용).
 	UPROPERTY()
 	TObjectPtr<UUserWidget> ActiveInteractionWidget;
 	
+	bool bInventoryToggle;
 protected:
 	//~ APlayerController interface
 	virtual void SetupInputComponent() override;
@@ -66,8 +80,9 @@ protected:
 	void Input_JumpStarted();
 	void Input_JumpCompleted();
 
-	void Input_InventoryStarted();
-	void Input_InventoryCompleted();
+	void Input_InventoryKey();
+	void InventoryStarted();
+	void InventoryCompleted();
 	
 	// 능력 입력 핸들러(눌림/뗌).
 	void Input_AbilityInputPressed(FGameplayTag InputTag);
@@ -235,6 +250,20 @@ public:
 	void SetCurrentInteractable(AOBInteractableActor* Interactable);
 	AOBInteractableActor* GetCurrentInteractable() const;
 	
+	void AddNearbyInteractable(AOBInteractableActor* Interactable);
+	void RemoveNearbyInteractable(AOBInteractableActor* Interactable);
+
+	// 컨테이너는 클라 소유 액터가 아니라서 자기 Server_ RPC가 라우팅되지 않는다.
+	// 소유 커넥션을 가진 컨트롤러가 대신 받는다.
+	UFUNCTION(Server, Reliable)
+	void Server_TakeLoot(AOBLootContainer* Container, FGameplayTag ItemTag, int32 Count);
+
+	UFUNCTION(Server, Reliable)
+	void Server_TakeAllLoot(AOBLootContainer* Container);
+
+	UFUNCTION(Server, Reliable)
+	void Server_PickUpWorldItem(AWorldItem* WorldItem);
+	
 	//~ Expedition 관전 -------------------------------------------
 	// 서버 → 클라: 관전 시작(팀원 생존).
 	UFUNCTION(Client, Reliable)
@@ -265,6 +294,9 @@ public:
 	// 결과창 버튼/자동타이머가 호출 → 데디 종료 후 로컬 Home 로드.
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
 	void ReturnToHome();
+	
+	// 실제 레벨 전환. ReturnToHome이 다음 틱으로 미뤄서 호출한다.
+	void TravelToHome();
 	
 	// 자동 복귀까지 남은 초(올림). 결과창 버튼 텍스트 "복귀하기 (N)"용.
 	UFUNCTION(BlueprintPure, Category = "Expedition")

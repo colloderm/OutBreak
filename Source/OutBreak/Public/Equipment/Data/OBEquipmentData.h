@@ -9,7 +9,7 @@ class AActor;
 class UOBAbilitySet;
 
 // Extension asset for non-weapon equipment such as helmets and armor.
-// Display/carry/shop data remains in UOBItemDefinition.
+// 표시/휴대/상점 데이터는 DT_Items(FOBItemDefinitionRow)가 소유한다.
 UCLASS(BlueprintType, Const)
 class OUTBREAK_API UOBEquipmentData : public UPrimaryDataAsset
 {

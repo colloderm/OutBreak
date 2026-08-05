@@ -16,19 +16,18 @@ class UOBEquipmentData;
 
 /**
 왜 존재하는가?
- - 아이템 한 종류의 스펙 원본. 태그 하나로 이걸 찾아 이름/아이콘/가격/스택을 얻는다.
+ - 아이템 한 종류의 스펙. DT_Items(DataTable)의 행 하나가 이 구조체다.
+ - 에셋 1개 = 아이템 1개였다가 표로 옮겼다. 코드가 아이템을 태그로만 지목해서 저장 방식만 바뀌었다.
 멀티플레이 역할?
- - 에셋이라 모든 머신에 동일. 복제하지 않는다(태그만 복제하고 각자 조회).
+ - 모든 머신이 같은 표를 읽는다. 태그만 복제하고 스펙은 각자 조회한다.
  */
-UCLASS(BlueprintType, Const)
-class OUTBREAK_API UOBItemDefinition : public UPrimaryDataAsset
+USTRUCT(BlueprintType)
+struct OUTBREAK_API FOBItemDefinitionRow : public FTableRowBase
 {
 	GENERATED_BODY()
 	
-public:
 	// 이 아이템의 고유 식별자. 창고/가방/드랍테이블이 전부 이 태그로만 아이템을 지목한다.
-	// 탄약은 반드시 무기의 AmmoType과 같은 태그(Ammo.Pistol 등)를 써야 한다
-	// → 재장전이 별도 매핑 없이 가방을 바로 조회할 수 있다.
+	// 탄약은 반드시 무기의 AmmoType과 같은 태그(Ammo.Pistol 등)를 써야 재장전이 바로 조회된다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Identity")
 	FGameplayTag ItemTag;
 
@@ -41,15 +40,16 @@ public:
 
 	// ===== 표시 =====
 
+	// 비워두면 무기 아이템은 WeaponData의 값을 상속한다(같은 정보를 두 번 입력하지 않게).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
 	FText DisplayName;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display", Meta = (MultiLine = "true"))
 	FText Description;
 
-	// 인벤토리 칸 / 루팅 목록 / 상점에 쓰는 아이콘.
+	// 소프트 참조. 표 전체가 로드돼도 아이콘까지 다 올라오지 않게 한다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Display")
-	TObjectPtr<UTexture2D> Icon;
+	TSoftObjectPtr<UTexture2D> Icon;
 
 	// ===== 휴대 =====
 
@@ -83,10 +83,8 @@ public:
 
 	// ===== 무기 전용 =====
 
-	// 이 아이템이 실제로 어떤 무기가 되는지. 창고/장착이 이 클래스를 쓴다.
-	// 디스크 저장을 고려해 Soft(에셋 경로 직렬화).
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon",
-		Meta = (EditCondition = "Category == EOBItemCategory::Weapon", EditConditionHides))
+	// 무기 카테고리 전용. 이 아이템이 실제로 어떤 무기가 되는지.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
 	TSoftClassPtr<AOBWeaponBase> WeaponClass;
 
 	// Non-weapon equipment extension. Slot, runtime actor and passive abilities

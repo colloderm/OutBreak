@@ -32,10 +32,27 @@ void AOBExpeditionGameMode::PreInitializeComponents()
 	// 그러면 SetPhase가 통째로 안 돌아 결과창도 타이머도 죽는다(원인 찾기 매우 어려움).
 	if (!GameStateClass || !GameStateClass->IsChildOf(AOBExpeditionGameState::StaticClass()))
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Expedition] GameStateClass가 %s 였다 → OBExpeditionGameState로 강제 교체. "
+				 "BP_ExpeditionGameMode의 Class Defaults > Classes > GameState Class 도 고칠 것."),
+			GameStateClass ? *GameStateClass->GetName() : TEXT("null"));
+
 		GameStateClass = AOBExpeditionGameState::StaticClass();
 	}
 	
 	Super::PreInitializeComponents(); // 여기서 GameState가 실제로 스폰된다
+	
+	// 루팅 시드는 어떤 액터의 BeginPlay보다도 먼저 정해져야 한다.
+	// StartPlay에서 정하면 Super::StartPlay()가 이미 전 액터의 BeginPlay를 돌린 뒤라
+	// 컨테이너들이 시드 0으로 굴려 매 세션 같은 결과가 나온다.
+	if (AOBExpeditionGameState* GS = Cast<AOBExpeditionGameState>(GameState))
+	{
+		int32 Seed = FMath::Rand();
+		if (Seed == 0) Seed = 1;   // 0은 "아직 안 정해짐" 표시로 남겨둔다
+
+		GS->SetLootSeed(Seed);
+		UE_LOG(LogTemp, Log, TEXT("[Loot] 세션 루팅 시드 = %d"), Seed);
+	}
 }
 
 void AOBExpeditionGameMode::StartPlay()

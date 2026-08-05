@@ -5,10 +5,12 @@
 #include "CoreMinimal.h"
 #include "Data/EnemyState.h"
 #include "GameFramework/Character.h"
+#include "Engine/DataTable.h"
 #include "GenericTeamAgentInterface.h"
 
 #include "EnemyCharacter.generated.h"
 
+class AOBLootContainer;
 class UEnemyAsset;
 
 class USkeletalMeshComponentBudgeted;
@@ -111,7 +113,7 @@ protected:
 	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
 
 	
-	TObjectPtr<UAudioComponent> CryingSoundComponent;
+	TWeakObjectPtr<UAudioComponent> CryingSoundComponent;
 	
 	UPROPERTY(
 		EditDefaultsOnly,
@@ -127,6 +129,14 @@ protected:
 		Category = "Death",
 		meta = (AllowPrivateAccess = "true"))
 	bool bIsDead = false;
+	
+	// 처치 시 남길 드랍 테이블. 비우면 아무것도 안 떨어진다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot", Meta = (RowType = "/Script/OutBreak.OBLootTableRow"))
+	FDataTableRowHandle DeathLootRow;
+
+	// 드랍을 담을 컨테이너 클래스(BP_LootDrop).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")
+	TSubclassOf<AOBLootContainer> LootContainerClass;
 	
 	/* ================================================== Components ============================================= */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))

@@ -9,8 +9,6 @@
 /**
 왜 존재하는가?
  - 창고 / 가방 / 드랍테이블 / 컨테이너가 아이템을 주고받는 공통 단위.
-무엇을 저장하는가?
- - 식별 태그 + 수량뿐. 실제 스펙(이름/가격/스택 한계)은 UOBItemDefinition에 있다.
 멀티플레이 역할?
  - 태그+정수라 복제 비용이 작다. 인벤토리 배열째로 복제된다.
  */
@@ -51,3 +49,9 @@ struct FOBItemStack
 		return ItemTag == Other.ItemTag && Count == Other.Count;
 	}
 };
+
+namespace OBItemStacks
+{
+	// 같은 태그면 수량을 합치고, 없으면 새 항목을 추가한다. 컨테이너/드랍테이블 공용.
+	OUTBREAK_API void Add(TArray<FOBItemStack>& Stacks, const FGameplayTag& ItemTag, int32 Count);
+}
