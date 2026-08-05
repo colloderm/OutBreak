@@ -110,6 +110,8 @@ void AOBCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AOBCharacterBase, bIsDead);
 	DOREPLIFETIME(AOBCharacterBase, bIsAiming);
 	DOREPLIFETIME(AOBCharacterBase, bIsDowned);
+	DOREPLIFETIME(AOBCharacterBase, LastHitDirection);
+	DOREPLIFETIME(AOBCharacterBase, LastHitBoneName);
 }
 
 void AOBCharacterBase::HandleDeath()
@@ -246,6 +248,14 @@ void AOBCharacterBase::StartRagdoll()
 	MeshComp->SetAllBodiesSimulatePhysics(true);
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
+	
+	// 맞은 방향으로 쓰러진다. 방향이 없으면(낙사·출혈 등) 그냥 무너진다.
+	if (!LastHitDirection.IsNearlyZero() && RagdollImpulseStrength > 0.f)
+	{
+		const FName Bone = (LastHitBoneName != NAME_None) ? LastHitBoneName : MeshComp->GetBoneName(0);
+
+		MeshComp->AddImpulse(LastHitDirection * RagdollImpulseStrength, Bone, /*bVelChange=*/false);
+	}
 }
 
 void AOBCharacterBase::SetAiming(bool bnewAiming)
@@ -594,47 +604,21 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 	{
 		DefaultAbilitySet->GiveToAbilitySystem(AbilitySystemComponent, nullptr, this);
 	}
-	
-	// 4) 로드아웃: 로비 선택 무기 우선, 없으면 PawnData 기본.
-	TArray<TSubclassOf<AOBWeaponBase>> Loadout;
-	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
-	{
-		Loadout = PS->GetSelectedWeapons();
-	}
-	if (Loadout.Num() == 0 && PawnData)
-	{
-		Loadout = PawnData->DefaultWeapons;
-	}
 
 	if (PlayerInventoryComponent)
 	{
 		if (PawnData && PawnData->DefaultBackpackTag.IsValid())
 		{
-			PlayerInventoryComponent->EquipStartingBackpack(
-				PawnData->DefaultBackpackTag);
+			PlayerInventoryComponent->EquipStartingBackpack(PawnData->DefaultBackpackTag);
 		}
-		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Loadout)
-		{
-			if (WeaponClass)
-			{
-				PlayerInventoryComponent->AddWeapon(WeaponClass);
-			}
-		}
-		if (PawnData)
-		{
-			for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
-			{
-				PlayerInventoryComponent->TryAddItem(Item.Key, Item.Value);
-			}
-		}
-		PlayerInventoryComponent->EquipDefaultSlot();
-		
-		// 초기 지급이 끝난 이 시점이 기준선이다. 이후 늘어난 것만 "주운 것"으로 친다.
-		SpawnBagSnapshot = GetBagContentsAsStacks();
-		
-		// 기준선을 찍은 뒤에 지급한다. 그래야 반입분이 "이번에 얻은 것"으로 잡혀
-		// 탈출 시 창고로 되돌아간다(초기 지급품은 기준선에 포함돼 제외된다).
-		ApplyCarryItems();
+
+		// 로비 로드아웃은 클라가 BeginPlay에서 push한다. 패키징 빌드에서는 폰이 먼저
+		// 스폰되므로 여기서 비어 있을 수 있다. 도착 시점에 PS가 다시 부른다.
+		FinalizeSpawnLoadout();
+
+		// push가 끝내 안 오면(로드아웃이 빈 신규 플레이어 등) 기본 무기로 진행한다.
+		GetWorldTimerManager().SetTimer(
+			LoadoutWaitTimer, this, &AOBCharacterBase::FinalizeSpawnLoadoutFallback, LoadoutWaitSeconds, false);
 	}
 }
 
@@ -796,4 +780,72 @@ void AOBCharacterBase::ApplyCarryItems()
 			PC->Client_ReturnCarryLeftover(Leftover);
 		}
 	}
+}
+
+void AOBCharacterBase::FinalizeSpawnLoadout()
+{
+	TArray<TSubclassOf<AOBWeaponBase>> Loadout;
+	if (const AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	{
+		Loadout = PS->GetSelectedWeapons();
+	}
+
+	// 아직 push가 안 왔다. 플래그를 세우지 않고 다음 호출을 기다린다.
+	if (Loadout.IsEmpty()) return;
+
+	FinalizeSpawnLoadoutInternal(Loadout);
+}
+
+void AOBCharacterBase::FinalizeSpawnLoadoutFallback()
+{
+	if (bSpawnLoadoutApplied) return;
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("[Loadout] %s: 로드아웃 push가 %.1f초 안에 안 왔다 → PawnData 기본 무기로 진행."),
+		*GetName(), LoadoutWaitSeconds);
+
+	FinalizeSpawnLoadoutInternal(
+		PawnData ? PawnData->DefaultWeapons : TArray<TSubclassOf<AOBWeaponBase>>());
+}
+
+void AOBCharacterBase::FinalizeSpawnLoadoutInternal(
+	const TArray<TSubclassOf<AOBWeaponBase>>& Weapons)
+{
+	if (!HasAuthority() || bSpawnLoadoutApplied || !PlayerInventoryComponent) return;
+
+	bSpawnLoadoutApplied = true;
+	GetWorldTimerManager().ClearTimer(LoadoutWaitTimer);
+
+	for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Weapons)
+	{
+		if (WeaponClass)
+		{
+			PlayerInventoryComponent->AddWeapon(WeaponClass);
+		}
+	}
+
+	if (PawnData)
+	{
+		for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
+		{
+			PlayerInventoryComponent->TryAddItem(Item.Key, Item.Value);
+		}
+	}
+
+	PlayerInventoryComponent->EquipDefaultSlot();
+
+	// 무기·초기지급이 끝난 이 시점이 정산 기준선이다.
+	// 무기 지급이 늦어졌는데 여기서 안 찍으면 무기가 "이번에 얻은 것"이 되어 창고로 복사된다.
+	SpawnBagSnapshot = GetBagContentsAsStacks();
+
+	// 반입분은 기준선 뒤에 넣어야 탈출 시 창고로 되돌아간다.
+	ApplyCarryItems();
+}
+
+void AOBCharacterBase::NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection)
+{
+	if (!HasAuthority()) return;
+
+	LastHitDirection = HitDirection.GetSafeNormal();
+	LastHitBoneName = BoneName;
 }

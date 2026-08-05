@@ -106,6 +106,12 @@ void AOBPlayerStateBase::SetPartyLeader(bool bInLeader)
 void AOBPlayerStateBase::SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeaponBase>>& InWeapons)
 {
 	if (!HasAuthority()) return;
+	
+	// 폰이 먼저 스폰됐을 수 있다(패키징 빌드에서 실제로 그렇다).
+	if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(GetPawn()))
+	{
+		Char->FinalizeSpawnLoadout();
+	}
 
 	SelectedWeapons = InWeapons;   // 통째 교체(슬롯 유효성은 클라 Loadout이 이미 보장)
 	OnLobbyStateChanged.Broadcast();

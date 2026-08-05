@@ -69,13 +69,6 @@ public:
 private:
 	void RebuildCache();
 
-	// 표가 언로드되지 않게 붙잡는다. 캐시 포인터가 이 표의 행 메모리를 가리킨다.
-	UPROPERTY(Transient)
-	TObjectPtr<UDataTable> LoadedItemTable;
-	
-	UPROPERTY(Transient)
-	TObjectPtr<UDataTable> LoadedLootTable;
-
 	TMap<FGameplayTag, const FOBItemDefinitionRow*> ItemCache;
 	TMap<FSoftObjectPath, FGameplayTag> WeaponPathToTag;
 

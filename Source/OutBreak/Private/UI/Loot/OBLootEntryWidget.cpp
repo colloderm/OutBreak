@@ -40,5 +40,19 @@ void UOBLootEntryWidget::SetEntry(const FGameplayTag& InItemTag, int32 InCount)
 
 void UOBLootEntryWidget::HandleTakeClicked()
 {
-	OnEntryClicked.ExecuteIfBound(ItemTag, Count);
+	OnEntryClicked.ExecuteIfBound(ItemTag, ResolveClickCount());
+}
+
+int32 UOBLootEntryWidget::ResolveClickCount() const
+{
+	if (Count <= 1) return Count;
+
+	// UButton의 OnClicked는 수정키를 안 넘겨준다. 클릭 시점의 키보드 상태를 직접 읽는다.
+	if (!FSlateApplication::IsInitialized()) return Count;
+
+	const FModifierKeysState Mods = FSlateApplication::Get().GetModifierKeys();
+	if (Mods.IsControlDown()) return 1;
+	if (Mods.IsShiftDown())   return FMath::DivideAndRoundUp(Count, 2);
+	
+	return Count;
 }

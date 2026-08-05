@@ -124,6 +124,13 @@ public:
 	// 서버: 반입 아이템을 가방에 채운다. 한 번만 실행된다.
 	void ApplyCarryItems();
 	
+	// 서버: 무기·초기지급·정산 기준선·반입을 한 번에 확정한다.
+	// 로드아웃 push가 늦게 와도 PlayerState가 여기로 다시 들어온다.
+	void FinalizeSpawnLoadout();
+	
+	// 서버: 마지막 피격 방향/부위를 기록한다. 래그돌 시작 시 임펄스로 쓴다.
+	void NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection);
+	
 public:
 	/*
 	왜 존재하는가? - ASC가 준비된 시점을 로컬 UI 등에 알린다(타이밍 문제 해결).
@@ -177,6 +184,9 @@ protected:
 	
 	UFUNCTION() 
 	void OnRep_IsDowned();
+	
+	void FinalizeSpawnLoadoutFallback();
+	void FinalizeSpawnLoadoutInternal(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
 	
 protected:
 	UPROPERTY()
@@ -257,6 +267,24 @@ protected:
 	
 	// 반입 지급 중복 방지(PossessedBy와 PS push 양쪽에서 불릴 수 있다).
 	bool bCarryItemsApplied = false;
+	
+	// 로비 로드아웃을 기다리는 시간. 지나면 PawnData 기본 무기로 진행한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Loadout", Meta = (ClampMin = "0.1", Units = "s"))
+	float LoadoutWaitSeconds = 3.f;
+
+	FTimerHandle LoadoutWaitTimer;
+	bool bSpawnLoadoutApplied = false;
+	
+	// 래그돌 임펄스 세기. 캐릭터 질량에 맞춰 BP에서 조정한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Death", Meta = (ClampMin = "0.0"))
+	float RagdollImpulseStrength = 12000.f;
+
+	// 방향은 복제해야 클라에서도 같은 쪽으로 쓰러진다.
+	UPROPERTY(Replicated)
+	FVector_NetQuantizeNormal LastHitDirection = FVector::ZeroVector;
+
+	UPROPERTY(Replicated)
+	FName LastHitBoneName = NAME_None;
 	
 private:
 	void PollGround();

@@ -373,6 +373,23 @@ void AEnemyCharacter::Dead()
 	}
 
 	StopCharacterMovement();
+	
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->SetSimulatePhysics(true);
+
+		// 맞은 방향으로 쓰러진다. 방향이 없으면(환경 피해 등) 그냥 무너진다.
+		if (!LastHitDirection.IsNearlyZero() && RagdollImpulseStrength > 0.f)
+		{
+			const FName Bone = (LastHitBoneName != NAME_None)
+				? LastHitBoneName
+				: MeshComp->GetBoneName(0);
+
+			MeshComp->AddImpulse(
+				LastHitDirection * RagdollImpulseStrength, Bone, /*bVelChange=*/false);
+		}
+	}
+	
 	GetMesh()->SetSimulatePhysics(true);
 	
 	// 처치 보상. Destroy 분기보다 먼저 굴려야 시체가 사라지기 전에 드랍이 남는다.
@@ -574,4 +591,12 @@ void AEnemyCharacter::HandleReducedWorkChanged(
 
 	OnReducedAnimationWorkChanged.Broadcast(
 		bReducedAnimationWork);
+}
+
+void AEnemyCharacter::NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection)
+{
+	if (!HasAuthority()) return;
+
+	LastHitDirection = HitDirection.GetSafeNormal();
+	LastHitBoneName = BoneName;
 }

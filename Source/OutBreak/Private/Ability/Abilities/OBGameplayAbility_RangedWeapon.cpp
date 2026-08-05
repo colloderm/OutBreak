@@ -16,6 +16,16 @@
 #include "Kismet/GameplayStatics.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
+#include "AI/EnemyCharacter.h"
+
+namespace
+{
+	// UE 마네킹 스켈레톤 기준. 다른 스켈레톤을 쓰는 적이 생기면 데이터로 뺀다.
+	bool IsHeadBone(const FName BoneName)
+	{
+		return BoneName == TEXT("head") || BoneName == TEXT("neck_01");
+	}
+}
 
 UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -364,7 +374,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		}
 #endif
 
-		if (!bHit || !Hit.GetActor()) return; // 빗나감: 발사 큐만 재생하고 종료.
+		if (!bHit || !Hit.GetActor()) continue; // 빗나감: 발사 큐만 재생하고 종료.
 	
 		// --- 피격 큐: 탄착 이펙트 (명중 지점) ---
 		if (SourceASC)
@@ -377,7 +387,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		}
 	
 		// 같은 팀이면 무기 피해 무시(탄착 이펙트는 이미 재생됨).
-		if (AOBPlayerStateBase::AreSameTeam(Character, Hit.GetActor())) return;
+		if (AOBPlayerStateBase::AreSameTeam(Character, Hit.GetActor())) continue;
 
 		// --- 데미지 적용 ---
 		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Hit.GetActor());
@@ -392,8 +402,28 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 
 		if (SpecHandle.IsValid())
 		{
-			SpecHandle.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, WeaponData->BaseDamage);
+			float FinalDamage = WeaponData->BaseDamage;
+
+			const bool bHeadshot =
+				WeaponData->HeadshotMultiplier > 1.f && IsHeadBone(Hit.BoneName);
+			if (bHeadshot)
+			{
+				FinalDamage *= WeaponData->HeadshotMultiplier;
+			}
+
+			SpecHandle.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, FinalDamage);
 			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data, TargetASC);
+			
+			// 사망 시 래그돌이 맞은 방향으로 쓰러지도록 기록.
+			// ponytail: 피격 대상 타입이 셋째로 늘어나면 인터페이스로 뺀다. 둘이면 캐스트가 더 싸다.
+			if (AOBCharacterBase* HitChar = Cast<AOBCharacterBase>(Hit.GetActor()))
+			{
+				HitChar->NotifyHitForRagdoll(Hit.BoneName, ShotDirection);
+			}
+			else if (AEnemyCharacter* HitEnemy = Cast<AEnemyCharacter>(Hit.GetActor()))
+			{
+				HitEnemy->NotifyHitForRagdoll(Hit.BoneName, ShotDirection);
+			}
 		}
 	}
 }

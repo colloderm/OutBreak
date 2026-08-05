@@ -36,7 +36,11 @@ protected:
 
 	UFUNCTION()
 	void HandleTakeClicked();
+	
+	// 클릭 시점의 수정키로 수량을 정한다. Shift=절반, Ctrl=1개, 없으면 전부.
+	int32 ResolveClickCount() const;
 
+protected:
 	// 위젯에 같은 이름이 있으면 자동 연결. 없어도 크래시하지 않는다.
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> IMG_Icon;
