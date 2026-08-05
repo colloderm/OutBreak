@@ -25,8 +25,10 @@
 #include "Character/Components/OBCharacterMovementComponent.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "TimerManager.h"
+#include "AI/EnemyController.h"
 #include "Item/Loot/OBLootContainer.h"
 #include "Game/GameState/OBExpeditionGameState.h"
+#include "Player/Controller/OBPlayerController.h"
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
 {
@@ -176,30 +178,23 @@ void AOBCharacterBase::DropCorpseLoot()
 	UWorld* W = GetWorld();
 	if (!W || !W->GetGameState<AOBExpeditionGameState>()) return;
 
+	bCorpseDropped = true;
+	
+	if (!PlayerInventoryComponent) return;
+
+	// 장착 슬롯 + 가방 내용물 전부. 죽으면 다 잃는다.
+	// 인스턴스째 넘기므로 무기의 탄창 잔탄과 InstanceId가 보존된다.
 	TArray<FInventoryData> Items;
-	if (PlayerInventoryComponent)
-	{
-		PlayerInventoryComponent->GetLootableItemInstances(Items);
-	}
-	if (Items.IsEmpty())
-	{
-		bCorpseDropped = true;
-		return;
-	}
+	PlayerInventoryComponent->GetLootableItemInstances(Items);
+	if (Items.IsEmpty()) return;   // 빈 시체를 월드에 남기지 않는다.
 
 	const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
 	const FVector DropLoc = GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
 
-	AOBLootContainer* CorpseContainer =
-		AOBLootContainer::SpawnWithItemInstances(
-			W,
-			CorpseContainerClass,
-			FTransform(FRotator::ZeroRotator, DropLoc),
-			Items);
-	if (CorpseContainer && PlayerInventoryComponent)
+	// 스폰에 실패하면 인벤토리를 비우지 않는다. 아이템이 증발하는 것보단 낫다.
+	if (AOBLootContainer::SpawnWithItemInstances(W, CorpseContainerClass, FTransform(FRotator::ZeroRotator, DropLoc), Items))
 	{
 		PlayerInventoryComponent->ClearLootableItemInstances();
-		bCorpseDropped = true;
 	}
 }
 
@@ -401,6 +396,11 @@ void AOBCharacterBase::HandleExtracted()
 	{
 		EquipmentComponent->UnequipWeapon();
 	}
+	
+	// 탈출한 플레이어는 AI에게 존재하지 않는다.
+	// 폰을 숨기고 충돌을 꺼도 Sight는 그대로 보므로 인지 소스에서 빼야 한다.
+	AEnemyController::ForgetActorForAll(GetWorld(), this);
+	
 	// (폰 숨김/충돌·이동 정지는 GameMode가 처리)
 }
 
@@ -628,8 +628,14 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 			}
 		}
 		PlayerInventoryComponent->EquipDefaultSlot();
+		
+		// 초기 지급이 끝난 이 시점이 기준선이다. 이후 늘어난 것만 "주운 것"으로 친다.
+		SpawnBagSnapshot = GetBagContentsAsStacks();
+		
+		// 기준선을 찍은 뒤에 지급한다. 그래야 반입분이 "이번에 얻은 것"으로 잡혀
+		// 탈출 시 창고로 되돌아간다(초기 지급품은 기준선에 포함돼 제외된다).
+		ApplyCarryItems();
 	}
-
 }
 
 void AOBCharacterBase::OnRep_PlayerState()
@@ -709,5 +715,85 @@ void AOBCharacterBase::InitAbilitySystemComponent()
 	
 	// UI 등 구독자에게 ASC 준비 완료를 알린다.
 	OnAbilitySystemInitialized.Broadcast();
+}
+
+TArray<FOBItemStack> AOBCharacterBase::GetBagContentsAsStacks()
+{
+	TArray<FOBItemStack> Stacks;
+	if (!PlayerInventoryComponent) return Stacks;
+
+	// 사망 드랍과 같은 소스를 쓴다. 장착 무기를 한쪽만 세면
+	// "상자에서 주운 무기를 장착하고 탈출" 시 조용히 증발한다.
+	TArray<FInventoryData> Instances;
+	PlayerInventoryComponent->GetLootableItemInstances(Instances);
+
+	for (const FInventoryData& Item : Instances)
+	{
+		if (Item.ItemTag.IsValid() && Item.ItemStack > 0)
+		{
+			OBItemStacks::Add(Stacks, Item.ItemTag, Item.ItemStack);
+		}
+	}
+	return Stacks;
+}
+
+TArray<FOBItemStack> AOBCharacterBase::GetBagGainsSinceSpawn()
+{
+	TArray<FOBItemStack> Gains = GetBagContentsAsStacks();
+
+	for (const FOBItemStack& Base : SpawnBagSnapshot)
+	{
+		const int32 Index = Gains.IndexOfByPredicate(
+			[&Base](const FOBItemStack& S)
+			{
+				return S.ItemTag == Base.ItemTag;
+			});
+		if (Index == INDEX_NONE) continue;
+
+		Gains[Index].Count -= Base.Count;
+	}
+
+	// 쓰고 남은 양이 초기 지급보다 적으면 음수가 된다. 그건 획득이 아니다.
+	// (탄약 300발 중 100발 쏘고 30발 주웠다 → 순증 0)
+	Gains.RemoveAll(
+		[](const FOBItemStack& S)
+		{
+			return S.Count <= 0;
+		});
 	
+	return Gains;
+}
+
+void AOBCharacterBase::ApplyCarryItems()
+{
+	if (!HasAuthority() || bCarryItemsApplied || !PlayerInventoryComponent) return;
+
+	const AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	if (!PS) return;
+
+	const TArray<FOBItemStack>& Carry = PS->GetSelectedCarryItems();
+
+	// 아직 클라 push가 안 왔을 수 있다. 플래그를 세우지 않고 다음 호출을 기다린다.
+	if (Carry.IsEmpty()) return;
+
+	bCarryItemsApplied = true;
+
+	TArray<FOBItemStack> Leftover;
+	for (const FOBItemStack& Stack : Carry)
+	{
+		const int32 Added = PlayerInventoryComponent->TryAddItem(Stack.ItemTag, Stack.Count);
+		if (Added < Stack.Count)
+		{
+			Leftover.Emplace(Stack.ItemTag, Stack.Count - Added);
+		}
+	}
+
+	// 창고에서 이미 빠진 물건이다. 안 되돌리면 조용히 증발한다.
+	if (!Leftover.IsEmpty())
+	{
+		if (AOBPlayerController* PC = Cast<AOBPlayerController>(GetController()))
+		{
+			PC->Client_ReturnCarryLeftover(Leftover);
+		}
+	}
 }

@@ -764,6 +764,15 @@ void AOBExpeditionGameMode::NotifyPlayerExtracted(AController* Controller)
 	AOBPlayerStateBase* PS = Controller->GetPlayerState<AOBPlayerStateBase>();
 	// 살아있는 플레이어만 탈출 가능(중복/사망자 무효 처리).
 	if (!PS || PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive) return;
+	
+	// 폰을 정리하기 전에 가방을 찍는다. HandleExtracted가 장비를 해제한다.
+	if (AOBCharacterBase* Char = Cast<AOBCharacterBase>(Controller->GetPawn()))
+	{
+		if (AOBPlayerController* OwningPC = Cast<AOBPlayerController>(Controller))
+		{
+			OwningPC->Client_ApplyExtractionResult(Char->GetBagGainsSinceSpawn());
+		}
+	}
 
 	PS->SetExpeditionStatus(EOBPlayerExpeditionStatus::Extracted);
 	PS->SetExtractionProgress(0.f, false);

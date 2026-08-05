@@ -199,23 +199,28 @@ void UOBLoadoutSubsystem::ClearLoadout()
 
 void UOBLoadoutSubsystem::AddStashItem(const FGameplayTag& ItemTag, int32 Count)
 {
-	if (!ItemTag.IsValid() || Count <= 0) return;
-
-	// 창고는 칸 제한이 없어서 MaxStack을 적용하지 않고 태그당 한 항목으로 합친다.
-	const int32 Index = CurrentLoadout.StashItems.IndexOfByPredicate(
-		[&ItemTag](const FOBItemStack& S) { return S.ItemTag == ItemTag; });
-
-	if (Index != INDEX_NONE)
+	if (AddStashItemInternal(ItemTag, Count))
 	{
-		CurrentLoadout.StashItems[Index].Count += Count;
+		SaveToDisk();
 	}
-	else
+}
+
+void UOBLoadoutSubsystem::AddStashItems(const TArray<FOBItemStack>& Items)
+{
+	bool bChanged = false;
+	for (const FOBItemStack& Stack : Items)
 	{
-		CurrentLoadout.StashItems.Emplace(ItemTag, Count);
+		if (AddStashItemInternal(Stack.ItemTag, Stack.Count))
+		{
+			bChanged = true;
+		}
 	}
 
-	// ponytail: 호출마다 파일 쓰기. 정산에서 수십 종을 한꺼번에 넣게 되면 배치 저장으로 바꾼다.
-	SaveToDisk();
+	// 정산 한 판에 파일 쓰기 한 번.
+	if (bChanged)
+	{
+		SaveToDisk();
+	}
 }
 
 bool UOBLoadoutSubsystem::RemoveStashItem(const FGameplayTag& ItemTag, int32 Count)
@@ -537,6 +542,28 @@ void UOBLoadoutSubsystem::AppendSellItems(FShopWindowViewData& View, TSet<EOBIte
 	}
 }
 
+bool UOBLoadoutSubsystem::AddStashItemInternal(const FGameplayTag& ItemTag, int32 Count)
+{
+	if (!ItemTag.IsValid() || Count <= 0) return false;
+
+	// 창고는 칸 제한이 없어서 MaxStack을 적용하지 않고 태그당 한 항목으로 합친다.
+	const int32 Index = CurrentLoadout.StashItems.IndexOfByPredicate(
+		[&ItemTag](const FOBItemStack& S)
+		{
+			return S.ItemTag == ItemTag;
+		});
+
+	if (Index != INDEX_NONE)
+	{
+		CurrentLoadout.StashItems[Index].Count += Count;
+	}
+	else
+	{
+		CurrentLoadout.StashItems.Emplace(ItemTag, Count);
+	}
+	return true;
+}
+
 bool UOBLoadoutSubsystem::TryPurchaseItem(const FGameplayTag& ItemTag, int32 Count)
 {
 	if (Count <= 0) return false;
@@ -603,4 +630,54 @@ void UOBLoadoutSubsystem::LoadFromDisk()
 		CurrentLoadout = Save->Loadout;
 		CurrentCurrency = Save->Currency;
 	}
+}
+
+bool UOBLoadoutSubsystem::AddCarryItem(const FGameplayTag& ItemTag, int32 Count)
+{
+	// 창고에서 먼저 뺀다. 부분 차감을 안 하므로 실패하면 아무 일도 안 일어난다.
+	if (!RemoveStashItem(ItemTag, Count)) return false;
+
+	OBItemStacks::Add(CurrentLoadout.CarryItems, ItemTag, Count);
+	SaveToDisk();
+	return true;
+}
+
+bool UOBLoadoutSubsystem::RemoveCarryItem(const FGameplayTag& ItemTag, int32 Count)
+{
+	if (!ItemTag.IsValid() || Count <= 0) return false;
+
+	const int32 Index = CurrentLoadout.CarryItems.IndexOfByPredicate(
+		[&ItemTag](const FOBItemStack& S)
+		{
+			return S.ItemTag == ItemTag;
+		});
+	if (Index == INDEX_NONE || CurrentLoadout.CarryItems[Index].Count < Count) return false;
+
+	CurrentLoadout.CarryItems[Index].Count -= Count;
+	if (CurrentLoadout.CarryItems[Index].Count <= 0)
+	{
+		CurrentLoadout.CarryItems.RemoveAt(Index);
+	}
+
+	AddStashItemInternal(ItemTag, Count);   // 창고로 되돌린다
+	SaveToDisk();
+	return true;
+}
+
+void UOBLoadoutSubsystem::ClearCarryItems()
+{
+	if (CurrentLoadout.CarryItems.IsEmpty()) return;
+
+	CurrentLoadout.CarryItems.Empty();
+	SaveToDisk();
+}
+
+int32 UOBLoadoutSubsystem::GetCarryCount(const FGameplayTag& ItemTag) const
+{
+	const FOBItemStack* Found = CurrentLoadout.CarryItems.FindByPredicate(
+		[&ItemTag](const FOBItemStack& S)
+		{
+			return S.ItemTag == ItemTag;
+		});
+	return Found ? Found->Count : 0;
 }

@@ -103,6 +103,19 @@ void UEnemyMemoryComponent::HandlePerceptionForgotten(
 	BroadcastMemoryUpdated();
 }
 
+void UEnemyMemoryComponent::ForgetTarget(const AActor* Actor)
+{
+	if (TargetActor.Get() != Actor)
+	{
+		return;
+	}
+
+	TargetActor = nullptr;
+	bTargetVisible = false;
+	ClearStimulusMemory();
+	BroadcastMemoryUpdated();
+}
+
 float UEnemyMemoryComponent::GetTimeSinceTargetSeen() const
 {
 	if (!HasValidTarget() || bTargetVisible)

@@ -27,6 +27,10 @@ public:
 
 	void HandlePerceptionForgotten(AActor* ForgottenActor);
 	
+	// 이 액터를 대상에서 완전히 지운다(탈출 등 더 이상 존재하지 않는 대상).
+	// HandlePerceptionForgotten과 달리 마지막 목격 지점 수색도 남기지 않는다.
+	void ForgetTarget(const AActor* Actor);
+	
 	AActor* GetTargetActor() const { return TargetActor.Get(); }
 	bool HasValidTarget() const { return IsValid(TargetActor); }
 	bool IsTargetVisible() const { return bTargetVisible && HasValidTarget(); }

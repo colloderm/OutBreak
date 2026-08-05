@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "AI/Data/EnemyAsset.h"
-#include "AI/Interface/EnemyComponentInterface.h"
 #include "EnemyBaseActorComponent.generated.h"
 
 

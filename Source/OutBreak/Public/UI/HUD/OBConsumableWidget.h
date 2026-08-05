@@ -6,8 +6,8 @@
 #include "Blueprint/UserWidget.h"
 #include "OBConsumableWidget.generated.h"
 
-class UTextBlock;
 class UPlayerInventoryComponent;
+class UTextBlock;
 
 UCLASS()
 class OUTBREAK_API UOBConsumableWidget : public UUserWidget

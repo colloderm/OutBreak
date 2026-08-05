@@ -102,8 +102,7 @@ void AOBHUD::BindAmmoToCharacter(AOBCharacterBase* Character)
 	if (!Character || !AmmoWidgetClass) return;
 
 	UOBEquipmentComponent* Equipment = Character->FindComponentByClass<UOBEquipmentComponent>();
-	UPlayerInventoryComponent* Inventory =
-		Character->FindComponentByClass<UPlayerInventoryComponent>();
+	UPlayerInventoryComponent* Inventory = Character->FindComponentByClass<UPlayerInventoryComponent>();
 	if (!Equipment) return;
 	
 	if (!AmmoWidget)
@@ -141,8 +140,7 @@ void AOBHUD::BindConsumablesToCharacter(AOBCharacterBase* Character)
 {
 	if (!Character || !ConsumableWidgetClass) return;
 	
-	UPlayerInventoryComponent* Inventory =
-		Character->GetPlayerInventoryComponent();
+	UPlayerInventoryComponent* Inventory = Character->GetPlayerInventoryComponent();
 	if (!Inventory) return;
 	
 	if (!ConsumableWidget)

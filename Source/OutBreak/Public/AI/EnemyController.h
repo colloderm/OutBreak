@@ -25,8 +25,7 @@ public:
 	// Sets default values for this actor's properties
 	AEnemyController();
 
-	virtual ETeamAttitude::Type GetTeamAttitudeTowards(
-		const AActor& Other) const override;
+	virtual ETeamAttitude::Type GetTeamAttitudeTowards(const AActor& Other) const override;
 
 	void InitializeComponents();
 
@@ -37,12 +36,14 @@ public:
 	{
 		return EnemyMemoryComponent.Get();
 	}
+	
+	// 월드의 모든 적이 이 액터를 즉시 잊는다. 탈출한 플레이어를 계속 쫓지 않게 한다.
+	static void ForgetActorForAll(UWorld* World, AActor* Actor);
 
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-	virtual void EndPlay(
-		const EEndPlayReason::Type EndPlayReason) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void OnUnPossess() override;

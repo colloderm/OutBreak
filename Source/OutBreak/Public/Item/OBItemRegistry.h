@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
 #include "GameplayTagContainer.h"
+#include "Data/OBItemTypes.h"
 #include "UObject/SoftObjectPath.h"
 #include "OBItemRegistry.generated.h"
 
@@ -35,6 +36,7 @@ public:
 	UPROPERTY(Config, EditDefaultsOnly, Category = "Data", Meta = (AllowedClasses = "/Script/Engine.DataTable"))
 	TSoftObjectPtr<UDataTable> LootTable;
 	
+public:
 	// 태그로 스펙 찾기. 표에 없으면 nullptr.
 	static const FOBItemDefinitionRow* FindItem(const FGameplayTag& ItemTag);
 
@@ -48,6 +50,9 @@ public:
 	// 표시 규칙을 여기 한 곳에만 둔다(상점·루팅·인벤토리가 같은 결과를 내야 한다).
 	// 반환값: 표에 행이 있었는가. false여도 OutName에는 태그 문자열이 들어간다.
 	static bool GetItemDisplay(const FGameplayTag& ItemTag, FText& OutName, UTexture2D*& OutIcon);
+	
+	// 창고 / 상점 / 루팅이 같은 순서로 보이도록. 카테고리 → SortOrder → 태그.
+	static void SortStacks(TArray<FOBItemStack>& Stacks);
 
 	// 드랍 테이블이 담긴 표. 컨테이너의 RowHandle이 이걸 가리켜야 한다.
 	static UDataTable* GetLootTable();

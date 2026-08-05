@@ -26,6 +26,7 @@
 #include "TimerManager.h"
 #include "Game/GameMode/OBExpeditionGameMode.h"
 #include "Item/Loot/OBLootContainer.h"
+#include "UI/Widgets/Expedition/OBExpeditionResultWidget.h"
 
 
 AOBPlayerController::AOBPlayerController()
@@ -71,6 +72,12 @@ void AOBPlayerController::BeginPlay()
 			if (Classes.Num() > 0)
 			{
 				Server_ApplyLoadout(Classes);
+				
+				const TArray<FOBItemStack>& Carry = Loadout->GetCarryItems();
+				if (Carry.Num() > 0)
+				{
+					Server_ApplyCarryItems(Carry);
+				}
 			}
 		}
 
@@ -698,6 +705,12 @@ void AOBPlayerController::ShowResultScreen()
 		if (ActiveResultWidget)
 		{
 			ActiveResultWidget->AddToViewport(100); // 최상단
+
+			// 사망 시에는 LastExtractionHaul이 비어 있어서 "가져온 것 없음"이 뜬다.
+			if (UOBExpeditionResultWidget* Result = Cast<UOBExpeditionResultWidget>(ActiveResultWidget))
+			{
+				Result->SetHaul(LastExtractionHaul);
+			}
 		}
 	}
 	
@@ -706,6 +719,21 @@ void AOBPlayerController::ShowResultScreen()
 	{
 		GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AOBPlayerController::ReturnToHome, AutoReturnSeconds, false);
 	}
+}
+
+void AOBPlayerController::Client_ApplyExtractionResult_Implementation(const TArray<FOBItemStack>& Haul)
+{
+	LastExtractionHaul = Haul;
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->AddStashItems(Haul);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[Expedition] 탈출 정산: %d종 창고 반영"), Haul.Num());
 }
 
 void AOBPlayerController::ReturnToHome()
@@ -726,6 +754,15 @@ void AOBPlayerController::ReturnToHome()
 void AOBPlayerController::TravelToHome()
 {
 	if (HomeLevel.IsNull()) return;
+
+	// 레벨을 열기 전에 UI를 스스로 정리한다. 월드 정리에 맡기면
+	// 참조가 남았을 때 엉뚱한 곳에서 World Leak으로 터진다.
+	if (ActiveResultWidget)
+	{
+		ActiveResultWidget->RemoveFromParent();
+		ActiveResultWidget = nullptr;
+	}
+	CloseInteractionWidget();   // 루팅 창 등이 열린 채 나가는 경우
 
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] 홈 복귀: %s"), *HomeLevel.ToString());
 
@@ -994,5 +1031,26 @@ void AOBPlayerController::Server_PickUpWorldItem_Implementation(
 		MyChar->GetPlayerInventoryComponent())
 	{
 		Inventory->PickUpWorldItem(WorldItem);
+	}
+}
+
+void AOBPlayerController::Server_ApplyCarryItems_Implementation(const TArray<FOBItemStack>& Items)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetCarryItemsBulk(Items);
+	}
+}
+
+void AOBPlayerController::Client_ReturnCarryLeftover_Implementation(const TArray<FOBItemStack>& Items)
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->AddStashItems(Items);
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Carry] 가방이 모자라 %d종을 창고로 되돌렸다."), Items.Num());
+		}
 	}
 }

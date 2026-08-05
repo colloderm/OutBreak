@@ -6,7 +6,6 @@
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
 #include "Item/OBItemRegistry.h"
-#include "UI/Loot/OBLootWindow.h"
 
 void UOBLootEntryWidget::NativeConstruct()
 {
@@ -18,26 +17,19 @@ void UOBLootEntryWidget::NativeConstruct()
 	}
 }
 
-void UOBLootEntryWidget::SetEntry(UOBLootWindow* InOwner, const FGameplayTag& InItemTag, int32 InCount)
+void UOBLootEntryWidget::SetEntry(const FGameplayTag& InItemTag, int32 InCount)
 {
-	Owner = InOwner;
 	ItemTag = InItemTag;
 	Count = InCount;
 
-	// 이름/아이콘 규칙(무기는 WeaponData 상속)은 레지스트리가 판단한다.
 	FText DisplayName;
 	UTexture2D* Icon = nullptr;
 	UOBItemRegistry::GetItemDisplay(ItemTag, DisplayName, Icon);
 
-	if (TXT_Name)
-	{
+	if (TXT_Name)  
 		TXT_Name->SetText(DisplayName);
-	}
-
-	if (TXT_Count)
-	{
+	if (TXT_Count) 
 		TXT_Count->SetText(Count > 1 ? FText::AsNumber(Count) : FText::GetEmpty());
-	}
 
 	if (IMG_Icon)
 	{
@@ -48,8 +40,5 @@ void UOBLootEntryWidget::SetEntry(UOBLootWindow* InOwner, const FGameplayTag& In
 
 void UOBLootEntryWidget::HandleTakeClicked()
 {
-	if (Owner)
-	{
-		Owner->RequestTake(ItemTag, Count);
-	}
+	OnEntryClicked.ExecuteIfBound(ItemTag, Count);
 }

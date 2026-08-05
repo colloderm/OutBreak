@@ -20,7 +20,8 @@ DECLARE_MULTICAST_DELEGATE(FOBOnLootContentsChanged);
  - 레벨 배치 상자 / 좀비 드랍 / 플레이어 시체 / 바닥 픽업이 전부 같은 "아이템 담는 액터"다.
    하나로 두고 채우는 방식만 다르게 한다.
 무엇을 저장하는가?
- - FOBItemStack 목록(복제). 실제 아이템 스펙은 태그로 레지스트리에서 찾는다.
+ - FInventoryData 목록(복제). 인스턴스째 들고 있어 무기의 탄창 잔탄이 보존된다.
+   아이템 스펙은 태그로 레지스트리에서 찾는다.
 멀티플레이 역할?
  - 채우는 건 서버 권위. 클라는 복제된 Contents만 읽는다.
  */
@@ -37,10 +38,8 @@ public:
 	// 시체 / 바닥에 버린 아이템처럼 내용이 이미 정해진 경우.
 	static AOBLootContainer* SpawnWithContents(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
 		const FTransform& SpawnTransform, const TArray<FOBItemStack>& Items);
-	static AOBLootContainer* SpawnWithItemInstances(UWorld* World,
-		TSubclassOf<AOBLootContainer> ContainerClass,
-		const FTransform& SpawnTransform,
-		const TArray<FInventoryData>& Items);
+	static AOBLootContainer* SpawnWithItemInstances(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
+		const FTransform& SpawnTransform, const TArray<FInventoryData>& Items);
 
 	// 서버 전용. 즉석에서 굴려 스폰한다(좀비 처치 등 매번 달라야 하는 드랍).
 	static AOBLootContainer* SpawnFromTable(UWorld* World, TSubclassOf<AOBLootContainer> ContainerClass,
@@ -51,12 +50,10 @@ public:
 	// 서버: 드랍 테이블로 채운다. 같은 세션에서는 몇 번 호출해도 결과가 같다.
 	void RollContents();
 	
-	// 서버: 내용물을 직접 지정/추가(좀비 드랍·시체·바닥 버리기가 쓴다).
-	void SetContents(const TArray<FOBItemStack>& InItems);
+	// 서버: 내용물을 인스턴스째 지정(좀비 드랍·시체·바닥 버리기가 쓴다).
 	void SetItemInstances(const TArray<FInventoryData>& InItems);
-	void AddContent(const FGameplayTag& ItemTag, int32 Count);
 	
-	// GetContents를 const 함수로 고친다(위젯이 const 포인터로도 읽어야 한다)
+	// 위젯이 const 포인터로도 읽는다.
 	const TArray<FInventoryData>& GetContents() const { return Contents; }
 	
 	UFUNCTION(BlueprintPure, Category = "Loot")

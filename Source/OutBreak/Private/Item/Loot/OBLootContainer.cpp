@@ -133,14 +133,6 @@ void AOBLootContainer::RollContents()
 	OnRep_Contents();   // OnRep은 서버에서 안 불린다. 호스트 화면을 위해 직접 호출.
 }
 
-void AOBLootContainer::SetContents(const TArray<FOBItemStack>& InItems)
-{
-	if (!HasAuthority()) return;
-	
-	Contents = ConvertStacksToInstances(InItems);
-	OnRep_Contents();
-}
-
 void AOBLootContainer::SetItemInstances(
 	const TArray<FInventoryData>& InItems)
 {
@@ -159,14 +151,6 @@ void AOBLootContainer::SetItemInstances(
 			Item.InstanceId = FGuid::NewGuid();
 		}
 	}
-	OnRep_Contents();
-}
-
-void AOBLootContainer::AddContent(const FGameplayTag& ItemTag, int32 Count)
-{
-	if (!HasAuthority()) return;
-
-	AppendStackAsInstances(FOBItemStack(ItemTag, Count), Contents);
 	OnRep_Contents();
 }
 

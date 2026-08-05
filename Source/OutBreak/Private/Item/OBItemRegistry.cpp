@@ -165,6 +165,22 @@ void UOBItemRegistry::RebuildCache()
 	UE_LOG(LogTemp, Log, TEXT("[OBItemRegistry] 아이템 %d종 등록됨."), ItemCache.Num());
 }
 
+void UOBItemRegistry::SortStacks(TArray<FOBItemStack>& Stacks)
+{
+	Stacks.Sort([](const FOBItemStack& A, const FOBItemStack& B)
+	{
+		const FOBItemDefinitionRow* RowA = FindItem(A.ItemTag);
+		const FOBItemDefinitionRow* RowB = FindItem(B.ItemTag);
+
+		// 표에 없는 건 맨 뒤로. 눈에 띄어야 CSV를 고친다.
+		if (!RowA || !RowB) return RowA != nullptr;
+
+		if (RowA->Category  != RowB->Category)  return RowA->Category  < RowB->Category;
+		if (RowA->SortOrder != RowB->SortOrder) return RowA->SortOrder < RowB->SortOrder;
+		return A.ItemTag.ToString() < B.ItemTag.ToString();
+	});
+}
+
 #if WITH_EDITOR
 void UOBItemRegistry::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {

@@ -63,6 +63,10 @@ public:
 	// 창고 입출고. 각각 즉시 저장한다(추출 정산/판매가 이걸 쓴다).
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	void AddStashItem(const FGameplayTag& ItemTag, int32 Count);
+	
+	// 정산용 일괄 추가. 파일 쓰기를 한 번만 한다.
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	void AddStashItems(const TArray<FOBItemStack>& Items);
 
 	// 수량이 부족하면 아무것도 빼지 않고 false. 부분 차감은 하지 않는다.
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
@@ -75,6 +79,25 @@ public:
 
 	// 현재 Loadout 읽기.
 	const FOBLoadout& GetLoadout() const { return CurrentLoadout; }
+	
+	// --- 반입 ---
+
+	// 창고 → 반입 목록. 창고 수량이 모자라면 아무것도 안 옮기고 false.
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	bool AddCarryItem(const FGameplayTag& ItemTag, int32 Count);
+
+	// 반입 목록 → 창고(선택 취소).
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	bool RemoveCarryItem(const FGameplayTag& ItemTag, int32 Count);
+
+	// 탐사 종료 시 항상 비운다. 사망이면 손실, 탈출이면 이미 정산으로 창고에 들어갔다.
+	UFUNCTION(BlueprintCallable, Category = "Loadout")
+	void ClearCarryItems();
+
+	UFUNCTION(BlueprintPure, Category = "Loadout")
+	int32 GetCarryCount(const FGameplayTag& ItemTag) const;
+
+	const TArray<FOBItemStack>& GetCarryItems() const { return CurrentLoadout.CarryItems; }
 
 	// --- 스타터킷 ---
 
@@ -127,6 +150,9 @@ public:
 private:
 	void AppendBuyItems(FShopWindowViewData& View, TSet<EOBItemCategory>& OutCategories) const;
 	void AppendSellItems(FShopWindowViewData& View, TSet<EOBItemCategory>& OutCategories) const;
+	
+	// 저장 없이 메모리만 갱신. 실제로 늘었으면 true.
+	bool AddStashItemInternal(const FGameplayTag& ItemTag, int32 Count);
 	
 private:
 	// 런타임 권위값(로드/편집 대상).
