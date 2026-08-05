@@ -11,14 +11,8 @@ public class InteriorPCGEditor : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
-			"Slate",
-			"SlateCore",
-			"UnrealEd",
-			"PropertyEditor",
-			"AssetTools",
 			"AssetRegistry",
-			"ContentBrowser",
-			"AssetDefinition",
+			"UnrealEd",
 			"InteriorPCGRuntime",
 			"PCG"
 		});
