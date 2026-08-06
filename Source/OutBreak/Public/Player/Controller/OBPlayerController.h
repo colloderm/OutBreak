@@ -89,6 +89,8 @@ protected:
 	void InventoryStarted();
 	void InventoryCompleted();
 	
+	void Input_ToggleMap();
+	
 	// 능력 입력 핸들러(눌림/뗌).
 	void Input_AbilityInputPressed(FGameplayTag InputTag);
 	void Input_AbilityInputReleased(FGameplayTag InputTag);
@@ -130,6 +132,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> InventoryAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> MapAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	int32 InputMappingPriority = 0;

@@ -115,6 +115,15 @@ protected:
 		const FString& Options, const FString& Portal) override;
 	
 	uint8 ResolveTeamForCode(const FString& PartyCode); // 코드→TeamId(같은 코드=같은 팀, 없으면 고유)
+	
+	// [지도] 레벨 배치 공용 탈출구를 모아 GameState에 싣는다(클라가 액터를 못 찾으므로).
+	void CollectPublicExtractsForMap();
+
+	// [지도] 팀에 배정된 개인 탈출구 좌표를 그 팀 전원의 PlayerState에 싣는다.
+	void PushPersonalExtractsToTeam(uint8 TeamId);
+	
+	// [지도] 1초마다 각 플레이어의 PS에 "그 팀의 다른 팀원" 위치를 싣는다.
+	void UpdateTeammateMapLocations();
 
 protected:
 	// 이 맵의 세션 설정(정원/시간). 맵별 GameMode BP에서 해당 맵의 MapData 에셋을 지정.
@@ -172,6 +181,8 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Down")
 	float ReviveHealthPercent = 0.35f;
+	
+	FTimerHandle TeammateMapTimer;
 	
 private:
 	void CheckTeamWipe(uint8 TeamId);          // 팀에 Alive 0명이면 다운자 전원 사망

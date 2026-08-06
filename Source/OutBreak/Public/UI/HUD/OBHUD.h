@@ -6,19 +6,19 @@
 #include "GameFramework/HUD.h"
 #include "OBHUD.generated.h"
 
+class UOBWorldMapWidget;
 class UOBConsumableWidget;
 class UOBAmmoViewModel;
 class AOBWeaponBase;
 class UUserWidget;
 class UOBHealthViewModel;
 class AOBCharacterBase;
-/**
- * 
- */
+
 UCLASS()
 class OUTBREAK_API AOBHUD : public AHUD
 {
 	GENERATED_BODY()
+	
 protected:
 	virtual void BeginPlay() override;
 	
@@ -79,5 +79,15 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UUserWidget> CrosshairWidget;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UOBWorldMapWidget> WorldMapWidgetClass;
+
+	UPROPERTY()
+	TObjectPtr<UOBWorldMapWidget> WorldMapWidget;
+	
+public:
+	// PC의 M키가 호출.
+	void ToggleWorldMap();
 	
 };

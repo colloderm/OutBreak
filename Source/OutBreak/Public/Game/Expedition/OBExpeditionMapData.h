@@ -55,4 +55,35 @@ public:
 	// [개인 탈출] 활성 종료 경과초(0=끝까지). 먼 거리 맵일수록 늘려 도달 여유 확보.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session|Extraction", meta = (ClampMin = "0"))
 	int32 PersonalActiveEndSec = 600;
+	
+	// ===== 전체 지도 =====
+
+	// 에디터에서 미리 구운 탑다운 이미지.
+	// World Partition이라 런타임 SceneCapture는 못 쓴다(언로드된 셀이 빈칸으로 찍힌다).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map|WorldMap")
+	TObjectPtr<UTexture2D> WorldMapTexture;
+
+	// 지도 이미지가 덮는 월드 영역의 중심(XY).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map|WorldMap")
+	FVector2D WorldMapCenter = FVector2D::ZeroVector;
+
+	// 지도 이미지가 덮는 월드 크기(cm). 캡처 액터의 Ortho Width와 같아야 한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map|WorldMap", meta = (ClampMin = "1.0"))
+	FVector2D WorldMapSize = FVector2D(100000.0, 100000.0);
+
+	// 월드 좌표 → 지도 UV(좌상단 0,0 / 우하단 1,1).
+	// SceneCapture2D를 Pitch=-90 / Yaw=0 / Orthographic으로 찍은 이미지 기준이다:
+	//   이미지 오른쪽 = 월드 +Y, 이미지 위쪽 = 월드 +X.
+	FVector2D WorldToMapUV(const FVector& WorldLocation) const
+	{
+		const double SizeX = FMath::Max(1.0, WorldMapSize.X);
+		const double SizeY = FMath::Max(1.0, WorldMapSize.Y);
+
+		const double MinX = WorldMapCenter.X - SizeX * 0.5;
+		const double MinY = WorldMapCenter.Y - SizeY * 0.5;
+
+		return FVector2D(
+			(WorldLocation.Y - MinY) / SizeY,
+			1.0 - (WorldLocation.X - MinX) / SizeX);
+	}
 };

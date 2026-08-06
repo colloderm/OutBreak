@@ -26,6 +26,7 @@
 #include "TimerManager.h"
 #include "Game/GameMode/OBExpeditionGameMode.h"
 #include "Item/Loot/OBLootContainer.h"
+#include "UI/HUD/OBHUD.h"
 #include "UI/Widgets/Expedition/OBExpeditionResultWidget.h"
 
 
@@ -189,6 +190,11 @@ void AOBPlayerController::SetupInputComponent()
 	if (InventoryAction)
 	{
 		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_InventoryKey);
+	}
+	
+	if (MapAction)
+	{
+		EIC->BindAction(MapAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_ToggleMap);
 	}
 
 	if (InputConfig)
@@ -1052,5 +1058,13 @@ void AOBPlayerController::Client_ReturnCarryLeftover_Implementation(const TArray
 			UE_LOG(LogTemp, Warning,
 				TEXT("[Carry] 가방이 모자라 %d종을 창고로 되돌렸다."), Items.Num());
 		}
+	}
+}
+
+void AOBPlayerController::Input_ToggleMap()
+{
+	if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
+	{
+		OBHUD->ToggleWorldMap();
 	}
 }
