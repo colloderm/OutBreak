@@ -65,14 +65,19 @@ void UOBLootWindow::Rebuild()
 
 	Box_Entries->ClearChildren();
 
-	TArray<FOBItemStack> Items;
-	for (const FInventoryData& Item : Bound->GetContents())
-	{
-		OBItemStacks::Add(Items, Item.ItemTag, Item.ItemStack);
-	}
+	TArray<FInventoryData> Items = Bound->GetContents();
 
 	// 정렬 기준은 창고·상점과 같다: 카테고리 → SortOrder → 태그.
-	UOBItemRegistry::SortStacks(Items);
+	Items.Sort([](const FInventoryData& A, const FInventoryData& B)
+	{
+		const FOBItemDefinitionRow* RowA = A.GetDefinition();
+		const FOBItemDefinitionRow* RowB = B.GetDefinition();
+		if (!RowA || !RowB) return RowA != nullptr;
+		if (RowA->Category != RowB->Category) return RowA->Category < RowB->Category;
+		if (RowA->SortOrder != RowB->SortOrder) return RowA->SortOrder < RowB->SortOrder;
+		if (A.ItemTag != B.ItemTag) return A.ItemTag.ToString() < B.ItemTag.ToString();
+		return A.InstanceId.ToString() < B.InstanceId.ToString();
+	});
 
 	if (!EntryWidgetClass)
 	{
@@ -80,15 +85,15 @@ void UOBLootWindow::Rebuild()
 		return;
 	}
 
-	for (const FOBItemStack& Stack : Items)
+	for (const FInventoryData& Item : Items)
 	{
-		if (Stack.IsEmpty()) continue;
+		if (!Item.ItemTag.IsValid() || Item.ItemStack <= 0) continue;
 
 		UOBLootEntryWidget* Entry = CreateWidget<UOBLootEntryWidget>(this, EntryWidgetClass);
 		if (!Entry) continue;
 
-		Entry->SetEntry(Stack.ItemTag, Stack.Count);
-		Entry->OnEntryClicked.BindUObject(this, &UOBLootWindow::RequestTake);
+		Entry->SetItemInstance(Item);
+		Entry->OnInstanceClicked.BindUObject(this, &UOBLootWindow::RequestTakeInstance);
 		Box_Entries->AddChild(Entry);
 	}
 }
@@ -101,6 +106,15 @@ void UOBLootWindow::RequestTake(const FGameplayTag& ItemTag, int32 Count)
 
 	// 로컬에서 미리 지우지 않는다. 가방이 꽉 차서 실패하면 되돌려야 하기 때문.
 	PC->Server_TakeLoot(Bound, ItemTag, Count);
+}
+
+void UOBLootWindow::RequestTakeInstance(const FGuid& InstanceId, int32 Count)
+{
+	AOBLootContainer* Bound = Container.Get();
+	AOBPlayerController* PC = GetOwningPlayer<AOBPlayerController>();
+	if (!Bound || !PC || !InstanceId.IsValid() || Count <= 0) return;
+
+	PC->Server_TakeLootInstance(Bound, InstanceId, Count);
 }
 
 void UOBLootWindow::RequestTakeAll()

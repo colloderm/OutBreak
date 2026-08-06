@@ -7,6 +7,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
 #include "GenericTeamAgentInterface.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/Data/OBItemTypes.h"
 #include "OBCharacterBase.generated.h"
 
@@ -70,6 +71,9 @@ public:
 	
 	// 스폰 이후 늘어난 것만. 정산은 "레벨에서 주운 것"만 창고로 보낸다.
 	TArray<FOBItemStack> GetBagGainsSinceSpawn();
+	TArray<FOBItemStack> GetExtractionStackGains();
+	TArray<FInventoryData> GetLootedUniqueItemInstances();
+	TArray<FInventoryData> GetReturnedLoadoutItemInstances();
 	
 	// 조준 상태(서버). 이동 감속 + 복제 상태
 	void SetAiming(bool bnewAiming);
@@ -187,6 +191,9 @@ protected:
 	
 	void FinalizeSpawnLoadoutFallback();
 	void FinalizeSpawnLoadoutInternal(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
+	void FinalizeSpawnLoadoutInstancesInternal(const TArray<FInventoryData>& Weapons);
+	void CompleteSpawnInventorySetup();
+	void CaptureSpawnInventorySnapshot();
 	
 protected:
 	UPROPERTY()
@@ -264,6 +271,7 @@ protected:
 	
 	// 초기 지급이 끝난 시점의 가방(서버 전용). 정산에서 빼는 기준선.
 	TArray<FOBItemStack> SpawnBagSnapshot;
+	TSet<FGuid> SpawnInstanceIds;
 	
 	// 반입 지급 중복 방지(PossessedBy와 PS push 양쪽에서 불릴 수 있다).
 	bool bCarryItemsApplied = false;

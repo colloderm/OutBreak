@@ -18,23 +18,71 @@
 // 아이콘=Icon, 최대 스택=MaxStack, 월드 드랍 액터=WorldItemClass 가 각각 대체한다.
 
 USTRUCT(BlueprintType)
+struct OUTBREAK_API FOBInstalledAttachment
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	FGameplayTag SlotTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	FGameplayTag ItemTag;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	FGuid InstanceId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float Durability = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Meta = (ClampMin = "0"))
+	int32 QualityTier = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	bool bFoundInRaid = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	FGuid RaidAcquisitionId;
+};
+
+USTRUCT(BlueprintType)
 struct OUTBREAK_API FInventoryData
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	FGameplayTag ItemTag;
 	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	int32 ItemStack = 0;
 
 	// Stable identity for equipment state. Array indices can change when slots move.
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	FGuid InstanceId;
 
 	// Per-item runtime state. -1 means that the weapon has not been equipped yet.
-	UPROPERTY(BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
 	int32 MagazineAmmo = -1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float Durability = 1.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame, Meta = (ClampMin = "0"))
+	int32 QualityTier = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	bool bFoundInRaid = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	FGuid RaidAcquisitionId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	TArray<FOBInstalledAttachment> Attachments;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	int32 DataVersion = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, SaveGame)
+	int32 Revision = 0;
 	
 	// 스펙은 표에서 그때그때 조회한다. 포인터를 들고 있지 않는다.
 	const FOBItemDefinitionRow* GetDefinition() const

@@ -48,12 +48,12 @@ void UOBAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	{
 		if (UOBEquipmentComponent* Equip = OwningCharacter->FindComponentByClass<UOBEquipmentComponent>())
 			if (AOBWeaponBase* W = Equip->GetCurrentWeapon())
-				if (UOBWeaponData* Data = W->GetWeaponData())
+				if (const FOBWeaponDefinitionRow* Definition = W->GetWeaponDefinition())
 				{
-					CurrentOverlayLocomotion = Data->OverlayLocomotion;
-					CurrentAimOffset         = Data->AimOffset;
-					CurrentADSPose           = Data->ADSPose;
-					CurrentSprintPose		 = Data->SprintPose;
+					CurrentOverlayLocomotion = Definition->Visual.OverlayLocomotion.LoadSynchronous();
+					CurrentAimOffset         = Definition->Visual.AimOffset.LoadSynchronous();
+					CurrentADSPose           = Definition->Visual.ADSPose.LoadSynchronous();
+					CurrentSprintPose        = Definition->Visual.SprintPose.LoadSynchronous();
 				}
 
 		// 블렌드스페이스 입력: 수직 속도는 제외(점프 중 상체가 질주 자세 되는 것 방지).
@@ -180,12 +180,14 @@ bool UOBAnimInstance::ShouldDisableLeftHandIK() const
 
 	UOBEquipmentComponent* Equipment = OwningCharacter->FindComponentByClass<UOBEquipmentComponent>();
 	AOBWeaponBase* Weapon = Equipment ? Equipment->GetCurrentWeapon() : nullptr;
-	UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
-	if (!Data) return false;
+	const FOBWeaponDefinitionRow* Definition = Weapon ? Weapon->GetWeaponDefinition() : nullptr;
+	if (!Definition) return false;
+	UAnimMontage* EquipMontage = Definition->Visual.EquipMontage.LoadSynchronous();
+	UAnimMontage* ReloadMontage = Definition->Visual.ReloadMontage.LoadSynchronous();
 
 	// 꺼내기(Equip)/재장전 몽타주가 재생 중이면 왼팔을 자유롭게(IK off).
-	if (Data->EquipMontage  && Montage_IsPlaying(Data->EquipMontage))  return true;
-	if (Data->ReloadMontage && Montage_IsPlaying(Data->ReloadMontage)) return true;
+	if (EquipMontage && Montage_IsPlaying(EquipMontage)) return true;
+	if (ReloadMontage && Montage_IsPlaying(ReloadMontage)) return true;
 	if (UAbilitySystemComponent* ASC = OwningCharacter->GetAbilitySystemComponent())
 	{
 		if (ASC->HasMatchingGameplayTag(OBGameplayTags::State_UsingConsumable)) return true;

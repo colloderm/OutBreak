@@ -65,6 +65,10 @@ public:
 	// 서버: 가방에 들어가는 만큼만 옮기고 그만큼 상자에서 뺀다. 부분 이동을 허용한다.
 	// 반환: 실제로 옮긴 개수(0이면 가방이 꽉 찼거나 그 아이템이 없다).
 	int32 TryTakeItem(UPlayerInventoryComponent* Inventory, const FGameplayTag& ItemTag, int32 Count);
+	int32 TryTakeItemInstance(
+		UPlayerInventoryComponent* Inventory,
+		const FGuid& InstanceId,
+		int32 Count);
 
 	// 서버: 들어있는 걸 전부 시도한다. 안 들어가는 건 상자에 남는다.
 	int32 TryTakeAll(UPlayerInventoryComponent* Inventory);

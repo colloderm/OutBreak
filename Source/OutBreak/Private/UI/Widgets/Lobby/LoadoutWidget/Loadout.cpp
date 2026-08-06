@@ -12,6 +12,8 @@
 #include "Weapon/Data/OBWeaponData.h"
 #include "Weapon/Data/OBWeaponCatalog.h"
 #include "Engine/GameInstance.h"
+#include "Data/OBGameDataSubsystem.h"
+#include "Item/OBItemRegistry.h"
 
 void ULoadout::NativeConstruct()
 {
@@ -150,20 +152,36 @@ void ULoadout::ShowStats(TSubclassOf<AOBWeaponBase> WeaponClass)
 {
 	if (!LoadoutSelectionView || !WeaponClass) return;
 
-	const AOBWeaponBase* CDO = WeaponClass->GetDefaultObject<AOBWeaponBase>();
-	const UOBWeaponData* D = CDO ? CDO->GetWeaponData() : nullptr;
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	const FGameplayTag ItemTag = GameData
+		? GameData->FindTagForWeaponClass(WeaponClass.Get())
+		: FGameplayTag();
+	const FOBWeaponDefinitionRow* D = GameData
+		? GameData->FindWeapon(ItemTag)
+		: nullptr;
 	if (!D) return;
 
 	auto Norm = [](float V, float Max) { return Max > 0.f ? FMath::Clamp(V / Max, 0.f, 1.f) : 0.f; };
 
-	FText Name = D->DisplayName;
-	const float Damage   = Norm(D->BaseDamage, MaxDamage);
-	const float FireRate = Norm(D->RoundsPerMinute, MaxRPM);
-	const float Accuracy = MaxSpread / (MaxSpread + FMath::Max(D->BaseSpreadDegrees, 0.f));
-	const float Recoil   = Norm(D->VerticalRecoil + D->HorizontalRecoil, MaxRecoil);
+	FText Name;
+	UTexture2D* Icon = nullptr;
+	UOBItemRegistry::GetItemDisplay(ItemTag, Name, Icon);
+	const float Damage = Norm(D->Common.BaseDamage, MaxDamage);
+	const float RawFireRate = D->WeaponType == EOBWeaponType::Ranged
+		? D->Ranged.RoundsPerMinute
+		: (D->Melee.AttackDuration > 0.f ? 60.f / D->Melee.AttackDuration : 0.f);
+	const float FireRate = Norm(RawFireRate, MaxRPM);
+	const float Accuracy = D->WeaponType == EOBWeaponType::Ranged
+		? MaxSpread / (MaxSpread + FMath::Max(D->Ranged.BaseSpreadDegrees, 0.f))
+		: FMath::Clamp(D->Melee.ArcDegrees / 180.f, 0.f, 1.f);
+	const float Recoil = D->WeaponType == EOBWeaponType::Ranged
+		? Norm(D->Ranged.VerticalRecoil + D->Ranged.HorizontalRecoil, MaxRecoil)
+		: 0.f;
 	const float Mobility = FMath::GetMappedRangeValueClamped(
-		FVector2f(MinMobilityMultiplier, 1.f), FVector2f(0.f, 1.f), D->MobilityMultiplier);
-	FText Ammo = FText::FromString(FString::Printf(TEXT("%d / %d"), D->MagazineSize, D->MaxReserveAmmo));
+		FVector2f(MinMobilityMultiplier, 1.f), FVector2f(0.f, 1.f), D->Common.MobilityMultiplier);
+	FText Ammo = D->WeaponType == EOBWeaponType::Ranged
+		? FText::FromString(FString::Printf(TEXT("%d / %d"), D->Ranged.MagazineSize, D->Ranged.MaxReserveAmmo))
+		: FText::FromString(TEXT("Melee"));
 
 	LoadoutSelectionView->SetStatView(Name, Damage, FireRate, Accuracy, Recoil, Mobility, Ammo);
 }

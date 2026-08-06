@@ -7,6 +7,9 @@
 #include "Character/OBCharacterBase.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Data/OBGameDataSubsystem.h"
+#include "Inventory/Data/InventoryData.h"
+#include "Item/OBItemRegistry.h"
 #include "Weapon/OBWeaponBase.h"
 #include "GameFramework/Character.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -31,6 +34,28 @@ void UOBEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 
 void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 {
+	if (!WeaponClass)
+	{
+		return;
+	}
+	FInventoryData DefaultInstance;
+	DefaultInstance.ItemTag = UOBItemRegistry::FindTagForWeaponClass(WeaponClass.Get());
+	DefaultInstance.ItemStack = 1;
+	DefaultInstance.InstanceId = FGuid::NewGuid();
+	EquipWeaponInstance(DefaultInstance);
+}
+
+void UOBEquipmentComponent::EquipWeaponInstance(const FInventoryData& ItemInstance)
+{
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	const FOBWeaponDefinitionRow* Definition = GameData
+		? GameData->FindWeapon(ItemInstance.ItemTag)
+		: nullptr;
+	UClass* LoadedWeaponClass = Definition
+		? Definition->ActorClass.LoadSynchronous()
+		: nullptr;
+	TSubclassOf<AOBWeaponBase> WeaponClass = LoadedWeaponClass;
+
 	// 스폰/부착은 서버 권위에서만.
 	AActor* OwnerActor = GetOwner();
 	if (!OwnerActor || !OwnerActor->HasAuthority() || !WeaponClass) return;
@@ -54,19 +79,29 @@ void UOBEquipmentComponent::EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass)
 	if (!NewWeapon) return;
 
 	CurrentWeapon = NewWeapon;
+	NewWeapon->InitializeFromItemInstance(ItemInstance);
 
 	// 서버는 OnRep이 호출되지 않으므로 여기서 직접 부착(리슨 서버 포함).
 	AttachWeaponToOwner();
 	
 	// [수정] 장착 즉시 탄약 초기화(WeaponData 기준) → CurrentAmmo 세팅 + OnRep_Ammo 복제.
 	//        이게 없으면 첫 장전이 한 박자 밀림(속성 미세팅/복제 타이밍).
-	NewWeapon->InitializeAmmo();
 	
 	// 레이어 링크 + draw 몽타주(서버 로컬)
 	ApplyCosmeticEquip();
 	
 	// 무기 데이터의 AbilitySet을 캐릭터 ASC에 부여(발사 능력 등).
-	if (UOBWeaponData* Data = NewWeapon->GetWeaponData())
+	if (Definition)
+	{
+		if (UOBAbilitySet* AbilitySet = Definition->Common.AbilitySet.LoadSynchronous())
+		{
+			if (UAbilitySystemComponent* ASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter))
+			{
+				AbilitySet->GiveToAbilitySystem(ASC, &GrantedAbilityHandles, NewWeapon);
+			}
+		}
+	}
+	else if (UOBWeaponData* Data = NewWeapon->GetWeaponData())
 	{
 		if (Data->AbilitySet)
 		{
@@ -151,7 +186,10 @@ void UOBEquipmentComponent::AttachWeaponToOwner()
 
 	// 무기별 소켓(비어 있으면 컴포넌트 기본값).
 	const UOBWeaponData* Data = CurrentWeapon->GetWeaponData();
-	const FName SocketToUse = (Data && !Data->AttachSocket.IsNone()) ? Data->AttachSocket : AttachSocketName;
+	const FOBWeaponDefinitionRow* Definition = CurrentWeapon->GetWeaponDefinition();
+	const FName SocketToUse = Definition && !Definition->Visual.AttachSocket.IsNone()
+		? Definition->Visual.AttachSocket
+		: ((Data && !Data->AttachSocket.IsNone()) ? Data->AttachSocket : AttachSocketName);
 
 	// 소켓이 없으면 컴포넌트 원점(발밑)에 붙어 총이 바닥에 떨어진다. 조용히 실패하지 않도록 경고.
 	if (!TargetMesh->DoesSocketExist(SocketToUse))
@@ -175,13 +213,22 @@ void UOBEquipmentComponent::ApplyCosmeticEquip()
 	UAnimInstance* Anim = MontageMesh ? MontageMesh->GetAnimInstance() : nullptr;
 	if (!Anim) return;
 
-	UOBWeaponData* Data = CurrentWeapon->GetWeaponData();
-	if (!Data) return;
+	const FOBWeaponDefinitionRow* Definition = CurrentWeapon->GetWeaponDefinition();
+	UAnimMontage* EquipMontage = Definition
+		? Definition->Visual.EquipMontage.LoadSynchronous()
+		: nullptr;
+	if (!EquipMontage)
+	{
+		if (const UOBWeaponData* Data = CurrentWeapon->GetWeaponData())
+		{
+			EquipMontage = Data->EquipMontage;
+		}
+	}
 
 	// 꺼내기(draw) 몽타주.
-	if (Data->EquipMontage)
+	if (EquipMontage)
 	{
-		Anim->Montage_Play(Data->EquipMontage);
+		Anim->Montage_Play(EquipMontage);
 	}
 }
 

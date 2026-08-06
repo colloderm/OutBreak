@@ -2,6 +2,7 @@
 
 #include "Item/OBItemRegistry.h"
 
+#include "Data/OBGameDataSubsystem.h"
 #include "Engine/DataTable.h"
 #include "Item/Data/OBItemDefinition.h"
 #include "Weapon/OBWeaponBase.h"
@@ -57,6 +58,10 @@ namespace
 const FOBItemDefinitionRow* UOBItemRegistry::FindItem(const FGameplayTag& ItemTag)
 {
 	if (!ItemTag.IsValid()) return nullptr;
+	if (const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get())
+	{
+		return GameData->FindItem(ItemTag);
+	}
 
 	UOBItemRegistry* Registry = GetReadyRegistry();
 	if (!Registry) return nullptr;
@@ -68,6 +73,10 @@ const FOBItemDefinitionRow* UOBItemRegistry::FindItem(const FGameplayTag& ItemTa
 FGameplayTag UOBItemRegistry::FindTagForWeaponClass(const UClass* WeaponClass)
 {
 	if (!WeaponClass) return FGameplayTag();
+	if (const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get())
+	{
+		return GameData->FindTagForWeaponClass(WeaponClass);
+	}
 
 	UOBItemRegistry* Registry = GetReadyRegistry();
 	if (!Registry) return FGameplayTag();
@@ -79,6 +88,11 @@ FGameplayTag UOBItemRegistry::FindTagForWeaponClass(const UClass* WeaponClass)
 void UOBItemRegistry::GetAllItems(TArray<const FOBItemDefinitionRow*>& OutItems)
 {
 	OutItems.Reset();
+	if (const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get())
+	{
+		GameData->GetAllItems(OutItems);
+		return;
+	}
 
 	UOBItemRegistry* Registry = GetReadyRegistry();
 	if (!Registry) return;
@@ -136,6 +150,10 @@ bool UOBItemRegistry::GetItemDisplay(const FGameplayTag& ItemTag, FText& OutName
 
 UDataTable* UOBItemRegistry::GetLootTable()
 {
+	if (const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get())
+	{
+		return GameData->GetLootTable();
+	}
 	GetReadyRegistry(); // 캐시 보장
 	return GetTableKeeper().LootTable;
 }

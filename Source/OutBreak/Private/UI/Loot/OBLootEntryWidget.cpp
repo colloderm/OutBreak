@@ -5,7 +5,9 @@
 #include "Components/Button.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/OBItemRegistry.h"
+#include "UI/Tooltip/OBItemTooltipLibrary.h"
 
 void UOBLootEntryWidget::NativeConstruct()
 {
@@ -19,6 +21,7 @@ void UOBLootEntryWidget::NativeConstruct()
 
 void UOBLootEntryWidget::SetEntry(const FGameplayTag& InItemTag, int32 InCount)
 {
+	InstanceId.Invalidate();
 	ItemTag = InItemTag;
 	Count = InCount;
 
@@ -38,9 +41,24 @@ void UOBLootEntryWidget::SetEntry(const FGameplayTag& InItemTag, int32 InCount)
 	}
 }
 
+void UOBLootEntryWidget::SetItemInstance(const FInventoryData& InItemInstance)
+{
+	SetEntry(InItemInstance.ItemTag, InItemInstance.ItemStack);
+	InstanceId = InItemInstance.InstanceId;
+	SetToolTipText(UOBItemTooltipLibrary::BuildFallbackTooltipText(InItemInstance));
+}
+
 void UOBLootEntryWidget::HandleTakeClicked()
 {
-	OnEntryClicked.ExecuteIfBound(ItemTag, ResolveClickCount());
+	const int32 RequestedCount = ResolveClickCount();
+	if (InstanceId.IsValid())
+	{
+		OnInstanceClicked.ExecuteIfBound(InstanceId, RequestedCount);
+	}
+	else
+	{
+		OnEntryClicked.ExecuteIfBound(ItemTag, RequestedCount);
+	}
 }
 
 int32 UOBLootEntryWidget::ResolveClickCount() const

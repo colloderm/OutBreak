@@ -68,16 +68,22 @@ void AOBPlayerController::BeginPlay()
 	{
 		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
 		{
-			const TArray<TSubclassOf<AOBWeaponBase>> Classes = Loadout->GetSelectedClasses();
-			if (Classes.Num() > 0)
+			const TArray<FInventoryData> WeaponInstances = Loadout->GetSelectedWeaponInstances();
+			if (!WeaponInstances.IsEmpty())
 			{
-				Server_ApplyLoadout(Classes);
-				
-				const TArray<FOBItemStack>& Carry = Loadout->GetCarryItems();
-				if (Carry.Num() > 0)
-				{
-					Server_ApplyCarryItems(Carry);
-				}
+				Server_ApplyLoadoutInstances(WeaponInstances);
+			}
+			else
+			{
+				const TArray<TSubclassOf<AOBWeaponBase>> Classes = Loadout->GetSelectedClasses();
+				if (!Classes.IsEmpty()) Server_ApplyLoadout(Classes);
+			}
+
+			const TArray<FOBItemStack>& CarryStacks = Loadout->GetCarryStackItems();
+			const TArray<FInventoryData>& CarryInstances = Loadout->GetCarryItemInstances();
+			if (!CarryStacks.IsEmpty() || !CarryInstances.IsEmpty())
+			{
+				Server_ApplyCarryLoadout(CarryStacks, CarryInstances);
 			}
 		}
 
@@ -736,6 +742,34 @@ void AOBPlayerController::Client_ApplyExtractionResult_Implementation(const TArr
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] 탈출 정산: %d종 창고 반영"), Haul.Num());
 }
 
+void AOBPlayerController::Client_ApplyExtractionResultV2_Implementation(
+	const TArray<FOBItemStack>& StackHaul,
+	const TArray<FInventoryData>& LootedInstances,
+	const TArray<FInventoryData>& ReturnedLoadoutInstances)
+{
+	LastExtractionHaul = StackHaul;
+	for (const FInventoryData& Item : LootedInstances)
+	{
+		if (Item.ItemTag.IsValid() && Item.ItemStack > 0)
+		{
+			OBItemStacks::Add(LastExtractionHaul, Item.ItemTag, Item.ItemStack);
+		}
+	}
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->ApplyExtractionResult(
+				StackHaul,
+				LootedInstances,
+				ReturnedLoadoutInstances);
+		}
+	}
+	UE_LOG(LogTemp, Log,
+		TEXT("[Expedition] Extraction V2: stacks=%d instances=%d returned=%d"),
+		StackHaul.Num(), LootedInstances.Num(), ReturnedLoadoutInstances.Num());
+}
+
 void AOBPlayerController::ReturnToHome()
 {
 	GetWorldTimerManager().ClearTimer(AutoReturnTimer);
@@ -992,6 +1026,37 @@ void AOBPlayerController::Server_TakeLoot_Implementation(AOBLootContainer* Conta
 	}
 }
 
+void AOBPlayerController::Server_ApplyLoadoutInstances_Implementation(
+	const TArray<FInventoryData>& Weapons)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetSelectedWeaponInstancesBulk(Weapons);
+	}
+}
+
+void AOBPlayerController::Server_TakeLootInstance_Implementation(
+	AOBLootContainer* Container,
+	FGuid InstanceId,
+	int32 Count)
+{
+	if (!Container || !InstanceId.IsValid() || Count <= 0) return;
+
+	AOBCharacterBase* MyChar = Cast<AOBCharacterBase>(GetPawn());
+	if (!MyChar || MyChar->IsDead()) return;
+	if (FVector::DistSquared(
+		MyChar->GetActorLocation(),
+		Container->GetActorLocation()) > OBMaxInteractionDistanceSq)
+	{
+		return;
+	}
+
+	if (UPlayerInventoryComponent* Inv = MyChar->GetPlayerInventoryComponent())
+	{
+		Container->TryTakeItemInstance(Inv, InstanceId, Count);
+	}
+}
+
 void AOBPlayerController::Server_TakeAllLoot_Implementation(AOBLootContainer* Container)
 {
 	if (!Container) return;
@@ -1042,15 +1107,40 @@ void AOBPlayerController::Server_ApplyCarryItems_Implementation(const TArray<FOB
 	}
 }
 
+void AOBPlayerController::Server_ApplyCarryLoadout_Implementation(
+	const TArray<FOBItemStack>& StackItems,
+	const TArray<FInventoryData>& ItemInstances)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetCarryLoadoutBulk(StackItems, ItemInstances);
+	}
+}
+
 void AOBPlayerController::Client_ReturnCarryLeftover_Implementation(const TArray<FOBItemStack>& Items)
 {
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
 		{
-			Loadout->AddStashItems(Items);
+			for (const FOBItemStack& Item : Items)
+			{
+				Loadout->RemoveCarryItem(Item.ItemTag, Item.Count);
+			}
 			UE_LOG(LogTemp, Warning,
 				TEXT("[Carry] 가방이 모자라 %d종을 창고로 되돌렸다."), Items.Num());
+		}
+	}
+}
+
+void AOBPlayerController::Client_ReturnCarryItemInstances_Implementation(
+	const TArray<FInventoryData>& Items)
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->ReturnCarryItemInstances(Items);
 		}
 	}
 }

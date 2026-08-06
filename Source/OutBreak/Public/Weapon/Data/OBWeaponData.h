@@ -223,7 +223,7 @@ public:
 	
 	// 발사 시 화면 집중 펄스(연사는 작게).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Feel",
-		Meta = (EditCondition = "WeaponType == EOBWeaponType::Melee", EditConditionHides))
+		Meta = (EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
 	float FireFocusPulse = 0.12f;
 	
 	// ===== 근접 전용 (WeaponType == Melee 일 때만 표시) =====

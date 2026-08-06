@@ -52,6 +52,46 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Meta")
 	FGameplayAttributeData Damage;
 	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, Damage)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Vital", ReplicatedUsing = OnRep_Stamina)
+	FGameplayAttributeData Stamina;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, Stamina)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Vital", ReplicatedUsing = OnRep_MaxStamina)
+	FGameplayAttributeData MaxStamina;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, MaxStamina)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Recovery", ReplicatedUsing = OnRep_HealthRegen)
+	FGameplayAttributeData HealthRegen;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, HealthRegen)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Recovery", ReplicatedUsing = OnRep_StaminaRegen)
+	FGameplayAttributeData StaminaRegen;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, StaminaRegen)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Mobility", ReplicatedUsing = OnRep_MoveSpeedMultiplier)
+	FGameplayAttributeData MoveSpeedMultiplier;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, MoveSpeedMultiplier)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Carry", ReplicatedUsing = OnRep_CarryCapacity)
+	FGameplayAttributeData CarryCapacity;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, CarryCapacity)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_RecoilControl)
+	FGameplayAttributeData RecoilControl;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, RecoilControl)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_AimStability)
+	FGameplayAttributeData AimStability;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, AimStability)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Combat", ReplicatedUsing = OnRep_MeleePower)
+	FGameplayAttributeData MeleePower;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, MeleePower)
+
+	UPROPERTY(BlueprintReadOnly, Category = "Defense", ReplicatedUsing = OnRep_Armor)
+	FGameplayAttributeData Armor;
+	ATTRIBUTE_ACCESSORS(UOBAttributeSetBase, Armor)
  
    protected:
 	UFUNCTION()
@@ -59,5 +99,16 @@ public:
 
 	UFUNCTION()
 	void OnRep_MaxHealth(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION() void OnRep_Stamina(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_MaxStamina(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_HealthRegen(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_StaminaRegen(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_MoveSpeedMultiplier(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_CarryCapacity(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_RecoilControl(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_AimStability(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_MeleePower(const FGameplayAttributeData& OldValue);
+	UFUNCTION() void OnRep_Armor(const FGameplayAttributeData& OldValue);
 	
 };

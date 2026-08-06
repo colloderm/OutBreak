@@ -10,6 +10,7 @@
 class AOBWeaponBase;
 class UAnimMontage;
 class UAnimInstance;
+struct FInventoryData;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FOBOnWeaponChanged, AOBWeaponBase*);
 
@@ -24,6 +25,7 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	void EquipWeapon(TSubclassOf<AOBWeaponBase> WeaponClass);
+	void EquipWeaponInstance(const FInventoryData& ItemInstance);
 
 	void UnequipWeapon();
 

@@ -4,11 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Inventory/Data/InventoryData.h"
+#include "Weapon/Data/OBWeaponDefinition.h"
 #include "OBWeaponBase.generated.h"
 
 DECLARE_MULTICAST_DELEGATE(FOBOnAmmoChanged);
 
 class USkeletalMeshComponent;
+class UStaticMeshComponent;
 class UOBWeaponData;
 
 UCLASS()
@@ -25,6 +28,19 @@ public:
 	// 무기 데이터 접근자(읽기 전용).
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	UOBWeaponData* GetWeaponData() const { return WeaponData; }
+
+	const FOBWeaponDefinitionRow* GetWeaponDefinition() const;
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	const FOBResolvedWeaponStats& GetResolvedStats() const { return ResolvedStats; }
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	FGameplayTag GetItemTag() const { return ItemTag; }
+
+	UFUNCTION(BlueprintPure, Category = "Weapon")
+	FGuid GetItemInstanceId() const { return ItemInstanceId; }
+
+	void InitializeFromItemInstance(const FInventoryData& ItemInstance);
 	
 	UFUNCTION(BlueprintPure, Category = "Weapon")
 	USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
@@ -50,6 +66,8 @@ protected:
 	virtual void BeginPlay() override;
 
 	UFUNCTION() void OnRep_Ammo();
+	UFUNCTION() void OnRep_WeaponInstance();
+	void RebuildAttachmentVisuals();
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
@@ -60,6 +78,21 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	FName MuzzleSocketName = TEXT("Muzzle");
+
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponInstance, BlueprintReadOnly, Category = "Weapon|Instance")
+	FGameplayTag ItemTag;
+
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponInstance, BlueprintReadOnly, Category = "Weapon|Instance")
+	FGuid ItemInstanceId;
+
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponInstance, BlueprintReadOnly, Category = "Weapon|Instance")
+	FOBResolvedWeaponStats ResolvedStats;
+
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponInstance, BlueprintReadOnly, Category = "Weapon|Instance")
+	TArray<FOBInstalledAttachment> InstalledAttachments;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UStaticMeshComponent>> AttachmentMeshComponents;
 	
 	// 현재 탄창 탄약.
 	UPROPERTY(ReplicatedUsing = OnRep_Ammo)
