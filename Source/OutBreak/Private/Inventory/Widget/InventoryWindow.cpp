@@ -2,9 +2,11 @@
 
 
 #include "Inventory/Widget/InventoryWindow.h"
+#include "Blueprint/WidgetTree.h"
 #include "Components/UniformGridPanel.h"
 #include "Components/UniformGridSlot.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
+#include "Inventory/Widget/EquipmentSlot.h"
 #include "Inventory/Widget/InventoryDragDropOperation.h"
 #include "Inventory/Widget/InventorySlot.h"
 #include "Inventory/Data/InventorySystemSetting.h"
@@ -59,6 +61,7 @@ void UInventoryWindow::Update()
 		EInventoryItemLocation::Container,
 		ContainerItems);
 	UpdateQuickSlotGrid(QuickSlots.Num());
+	RefreshEquipmentSlots();
 }
 
 bool UInventoryWindow::SynchronizeGridSlots(
@@ -211,6 +214,8 @@ bool UInventoryWindow::SynchronizeGridSlots(
 		{
 			GridSlot->SetRow(Index / GridColumns);
 			GridSlot->SetColumn(Index % GridColumns);
+			GridSlot->SetHorizontalAlignment(HAlign_Fill);
+			GridSlot->SetVerticalAlignment(VAlign_Fill);
 		}
 	}
 	return true;
@@ -259,4 +264,25 @@ void UInventoryWindow::UpdateQuickSlotGrid(const int32 QuickSlotCount)
 				InventoryComponent,
 				Index);
 	}
+}
+
+void UInventoryWindow::RefreshEquipmentSlots()
+{
+	if (!WidgetTree)
+	{
+		return;
+	}
+
+	// Equipment slot instances may be arranged anywhere in the InventoryWindow
+	// designer. Discovering them by class keeps the C++ binding independent of
+	// their panel hierarchy and widget names.
+	WidgetTree->ForEachWidget(
+		[this](UWidget* Widget)
+		{
+			if (UEquipmentSlot* EquipmentSlot =
+				Cast<UEquipmentSlot>(Widget))
+			{
+				EquipmentSlot->SetInventorySource(InventoryComponent);
+			}
+		});
 }

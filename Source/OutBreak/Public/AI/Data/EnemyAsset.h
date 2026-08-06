@@ -11,6 +11,7 @@ class UCurveFloat;
 class UPhysicalMaterial;
 class UStaticMesh;
 class USoundCue;
+class UNiagaraSystem;
 
 USTRUCT(BlueprintType)
 struct FEnemyLimbMesh
@@ -77,7 +78,19 @@ struct FEnemyPhysicalReact
 	TObjectPtr<UAnimMontage> Hit_Montage_Spine;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UNiagaraSystem> Blood_Splatter;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UNiagaraSystem> Blood_BulletHit;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UNiagaraSystem> Blood_Splatter_Direction;
+	
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float BlendWeight_Anim_Physics = 0.5;
+	
+	
 };
 
 USTRUCT(BlueprintType)

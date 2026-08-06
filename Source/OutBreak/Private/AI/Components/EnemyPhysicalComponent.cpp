@@ -7,6 +7,10 @@
 #include "AI/Components/EnemyMovementComponent.h"
 #include "Engine/StaticMeshActor.h"
 
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
+
 // Sets default values for this component's properties
 UEnemyPhysicalComponent::UEnemyPhysicalComponent()
 {
@@ -111,6 +115,8 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 	{
 		return;
 	}
+	
+	BloodVFX(HitResult);
 
 	const auto PhysicalReact = EnemyAsset->GetPhysicalReact();
 	const auto LimbMeshes = EnemyAsset->GetLimbMeshes();
@@ -189,6 +195,140 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 	ReactTimeline.PlayFromStart();
 	
 	bIsHit = true;
+}
+
+void UEnemyPhysicalComponent::BloodVFX(const FHitResult& HitResult)
+{
+	if (!IsValid(EnemyAsset))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: EnemyAsset is invalid."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__)
+		);
+		return;
+	}
+
+	const FEnemyPhysicalReact* PhysicalReact = EnemyAsset->GetPhysicalReact();
+
+	UNiagaraSystem* BulletHit                  = PhysicalReact->Blood_BulletHit;
+	UNiagaraSystem* BloodSplatter              = PhysicalReact->Blood_Splatter;
+	UNiagaraSystem* BloodSplatterDirection     = PhysicalReact->Blood_Splatter_Direction;
+
+	const FVector SpawnLocation =
+		HitResult.ImpactPoint + HitResult.ImpactNormal * 2.0f;
+
+	const FVector SplatterPosition =
+		SpawnLocation + FVector(10.010032f, 21.110564f, 15.012697f);
+
+	const FVector DirectionSplatterPosition =
+		SpawnLocation + FVector(4.536247f, -42.886109f, 15.012695f);
+
+	auto SpawnConfiguredNiagara =
+		[this](
+			UNiagaraSystem* System,
+			const FVector& Location,
+			const FRotator& Rotation,
+			const int32 SpawnCount,
+			const float LifetimeMultiplier,
+			const float ScaleMultiplier
+		) -> UNiagaraComponent*
+	{
+		if (!IsValid(System))
+		{
+			UE_LOG(
+				LogTemp,
+				Error,
+				TEXT("%s::%s: Niagara System is invalid."),
+				*GetClass()->GetName(),
+				TEXT(__FUNCTION__)
+			);
+			return nullptr;
+		}
+
+		UNiagaraComponent* Component =
+			UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+				GetWorld(),
+				System,
+				Location,
+				Rotation,
+				FVector::OneVector,
+
+				/* bAutoDestroy   */ true,
+				/* bAutoActivate  */ false,
+				/* PoolingMethod  */ ENCPoolMethod::None,
+				/* bPreCullCheck  */ false
+			);
+
+		if (!IsValid(Component))
+		{
+			UE_LOG(
+				LogTemp,
+				Error,
+				TEXT("%s::%s: Failed to spawn Niagara component: %s"),
+				*GetClass()->GetName(),
+				TEXT(__FUNCTION__),
+				*GetNameSafe(System)
+			);
+			return nullptr;
+		}
+
+		/*
+		 * Niagara System에서 아래 값들이
+		 * User Parameter로 노출되어 있어야 합니다.
+		 *
+		 * User.SpawnCount          : int32
+		 * User.LifetimeMultiplier  : float
+		 * User.ScaleMultiplier     : float
+		 */
+		Component->SetVariableInt(
+			TEXT("User.SpawnCount"),
+			SpawnCount
+		);
+
+		Component->SetVariableFloat(
+			TEXT("User.LifetimeMultiplier"),
+			LifetimeMultiplier
+		);
+
+		Component->SetVariableFloat(
+			TEXT("User.ScaleMultiplier"),
+			ScaleMultiplier
+		);
+
+		Component->Activate(true);
+
+		return Component;
+	};
+
+	SpawnConfiguredNiagara(
+		BulletHit,
+		SpawnLocation,
+		FRotator(0.0f, 90.0f, 0.0f),
+		8,
+		1.0f,
+		2.0f
+	);
+
+	SpawnConfiguredNiagara(
+		BloodSplatter,
+		SplatterPosition,
+		FRotator(0.0f, 90.0f, 0.0f),
+		4,
+		1.0f,
+		1.0f
+	);
+
+	SpawnConfiguredNiagara(
+		BloodSplatterDirection,
+		DirectionSplatterPosition,
+		FRotator(0.0f, -90.0f, 0.0f),
+		2,
+		1.0f,
+		1.0f
+	);
 }
 
 void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName, float DamageAmount)

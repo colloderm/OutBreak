@@ -22,6 +22,16 @@
 #include "Weapon/Data/OBWeaponData.h"
 #include "Weapon/OBWeaponBase.h"
 
+namespace
+{
+	bool IsWeaponEquipmentSlot(const EOBEquipmentSlot Slot)
+	{
+		return Slot == EOBEquipmentSlot::PrimaryWeapon ||
+			Slot == EOBEquipmentSlot::SecondaryWeapon ||
+			Slot == EOBEquipmentSlot::MeleeWeapon;
+	}
+}
+
 
 UPlayerInventoryComponent::UPlayerInventoryComponent()
 {
@@ -1404,6 +1414,26 @@ bool UPlayerInventoryComponent::GetEquippedItem(
 	return GetItemFromHandle(MakeEquipmentHandle(EquipmentSlot), OutItem);
 }
 
+bool UPlayerInventoryComponent::CanEquipItemToSlot(
+	const FInventoryItemHandle& Source,
+	const EOBEquipmentSlot TargetSlot) const
+{
+	if (!Source.HasItem() ||
+		TargetSlot == EOBEquipmentSlot::None ||
+		Source.Location == EInventoryItemLocation::None ||
+		Source.Location == EInventoryItemLocation::QuickSlot ||
+		(bSwitching && IsWeaponEquipmentSlot(TargetSlot)))
+	{
+		return false;
+	}
+
+	FInventoryData SourceItem;
+	EOBEquipmentSlot RequiredSlot = EOBEquipmentSlot::None;
+	return GetItemFromHandle(Source, SourceItem) &&
+		ResolveEquipmentSlot(SourceItem, RequiredSlot) &&
+		RequiredSlot == TargetSlot;
+}
+
 bool UPlayerInventoryComponent::IsItemEquipped(
 	const FGuid InstanceId,
 	EOBEquipmentSlot& OutEquipmentSlot) const
@@ -1700,6 +1730,13 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 
 	if (Target.Location == EInventoryItemLocation::Equipment)
 	{
+		// UI pre-validation is advisory. Repeat it here so forged handles and
+		// requests arriving during a weapon switch cannot mutate server state.
+		if (!CanEquipItemToSlot(Source, Target.EquipmentSlot))
+		{
+			return false;
+		}
+
 		if (Source.Location == EInventoryItemLocation::Equipment)
 		{
 			FEquipmentSlotEntry* SourceEntry =

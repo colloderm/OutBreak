@@ -121,6 +121,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
 	bool GetEquippedItem(EOBEquipmentSlot EquipmentSlot, FInventoryData& OutItem) const;
 
+	// Client-side UI preview of the same category rule enforced again by the
+	// authoritative MoveItem path. This never mutates inventory state.
+	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
+	bool CanEquipItemToSlot(
+		const FInventoryItemHandle& Source,
+		EOBEquipmentSlot TargetSlot) const;
+
 	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
 	bool IsItemEquipped(FGuid InstanceId, EOBEquipmentSlot& OutEquipmentSlot) const;
 

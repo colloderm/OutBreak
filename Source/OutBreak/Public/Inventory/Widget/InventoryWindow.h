@@ -11,6 +11,7 @@
  * 
  */
 class UPlayerInventoryComponent;
+class UEquipmentSlot;
 class UUniformGridPanel;
 
 UCLASS()
@@ -49,6 +50,7 @@ private:
 		EInventoryItemLocation Location,
 		const TArray<FInventoryData>& Items);
 	void UpdateQuickSlotGrid(int32 QuickSlotCount);
+	void RefreshEquipmentSlots();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPlayerInventoryComponent> InventoryComponent;
