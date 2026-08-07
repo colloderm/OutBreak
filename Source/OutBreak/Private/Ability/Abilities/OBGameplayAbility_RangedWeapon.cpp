@@ -164,25 +164,27 @@ void UOBGameplayAbility_RangedWeapon::FireOneShot()
 	// 반동/카메라 쉐이크: 소유 클라. 조준 중이면 감소
 	if (CurrentActorInfo && CurrentActorInfo->IsLocallyControlled())
 	{
-		if (UOBWeaponData* Data = Weapon->GetWeaponData())
+		if (Weapon->GetResolvedStats().WeaponType == EOBWeaponType::Ranged)
 		{
+			const FOBResolvedWeaponStats& Stats = Weapon->GetResolvedStats();
+			const FOBWeaponDefinitionRow* Definition = Weapon->GetWeaponDefinition();
 			if (AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
 			{
 				Char->NotifyFired();
 				
 				// 조준 중이면 반동 배율 적용.
-				const float RecoilMult = Char->IsAiming() ? Data->ADSRecoilMultiplier : 1.0f;
+				const float RecoilMult = Char->IsAiming() ? Stats.ADSRecoilMultiplier : 1.0f;
 				
 				if (AOBPlayerController* PC = Cast<AOBPlayerController>(Char->GetController()))
 				{
 					PC->ApplyWeaponRecoil(
-						Data->VerticalRecoil * RecoilMult,
-						Data->HorizontalRecoil * RecoilMult,
-						Data->RecoilRecoverySpeed,
-						Data->FireCameraShake,
-						Data->FireCameraShakeScale * RecoilMult);
+						Stats.VerticalRecoil * RecoilMult,
+						Stats.HorizontalRecoil * RecoilMult,
+						Stats.RecoilRecoverySpeed,
+						Definition ? Definition->Ranged.FireCameraShake : nullptr,
+						(Definition ? Definition->Ranged.FireCameraShakeScale : 1.f) * RecoilMult);
 					
-					Char->AddFireFocusPulse(Data->FireFocusPulse);  // 화면 집중 펄스
+					Char->AddFireFocusPulse(Stats.FireFocusPulse);
 				}
 			}
 		}
@@ -211,10 +213,7 @@ EOBWeaponFireMode UOBGameplayAbility_RangedWeapon::GetFireMode() const
 {
 	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
 	{
-		if (UOBWeaponData* Data = Weapon->GetWeaponData())
-		{
-			return Data->FireMode;
-		}
+		return Weapon->GetResolvedStats().FireMode;
 	}
 	return EOBWeaponFireMode::Single;
 }
@@ -223,10 +222,7 @@ int32 UOBGameplayAbility_RangedWeapon::GetBurstCount() const
 {
 	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
 	{
-		if (UOBWeaponData* Data = Weapon->GetWeaponData())
-		{
-			return FMath::Max(1, Data->BurstCount);
-		}
+		return FMath::Max(1, Weapon->GetResolvedStats().BurstCount);
 	}
 	return 3;
 }
@@ -235,10 +231,8 @@ float UOBGameplayAbility_RangedWeapon::GetFireInterval() const
 {
 	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
 	{
-		if (UOBWeaponData* Data = Weapon->GetWeaponData())
-		{
-			return (Data->RoundsPerMinute > 0.0f) ? (60.0f / Data->RoundsPerMinute) : 0.1f;
-		}
+		const float RPM = Weapon->GetResolvedStats().RoundsPerMinute;
+		return RPM > 0.f ? 60.f / RPM : 0.1f;
 	}
 	return 0.1f;
 }
@@ -263,8 +257,9 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	AOBWeaponBase* Weapon = GetEquippedWeapon();
 	if (!Character || !Weapon) return;
 
-	UOBWeaponData* WeaponData = Weapon->GetWeaponData();
-	if (!WeaponData) return;
+	const FOBResolvedWeaponStats& Stats = Weapon->GetResolvedStats();
+	const FOBWeaponDefinitionRow* WeaponDefinition = Weapon->GetWeaponDefinition();
+	if (Stats.WeaponType != EOBWeaponType::Ranged || !WeaponDefinition) return;
 
 	// 1) 카메라에서 전방으로 트레이스해 실제 조준점을 구한다(크로스헤어=화면 중앙과 일치).
 	FVector CamLoc;
@@ -279,7 +274,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		Character->GetActorEyesViewPoint(CamLoc, CamRot); // 폴백
 	}
 	
-	const FVector CamEnd = CamLoc + CamRot.Vector() * WeaponData->Range;
+	const FVector CamEnd = CamLoc + CamRot.Vector() * Stats.Range;
 	
 	FCollisionQueryParams AimParams(SCENE_QUERY_STAT(OBAimProbe), /*bTraceComplex=*/true);
 	AimParams.AddIgnoredActor(Character);
@@ -297,7 +292,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	// 카메라가 벽에 끼면 조준점이 머즐 뒤에 잡혀 탄이 뒤로 나간다. 카메라 전방으로 폴백.
 	if (FVector::DotProduct(AimPoint - MuzzleLoc, CamRot.Vector()) <= 0.f)
 	{
-		AimPoint = MuzzleLoc + CamRot.Vector() * WeaponData->Range;
+		AimPoint = MuzzleLoc + CamRot.Vector() * Stats.Range;
 	}
 	
 	const FVector AimDir = (AimPoint - MuzzleLoc).GetSafeNormal();
@@ -334,18 +329,18 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	}
 	
 	// 발사 반동 몽타주(모든 클라에 복제). 명중 여부와 무관.
-	if (WeaponData->AttackMontage)
+	if (UAnimMontage* AttackMontage = WeaponDefinition->Visual.AttackMontage.LoadSynchronous())
 	{
-		Character->Multicast_PlayFireMontage(WeaponData->AttackMontage);
+		Character->Multicast_PlayFireMontage(AttackMontage);
 	}
 	
 	// --- 탄자 루프: 샷건은 1회 발사에 여러 발이 각자 퍼진다 ---
 	// ponytail: 탄자마다 임팩트 큐를 개별 멀티캐스트. 8발이면 8회 — 대역폭이 문제되면 큐 1회로 묶을 것.
-	const int32 Pellets = FMath::Max(1, WeaponData->PelletsPerShot);
+	const int32 Pellets = FMath::Max(1, Stats.PelletsPerShot);
 	for (int32 PelletIndex = 0; PelletIndex < Pellets; ++PelletIndex)
 	{
 		const FVector ShotDirection = (SpreadRadians > 0.f) ? FMath::VRandCone(AimDir, SpreadRadians) : AimDir;
-		const FVector TraceEnd = TraceStart + ShotDirection * WeaponData->Range;
+		const FVector TraceEnd = TraceStart + ShotDirection * Stats.Range;
 		
 		FHitResult Hit;
 		const bool bHit = GetWorld()->LineTraceSingleByChannel(
@@ -357,7 +352,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		{
 			UGameplayStatics::ApplyPointDamage(
 				HitActor,
-				WeaponData->BaseDamage,
+				Stats.Damage,
 				ShotDirection,
 				Hit,
 				nullptr,
@@ -391,24 +386,24 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 
 		// --- 데미지 적용 ---
 		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Hit.GetActor());
-		if (!TargetASC || !WeaponData->DamageEffect || !SourceASC) continue;
+		if (!TargetASC || !WeaponDefinition->Common.DamageEffect || !SourceASC) continue;
 
 		// 데미지 GE 스펙 생성 + SetByCaller로 무기 데미지 주입.
 		FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
 		Context.AddSourceObject(Weapon);
 		Context.AddHitResult(Hit);
 
-		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(WeaponData->DamageEffect, GetAbilityLevel(), Context);
+		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(WeaponDefinition->Common.DamageEffect, GetAbilityLevel(), Context);
 
 		if (SpecHandle.IsValid())
 		{
-			float FinalDamage = WeaponData->BaseDamage;
+			float FinalDamage = Stats.Damage;
 
 			const bool bHeadshot =
-				WeaponData->HeadshotMultiplier > 1.f && IsHeadBone(Hit.BoneName);
+				Stats.HeadshotMultiplier > 1.f && IsHeadBone(Hit.BoneName);
 			if (bHeadshot)
 			{
-				FinalDamage *= WeaponData->HeadshotMultiplier;
+				FinalDamage *= Stats.HeadshotMultiplier;
 			}
 
 			SpecHandle.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, FinalDamage);

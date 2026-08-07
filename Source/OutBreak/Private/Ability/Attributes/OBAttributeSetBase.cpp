@@ -16,6 +16,16 @@ void UOBAttributeSetBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, Health, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, MaxHealth, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, Stamina, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, MaxStamina, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, HealthRegen, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, StaminaRegen, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, MoveSpeedMultiplier, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, CarryCapacity, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, RecoilControl, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, AimStability, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, MeleePower, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UOBAttributeSetBase, Armor, COND_None, REPNOTIFY_Always);
 }
 
 void UOBAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
@@ -29,6 +39,28 @@ void UOBAttributeSetBase::PreAttributeChange(const FGameplayAttribute& Attribute
 	else if (Attribute == GetHealthAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.0f, GetMaxHealth());
+	}
+	else if (Attribute == GetMaxStaminaAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.f);
+	}
+	else if (Attribute == GetStaminaAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+	}
+	else if (Attribute == GetMoveSpeedMultiplierAttribute() ||
+		Attribute == GetRecoilControlAttribute() ||
+		Attribute == GetAimStabilityAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.05f);
+	}
+	else if (Attribute == GetCarryCapacityAttribute() ||
+		Attribute == GetMeleePowerAttribute() ||
+		Attribute == GetArmorAttribute() ||
+		Attribute == GetHealthRegenAttribute() ||
+		Attribute == GetStaminaRegenAttribute())
+	{
+		NewValue = FMath::Max(NewValue, 0.f);
 	}
 }
 
@@ -78,3 +110,14 @@ void UOBAttributeSetBase::OnRep_MaxHealth(const FGameplayAttributeData& OldValue
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, MaxHealth, OldValue);
 }
+
+void UOBAttributeSetBase::OnRep_Stamina(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, Stamina, OldValue); }
+void UOBAttributeSetBase::OnRep_MaxStamina(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, MaxStamina, OldValue); }
+void UOBAttributeSetBase::OnRep_HealthRegen(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, HealthRegen, OldValue); }
+void UOBAttributeSetBase::OnRep_StaminaRegen(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, StaminaRegen, OldValue); }
+void UOBAttributeSetBase::OnRep_MoveSpeedMultiplier(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, MoveSpeedMultiplier, OldValue); }
+void UOBAttributeSetBase::OnRep_CarryCapacity(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, CarryCapacity, OldValue); }
+void UOBAttributeSetBase::OnRep_RecoilControl(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, RecoilControl, OldValue); }
+void UOBAttributeSetBase::OnRep_AimStability(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, AimStability, OldValue); }
+void UOBAttributeSetBase::OnRep_MeleePower(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, MeleePower, OldValue); }
+void UOBAttributeSetBase::OnRep_Armor(const FGameplayAttributeData& OldValue) { GAMEPLAYATTRIBUTE_REPNOTIFY(UOBAttributeSetBase, Armor, OldValue); }

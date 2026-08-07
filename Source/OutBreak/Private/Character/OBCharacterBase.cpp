@@ -27,8 +27,11 @@
 #include "TimerManager.h"
 #include "AI/EnemyController.h"
 #include "Item/Loot/OBLootContainer.h"
+#include "Item/Data/OBItemDefinition.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "Player/Controller/OBPlayerController.h"
+#include "Data/OBGameDataSubsystem.h"
+#include "Player/Data/OBPlayerStatData.h"
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
 {
@@ -273,29 +276,30 @@ void AOBCharacterBase::OnRep_isAiming()
 void AOBCharacterBase::UpdateAimingState()
 {
 	// 현재 무기 데이터
-	UOBWeaponData* Data = nullptr;
-	if (EquipmentComponent)
-	{
-		if (AOBWeaponBase* Weapon = EquipmentComponent->GetCurrentWeapon())
-		{
-			Data = Weapon->GetWeaponData();
-		}
-	}
+	const AOBWeaponBase* Weapon = EquipmentComponent
+		? EquipmentComponent->GetCurrentWeapon()
+		: nullptr;
+	const FOBResolvedWeaponStats* Stats = Weapon && Weapon->GetItemTag().IsValid()
+		? &Weapon->GetResolvedStats()
+		: nullptr;
 	
 	// 이동 감속(모든 머신: 복제된 bIsAiming + 공유 WeaponData)
 	if (UOBCharacterMovementComponent* MoveComp = Cast<UOBCharacterMovementComponent>(GetCharacterMovement()))
 	{
 		// 기동성(무기 무게) × ADS 감속. 맨손 = 1.0(최고속).
-		const float Mobility = Data ? Data->MobilityMultiplier : 1.0f;
-		const float AimMult  = (bIsAiming && Data) ? Data->ADSSpeedMultiplier : 1.0f;
+		const float PlayerMoveMultiplier = AttributeSet
+			? AttributeSet->GetMoveSpeedMultiplier()
+			: 1.f;
+		const float Mobility = (Stats ? Stats->MobilityMultiplier : 1.0f) * PlayerMoveMultiplier;
+		const float AimMult  = (bIsAiming && Stats) ? Stats->ADSSpeedMultiplier : 1.0f;
 		MoveComp->SetSpeedMultipliers(Mobility, AimMult);
 	}
 	
 	// 카메라 FOV 블렌드(조준하는 본인만)
 	if (IsLocallyControlled() && FollowCamera)
 	{
-		TargetCameraFOV = (bIsAiming && Data) ? Data->ADSFOV : DefaultCameraFOV;
-		CameraBlendSpeed = Data ? Data->ADSBlendSpeed : 12.f;
+		TargetCameraFOV = (bIsAiming && Stats) ? Stats->ADSFOV : DefaultCameraFOV;
+		CameraBlendSpeed = Stats ? Stats->ADSBlendSpeed : 12.f;
 		
 		// 조준 중이면 은은한 집중 유지.
 		CombatFocusTarget = bIsAiming ? AimFocusBaseline : 0.f;
@@ -316,14 +320,14 @@ float AOBCharacterBase::GetCurrentSpreadAngle() const
 {
 	const UOBEquipmentComponent* Equip = FindComponentByClass<UOBEquipmentComponent>();
 	const AOBWeaponBase* Weapon = Equip ? Equip->GetCurrentWeapon() : nullptr;
-	const UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
-	if (!Data) return 0.f;
+	if (!Weapon || !Weapon->GetItemTag().IsValid()) return 0.f;
+	const FOBResolvedWeaponStats& Stats = Weapon->GetResolvedStats();
 	
-	float Spread = Data->BaseSpreadDegrees;
+	float Spread = Stats.BaseSpreadDegrees;
 	if (bIsAiming)
-		Spread *= Data->ADSSpeedMultiplier;
+		Spread *= Stats.ADSSpreadMultiplier;
 	if (GetVelocity().SizeSquared2D() > FMath::Square(10.f))
-		Spread *= Data->MovingSpreadMultiplier;
+		Spread *= Stats.MovingSpreadMultiplier;
 	
 	return Spread;
 }
@@ -604,6 +608,21 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 	{
 		DefaultAbilitySet->GiveToAbilitySystem(AbilitySystemComponent, nullptr, this);
 	}
+	if (AOBPlayerStateBase* OBPlayerState = GetPlayerState<AOBPlayerStateBase>())
+	{
+		OBPlayerState->InitializePlayerStatsFromData();
+		if (const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get())
+		{
+			if (const FOBPlayerArchetypeRow* Archetype = GameData->FindPlayerArchetype(OBPlayerState->GetPlayerArchetypeId()))
+			{
+				if (UOBAbilitySet* ArchetypeAbilities = Archetype->DefaultAbilitySet.LoadSynchronous();
+					ArchetypeAbilities && ArchetypeAbilities != DefaultAbilitySet)
+				{
+					ArchetypeAbilities->GiveToAbilitySystem(AbilitySystemComponent, nullptr, this);
+				}
+			}
+		}
+	}
 
 	if (PlayerInventoryComponent)
 	{
@@ -748,6 +767,60 @@ TArray<FOBItemStack> AOBCharacterBase::GetBagGainsSinceSpawn()
 	return Gains;
 }
 
+TArray<FOBItemStack> AOBCharacterBase::GetExtractionStackGains()
+{
+	TArray<FOBItemStack> Gains = GetBagGainsSinceSpawn();
+	Gains.RemoveAll(
+		[](const FOBItemStack& Stack)
+		{
+			const FOBItemDefinitionRow* Definition = UOBItemRegistry::FindItem(Stack.ItemTag);
+			return Definition &&
+				(Definition->Category == EOBItemCategory::Weapon ||
+				 Definition->Category == EOBItemCategory::Equipment ||
+				 Definition->Category == EOBItemCategory::Attachment);
+		});
+	return Gains;
+}
+
+TArray<FInventoryData> AOBCharacterBase::GetLootedUniqueItemInstances()
+{
+	TArray<FInventoryData> Out;
+	if (!PlayerInventoryComponent) return Out;
+	TArray<FInventoryData> Items;
+	PlayerInventoryComponent->GetLootableItemInstances(Items);
+	for (const FInventoryData& Item : Items)
+	{
+		const FOBItemDefinitionRow* Definition = Item.GetDefinition();
+		const bool bPersistent = Definition &&
+			(Definition->Category == EOBItemCategory::Weapon ||
+			 Definition->Category == EOBItemCategory::Equipment ||
+			 Definition->Category == EOBItemCategory::Attachment);
+		if (bPersistent && !SpawnInstanceIds.Contains(Item.InstanceId))
+		{
+			Out.Add(Item);
+		}
+	}
+	return Out;
+}
+
+TArray<FInventoryData> AOBCharacterBase::GetReturnedLoadoutItemInstances()
+{
+	TArray<FInventoryData> Out;
+	if (!PlayerInventoryComponent) return Out;
+	TArray<FInventoryData> Items;
+	PlayerInventoryComponent->GetLootableItemInstances(Items);
+	for (const FInventoryData& Item : Items)
+	{
+		const FOBItemDefinitionRow* Definition = Item.GetDefinition();
+		if (SpawnInstanceIds.Contains(Item.InstanceId) && Definition &&
+			Definition->Category == EOBItemCategory::Weapon)
+		{
+			Out.Add(Item);
+		}
+	}
+	return Out;
+}
+
 void AOBCharacterBase::ApplyCarryItems()
 {
 	if (!HasAuthority() || bCarryItemsApplied || !PlayerInventoryComponent) return;
@@ -756,13 +829,25 @@ void AOBCharacterBase::ApplyCarryItems()
 	if (!PS) return;
 
 	const TArray<FOBItemStack>& Carry = PS->GetSelectedCarryItems();
+	const TArray<FInventoryData>& CarryInstances = PS->GetSelectedCarryItemInstances();
 
 	// 아직 클라 push가 안 왔을 수 있다. 플래그를 세우지 않고 다음 호출을 기다린다.
-	if (Carry.IsEmpty()) return;
+	if (Carry.IsEmpty() && CarryInstances.IsEmpty()) return;
 
 	bCarryItemsApplied = true;
 
 	TArray<FOBItemStack> Leftover;
+	TArray<FInventoryData> LeftoverInstances;
+	for (const FInventoryData& Item : CarryInstances)
+	{
+		const int32 Added = PlayerInventoryComponent->TryAddItemInstance(Item);
+		if (Added < Item.ItemStack)
+		{
+			FInventoryData Remaining = Item;
+			Remaining.ItemStack = Item.ItemStack - Added;
+			LeftoverInstances.Add(MoveTemp(Remaining));
+		}
+	}
 	for (const FOBItemStack& Stack : Carry)
 	{
 		const int32 Added = PlayerInventoryComponent->TryAddItem(Stack.ItemTag, Stack.Count);
@@ -780,6 +865,13 @@ void AOBCharacterBase::ApplyCarryItems()
 			PC->Client_ReturnCarryLeftover(Leftover);
 		}
 	}
+	if (!LeftoverInstances.IsEmpty())
+	{
+		if (AOBPlayerController* PC = Cast<AOBPlayerController>(GetController()))
+		{
+			PC->Client_ReturnCarryItemInstances(LeftoverInstances);
+		}
+	}
 }
 
 void AOBCharacterBase::FinalizeSpawnLoadout()
@@ -787,6 +879,11 @@ void AOBCharacterBase::FinalizeSpawnLoadout()
 	TArray<TSubclassOf<AOBWeaponBase>> Loadout;
 	if (const AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
 	{
+		if (!PS->GetSelectedWeaponInstances().IsEmpty())
+		{
+			FinalizeSpawnLoadoutInstancesInternal(PS->GetSelectedWeaponInstances());
+			return;
+		}
 		Loadout = PS->GetSelectedWeapons();
 	}
 
@@ -823,6 +920,25 @@ void AOBCharacterBase::FinalizeSpawnLoadoutInternal(
 			PlayerInventoryComponent->AddWeapon(WeaponClass);
 		}
 	}
+	CompleteSpawnInventorySetup();
+}
+
+void AOBCharacterBase::FinalizeSpawnLoadoutInstancesInternal(
+	const TArray<FInventoryData>& Weapons)
+{
+	if (!HasAuthority() || bSpawnLoadoutApplied || !PlayerInventoryComponent) return;
+	bSpawnLoadoutApplied = true;
+	GetWorldTimerManager().ClearTimer(LoadoutWaitTimer);
+	for (const FInventoryData& Weapon : Weapons)
+	{
+		PlayerInventoryComponent->AddWeaponInstance(Weapon);
+	}
+	CompleteSpawnInventorySetup();
+}
+
+void AOBCharacterBase::CompleteSpawnInventorySetup()
+{
+	if (!HasAuthority() || !PlayerInventoryComponent) return;
 
 	if (PawnData)
 	{
@@ -836,10 +952,23 @@ void AOBCharacterBase::FinalizeSpawnLoadoutInternal(
 
 	// 무기·초기지급이 끝난 이 시점이 정산 기준선이다.
 	// 무기 지급이 늦어졌는데 여기서 안 찍으면 무기가 "이번에 얻은 것"이 되어 창고로 복사된다.
-	SpawnBagSnapshot = GetBagContentsAsStacks();
+	CaptureSpawnInventorySnapshot();
 
 	// 반입분은 기준선 뒤에 넣어야 탈출 시 창고로 되돌아간다.
 	ApplyCarryItems();
+}
+
+void AOBCharacterBase::CaptureSpawnInventorySnapshot()
+{
+	SpawnBagSnapshot = GetBagContentsAsStacks();
+	SpawnInstanceIds.Reset();
+	if (!PlayerInventoryComponent) return;
+	TArray<FInventoryData> Items;
+	PlayerInventoryComponent->GetLootableItemInstances(Items);
+	for (const FInventoryData& Item : Items)
+	{
+		if (Item.InstanceId.IsValid()) SpawnInstanceIds.Add(Item.InstanceId);
+	}
 }
 
 void AOBCharacterBase::NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection)

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "GameplayTagContainer.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/Data/OBItemTypes.h"
 #include "OBLootTable.generated.h"
 
@@ -33,6 +34,24 @@ struct FOBLootEntry
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot", Meta = (ClampMin = "1"))
 	int32 MaxCount = 1;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot|Instance", Meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MinDurability = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot|Instance", Meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float MaxDurability = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot|Instance", Meta = (ClampMin = "0"))
+	int32 MinQualityTier = 0;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot|Instance", Meta = (ClampMin = "0"))
+	int32 MaxQualityTier = 0;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot|Instance")
+	bool bFoundInRaid = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot|Instance", Meta = (Categories = "Item"))
+	TArray<FGameplayTag> GuaranteedAttachments;
 };
 
 USTRUCT(BlueprintType)
@@ -52,5 +71,9 @@ struct OUTBREAK_API FOBLootTableRow : public FTableRowBase
 
 	// 서버 전용. 같은 스트림을 주면 항상 같은 결과가 나온다(재파밍 방지에 사용).
 	void Roll(FRandomStream& Stream, TArray<FOBItemStack>& OutItems) const;
+
+	// Extraction-shooter path. Unlike FOBItemStack, this retains condition,
+	// provenance and weapon customization through every later transfer.
+	void RollInstances(FRandomStream& Stream, TArray<FInventoryData>& OutItems) const;
 	
 };

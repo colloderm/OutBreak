@@ -126,9 +126,7 @@ void AOBLootContainer::RollContents()
 	}
 	
 	FRandomStream Stream(static_cast<int32>(HashCombine(GetTypeHash(GetFName()), static_cast<uint32>(SessionSeed))));
-	TArray<FOBItemStack> RolledStacks;
-	Row->Roll(Stream, RolledStacks);
-	Contents = ConvertStacksToInstances(RolledStacks);
+	Row->RollInstances(Stream, Contents);
 
 	OnRep_Contents();   // OnRep은 서버에서 안 불린다. 호스트 화면을 위해 직접 호출.
 }
@@ -238,20 +236,42 @@ AOBLootContainer* AOBLootContainer::SpawnFromTable(UWorld* World, TSubclassOf<AO
 	
 	// 처치 드랍은 매번 달라야 하므로 시드를 고정하지 않는다(레벨 상자와 정반대)
 	FRandomStream Stream(FMath::Rand());
-	TArray<FOBItemStack> Items;
-	Row->Roll(Stream, Items);
-	
-	return SpawnWithContents(World, ContainerClass, SpawnTransform, Items);
+	TArray<FInventoryData> Items;
+	Row->RollInstances(Stream, Items);
+	return SpawnWithItemInstances(World, ContainerClass, SpawnTransform, Items);
 }
 
-int32 AOBLootContainer::TryTakeItem(UPlayerInventoryComponent* Inventory, const FGameplayTag& ItemTag, int32 Count)
+int32 AOBLootContainer::TryTakeItem(
+	UPlayerInventoryComponent* Inventory,
+	const FGameplayTag& ItemTag,
+	const int32 Count)
 {
 	if (!HasAuthority() || !Inventory || Count <= 0) return 0;
-
-	FInventoryData* Found = Contents.FindByPredicate(
+	const FInventoryData* Found = Contents.FindByPredicate(
 		[&ItemTag](const FInventoryData& Item)
 		{
-			return Item.ItemTag == ItemTag;
+			return Item.ItemTag == ItemTag && Item.ItemStack > 0;
+		});
+	if (!Found) return 0;
+	const FGuid InstanceId = Found->InstanceId;
+	const int32 Requested = FMath::Min(Count, Found->ItemStack);
+	const int32 Moved = TryTakeItemInstance(Inventory, InstanceId, Requested);
+	return Moved + (Moved == Requested && Count > Moved
+		? TryTakeItem(Inventory, ItemTag, Count - Moved)
+		: 0);
+}
+
+int32 AOBLootContainer::TryTakeItemInstance(
+	UPlayerInventoryComponent* Inventory,
+	const FGuid& InstanceId,
+	const int32 Count)
+{
+	if (!HasAuthority() || !Inventory || !InstanceId.IsValid() || Count <= 0) return 0;
+
+	FInventoryData* Found = Contents.FindByPredicate(
+		[&InstanceId](const FInventoryData& Item)
+		{
+			return Item.InstanceId == InstanceId;
 		});
 	if (!Found || Found->ItemStack <= 0) return 0;
 
@@ -260,6 +280,10 @@ int32 AOBLootContainer::TryTakeItem(UPlayerInventoryComponent* Inventory, const 
 
 	FInventoryData RequestedInstance = *Found;
 	RequestedInstance.ItemStack = Requested;
+	if (Requested < Found->ItemStack)
+	{
+		RequestedInstance.InstanceId = FGuid::NewGuid();
+	}
 	const int32 Moved = Inventory->TryAddItemInstance(RequestedInstance);
 	if (Moved <= 0) return 0;
 
@@ -274,9 +298,7 @@ int32 AOBLootContainer::TryTakeItem(UPlayerInventoryComponent* Inventory, const 
 
 	OnRep_Contents(); // OnRep은 서버에서 안 불린다. 호스트 화면을 위해 직접 호출.
 	
-	return Moved + (Moved == Requested && Count > Moved
-		? TryTakeItem(Inventory, ItemTag, Count - Moved)
-		: 0);
+	return Moved;
 }
 
 int32 AOBLootContainer::TryTakeAll(UPlayerInventoryComponent* Inventory)
@@ -289,7 +311,7 @@ int32 AOBLootContainer::TryTakeAll(UPlayerInventoryComponent* Inventory)
 	int32 Total = 0;
 	for (const FInventoryData& Item : Snapshot)
 	{
-		Total += TryTakeItem(Inventory, Item.ItemTag, Item.ItemStack);
+		Total += TryTakeItemInstance(Inventory, Item.InstanceId, Item.ItemStack);
 	}
 	
 	return Total;

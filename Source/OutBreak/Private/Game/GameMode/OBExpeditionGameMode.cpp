@@ -791,7 +791,10 @@ void AOBExpeditionGameMode::NotifyPlayerExtracted(AController* Controller)
 	{
 		if (AOBPlayerController* OwningPC = Cast<AOBPlayerController>(Controller))
 		{
-			OwningPC->Client_ApplyExtractionResult(Char->GetBagGainsSinceSpawn());
+			OwningPC->Client_ApplyExtractionResultV2(
+				Char->GetExtractionStackGains(),
+				Char->GetLootedUniqueItemInstances(),
+				Char->GetReturnedLoadoutItemInstances());
 		}
 	}
 

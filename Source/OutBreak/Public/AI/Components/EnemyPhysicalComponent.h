@@ -57,6 +57,7 @@ public:
 	
 	void ApplyDamage(float DamageAmount);
 	void ActionPhysical(const FHitResult& HitResult, float DamageAmount);
+	void BloodVFX(const FHitResult& HitResult);
 
 	ELocomotionWalkRunState EvaluateLocomotionState() const;
 

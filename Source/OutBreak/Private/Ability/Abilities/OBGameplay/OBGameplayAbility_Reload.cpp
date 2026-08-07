@@ -34,7 +34,10 @@ void UOBGameplayAbility_Reload::ActivateAbility(
 		return;
 	}
 
-	UAnimMontage* Montage = Weapon->GetWeaponData() ? Weapon->GetWeaponData()->ReloadMontage : nullptr;
+	const FOBWeaponDefinitionRow* Definition = Weapon->GetWeaponDefinition();
+	UAnimMontage* Montage = Definition
+		? Definition->Visual.ReloadMontage.LoadSynchronous()
+		: nullptr;
 	float ReloadTime = 1.5f; // 몽타주 없을 때 기본
 	
 	if (Montage)

@@ -2,10 +2,15 @@
 
 #include "Weapon/OBWeaponBase.h"
 
+#include "AbilitySystemBlueprintLibrary.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Data/OBGameDataSubsystem.h"
 #include "Net/UnrealNetwork.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
+#include "Item/OBItemRegistry.h"
 #include "Weapon/Data/OBWeaponData.h"
+#include "Weapon/Data/OBWeaponStatResolver.h"
 
 AOBWeaponBase::AOBWeaponBase()
 {
@@ -25,7 +30,18 @@ void AOBWeaponBase::BeginPlay()
 	
 	if (HasAuthority())
 	{
-		InitializeAmmo();
+		FInventoryData DefaultInstance;
+		DefaultInstance.ItemTag = UOBItemRegistry::FindTagForWeaponClass(GetClass());
+		DefaultInstance.ItemStack = 1;
+		DefaultInstance.InstanceId = FGuid::NewGuid();
+		if (DefaultInstance.ItemTag.IsValid())
+		{
+			InitializeFromItemInstance(DefaultInstance);
+		}
+		else
+		{
+			InitializeAmmo();
+		}
 	}
 }
 
@@ -44,26 +60,96 @@ void AOBWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	
 	DOREPLIFETIME(AOBWeaponBase, CurrentAmmo);
+	DOREPLIFETIME(AOBWeaponBase, ItemTag);
+	DOREPLIFETIME(AOBWeaponBase, ItemInstanceId);
+	DOREPLIFETIME(AOBWeaponBase, ResolvedStats);
+	DOREPLIFETIME(AOBWeaponBase, InstalledAttachments);
+}
+
+const FOBWeaponDefinitionRow* AOBWeaponBase::GetWeaponDefinition() const
+{
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	return GameData ? GameData->FindWeapon(ItemTag) : nullptr;
+}
+
+void AOBWeaponBase::InitializeFromItemInstance(const FInventoryData& ItemInstance)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	FOBResolvedWeaponStats NewStats;
+	if (!UOBWeaponStatResolver::ResolveWeaponStats(
+		ItemInstance,
+		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner()),
+		NewStats))
+	{
+		return;
+	}
+
+	ItemTag = ItemInstance.ItemTag;
+	ItemInstanceId = ItemInstance.InstanceId.IsValid()
+		? ItemInstance.InstanceId
+		: FGuid::NewGuid();
+	ResolvedStats = NewStats;
+	InstalledAttachments = ItemInstance.Attachments;
+	if (const FOBWeaponDefinitionRow* Definition = GetWeaponDefinition())
+	{
+		if (USkeletalMesh* Mesh = Definition->Visual.WeaponMesh.LoadSynchronous())
+		{
+			WeaponMesh->SetSkeletalMeshAsset(Mesh);
+		}
+		MuzzleSocketName = Definition->Ranged.MuzzleSocket;
+	}
+	CurrentAmmo = ResolvedStats.WeaponType == EOBWeaponType::Ranged
+		? FMath::Clamp(
+			ItemInstance.MagazineAmmo >= 0 ? ItemInstance.MagazineAmmo : ResolvedStats.MagazineSize,
+			0,
+			ResolvedStats.MagazineSize)
+		: 0;
+	RebuildAttachmentVisuals();
+	OnAmmoChanged.Broadcast();
 }
 
 void AOBWeaponBase::InitializeAmmo()
 {
-	if (WeaponData)
+	if (ItemTag.IsValid())
+	{
+		CurrentAmmo = ResolvedStats.WeaponType == EOBWeaponType::Ranged
+			? ResolvedStats.MagazineSize
+			: 0;
+	}
+	else if (WeaponData && WeaponData->WeaponType == EOBWeaponType::Ranged)
 	{
 		CurrentAmmo = WeaponData->MagazineSize;
+	}
+	else
+	{
+		CurrentAmmo = 0;
 	}
 	OnAmmoChanged.Broadcast();
 }
 
 bool AOBWeaponBase::CanReload() const
 {
-	if (!WeaponData || CurrentAmmo >= WeaponData->MagazineSize) return false;
+	const bool bResolved = ItemTag.IsValid();
+	const EOBWeaponType WeaponType = bResolved
+		? ResolvedStats.WeaponType
+		: (WeaponData ? WeaponData->WeaponType : EOBWeaponType::Melee);
+	const int32 MagazineSize = bResolved
+		? ResolvedStats.MagazineSize
+		: (WeaponData ? WeaponData->MagazineSize : 0);
+	const FGameplayTag AmmoType = bResolved
+		? ResolvedStats.AmmoType
+		: (WeaponData ? WeaponData->AmmoType : FGameplayTag());
+	if (WeaponType != EOBWeaponType::Ranged || CurrentAmmo >= MagazineSize || !AmmoType.IsValid()) return false;
 	
 	if (UPlayerInventoryComponent* Inv = GetOwner()
 		? GetOwner()->FindComponentByClass<UPlayerInventoryComponent>()
 		: nullptr)
 	{
-		return Inv->GetAmmo(WeaponData->AmmoType) > 0;   // 풀에 해당 타입 탄 있어야
+		return Inv->GetAmmo(AmmoType) > 0;
 	}
 	return false;
 }
@@ -77,16 +163,18 @@ void AOBWeaponBase::ConsumeAmmo(int32 Amount)
 
 void AOBWeaponBase::PerformReload()
 {
-	if (!HasAuthority() || !WeaponData) return;
+	if (!HasAuthority() || !CanReload()) return;
 
-	const int32 Needed = WeaponData->MagazineSize - CurrentAmmo;
+	const int32 MagazineSize = ItemTag.IsValid() ? ResolvedStats.MagazineSize : WeaponData->MagazineSize;
+	const FGameplayTag AmmoType = ItemTag.IsValid() ? ResolvedStats.AmmoType : WeaponData->AmmoType;
+	const int32 Needed = MagazineSize - CurrentAmmo;
 	if (Needed <= 0) return;
 	
 	if (UPlayerInventoryComponent* Inv = GetOwner()
 		? GetOwner()->FindComponentByClass<UPlayerInventoryComponent>()
 		: nullptr)
 	{
-		const int32 ToLoad = Inv->ConsumeAmmoFromPool(WeaponData->AmmoType, Needed);
+		const int32 ToLoad = Inv->ConsumeAmmoFromPool(AmmoType, Needed);
 		CurrentAmmo += ToLoad;
 		OnAmmoChanged.Broadcast();
 	}	
@@ -98,9 +186,70 @@ void AOBWeaponBase::OnRep_Ammo()
 	OnAmmoChanged.Broadcast();
 }
 
+void AOBWeaponBase::OnRep_WeaponInstance()
+{
+	RebuildAttachmentVisuals();
+	OnAmmoChanged.Broadcast();
+}
+
+void AOBWeaponBase::RebuildAttachmentVisuals()
+{
+	for (UStaticMeshComponent* Component : AttachmentMeshComponents)
+	{
+		if (Component)
+		{
+			Component->DestroyComponent();
+		}
+	}
+	AttachmentMeshComponents.Reset();
+
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	const FOBWeaponDefinitionRow* WeaponDefinition = GetWeaponDefinition();
+	if (!GameData || !WeaponDefinition || !WeaponMesh)
+	{
+		return;
+	}
+
+	for (const FOBInstalledAttachment& Installed : InstalledAttachments)
+	{
+		const FOBAttachmentDefinitionRow* Attachment = GameData->FindAttachment(Installed.ItemTag);
+		UStaticMesh* Mesh = Attachment ? Attachment->Mesh.LoadSynchronous() : nullptr;
+		if (!Attachment || !Mesh)
+		{
+			continue;
+		}
+		FName Socket = Attachment->AttachSocket;
+		if (Socket.IsNone())
+		{
+			if (const FOBAttachmentSlotSpec* Slot = WeaponDefinition->AttachmentSlots.FindByPredicate(
+				[&Installed](const FOBAttachmentSlotSpec& Candidate)
+				{
+					return Candidate.SlotTag == Installed.SlotTag;
+				}))
+			{
+				Socket = Slot->MeshSocket;
+			}
+		}
+
+		UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(this);
+		Component->SetStaticMesh(Mesh);
+		Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Component->SetIsReplicated(false);
+		Component->RegisterComponent();
+		Component->AttachToComponent(
+			WeaponMesh,
+			FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+			Socket);
+		AttachmentMeshComponents.Add(Component);
+	}
+}
+
 void AOBWeaponBase::SetCurrentAmmo(int32 NewAmmo)
 {
-	if (!HasAuthority() || !WeaponData) return;
-	CurrentAmmo = FMath::Clamp(NewAmmo, 0, WeaponData->MagazineSize);
+	if (!HasAuthority()) return;
+	const int32 MagazineSize = ItemTag.IsValid()
+		? ResolvedStats.MagazineSize
+		: (WeaponData ? WeaponData->MagazineSize : 0);
+	CurrentAmmo = FMath::Clamp(NewAmmo, 0, MagazineSize);
 	OnAmmoChanged.Broadcast();
 }

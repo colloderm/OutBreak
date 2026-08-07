@@ -10,9 +10,11 @@
 class UButton;
 class UImage;
 class UTextBlock;
+struct FInventoryData;
 
 // 클릭된 항목. 무엇을 할지는 소유 위젯이 정한다(가져가기 / 반입 / 반환).
 DECLARE_DELEGATE_TwoParams(FOBOnLootEntryClicked, const FGameplayTag& /*ItemTag*/, int32 /*Count*/);
+DECLARE_DELEGATE_TwoParams(FOBOnLootInstanceClicked, const FGuid& /*InstanceId*/, int32 /*Count*/);
 
 /**
 왜 존재하는가?
@@ -27,9 +29,11 @@ class OUTBREAK_API UOBLootEntryWidget : public UUserWidget
 	
 public:
 	void SetEntry(const FGameplayTag& InItemTag, int32 InCount);
+	void SetItemInstance(const FInventoryData& InItemInstance);
 	
 	// 바인딩하지 않으면 클릭해도 아무 일도 없다(결과창처럼 읽기 전용인 경우).
 	FOBOnLootEntryClicked OnEntryClicked;
+	FOBOnLootInstanceClicked OnInstanceClicked;
 
 protected:
 	virtual void NativeConstruct() override;
@@ -56,6 +60,7 @@ protected:
 
 private:
 	FGameplayTag ItemTag;
+	FGuid InstanceId;
 	int32 Count = 0;
 	
 };

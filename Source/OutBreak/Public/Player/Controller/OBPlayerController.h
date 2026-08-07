@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Game/Expedition/OBExpeditionTypes.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/Data/OBItemTypes.h"
 #include "OBPlayerController.generated.h"
 
@@ -238,13 +239,24 @@ public:
 	// 클라 → 서버: 내 GameInstance Loadout을 PlayerState로 적용.
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyLoadout(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
+
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyLoadoutInstances(const TArray<FInventoryData>& Weapons);
 	
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyCarryItems(const TArray<FOBItemStack>& Items);
+
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyCarryLoadout(
+		const TArray<FOBItemStack>& StackItems,
+		const TArray<FInventoryData>& ItemInstances);
 	
 	// 가방에 다 못 들어간 반입분을 창고로 되돌린다.
 	UFUNCTION(Client, Reliable)
 	void Client_ReturnCarryLeftover(const TArray<FOBItemStack>& Items);
+
+	UFUNCTION(Client, Reliable)
+	void Client_ReturnCarryItemInstances(const TArray<FInventoryData>& Items);
 	
 	// 파티 리더십을 서버 PlayerState에 반영(게이팅용).
 	UFUNCTION(Server, Reliable)
@@ -274,6 +286,9 @@ public:
 	// 소유 커넥션을 가진 컨트롤러가 대신 받는다.
 	UFUNCTION(Server, Reliable)
 	void Server_TakeLoot(AOBLootContainer* Container, FGameplayTag ItemTag, int32 Count);
+
+	UFUNCTION(Server, Reliable)
+	void Server_TakeLootInstance(AOBLootContainer* Container, FGuid InstanceId, int32 Count);
 
 	UFUNCTION(Server, Reliable)
 	void Server_TakeAllLoot(AOBLootContainer* Container);
@@ -329,4 +344,10 @@ public:
 	// 창고는 GameInstance 서브시스템이라 서버가 직접 못 건드린다. 이 경로가 유일하다.
 	UFUNCTION(Client, Reliable)
 	void Client_ApplyExtractionResult(const TArray<FOBItemStack>& Haul);
+
+	UFUNCTION(Client, Reliable)
+	void Client_ApplyExtractionResultV2(
+		const TArray<FOBItemStack>& StackHaul,
+		const TArray<FInventoryData>& LootedInstances,
+		const TArray<FInventoryData>& ReturnedLoadoutInstances);
 };

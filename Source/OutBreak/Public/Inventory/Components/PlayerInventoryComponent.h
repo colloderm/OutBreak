@@ -16,6 +16,7 @@ class AWorldItem;
 class AOBWeaponBase;
 class UOBEquipmentComponent;
 class UOBWeaponData;
+struct FOBWeaponDefinitionRow;
 class UInventoryWindow;
 struct FOBItemDefinitionRow;
 
@@ -67,6 +68,7 @@ public:
 
 	// Weapon inventory owns selection and magazine state. Equipment only spawns/attaches.
 	bool AddWeapon(TSubclassOf<AOBWeaponBase> WeaponClass);
+	bool AddWeaponInstance(const FInventoryData& WeaponInstance);
 	bool EquipStartingBackpack(const FGameplayTag& BackpackItemTag);
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
@@ -120,6 +122,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
 	bool GetEquippedItem(EOBEquipmentSlot EquipmentSlot, FInventoryData& OutItem) const;
+
+	// Client-side UI preview of the same category rule enforced again by the
+	// authoritative MoveItem path. This never mutates inventory state.
+	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
+	bool CanEquipItemToSlot(
+		const FInventoryItemHandle& Source,
+		EOBEquipmentSlot TargetSlot) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
 	bool IsItemEquipped(FGuid InstanceId, EOBEquipmentSlot& OutEquipmentSlot) const;
@@ -182,6 +191,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
 	void EquipDefaultSlot();
 
+	UFUNCTION(BlueprintPure, Category = "Inventory|Weapon|Customization")
+	bool CanInstallAttachment(FGuid WeaponInstanceId, FGuid AttachmentInstanceId) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon|Customization")
+	void InstallAttachment(FGuid WeaponInstanceId, FGuid AttachmentInstanceId);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon|Customization")
+	void RemoveAttachment(FGuid WeaponInstanceId, FGameplayTag SlotTag);
+
+	UFUNCTION(Server, Reliable)
+	void Server_InstallAttachment(FGuid WeaponInstanceId, FGuid AttachmentInstanceId);
+
+	UFUNCTION(Server, Reliable)
+	void Server_RemoveAttachment(FGuid WeaponInstanceId, FGameplayTag SlotTag);
+
 	UFUNCTION(Server, Reliable)
 	void Server_EquipSlot(EOBWeaponSlot Slot);
 
@@ -236,7 +260,7 @@ private:
 	bool ResolveWeaponDefinition(
 		const FOBItemDefinitionRow* ItemRow,
 		TSubclassOf<AOBWeaponBase>& OutWeaponClass,
-		const UOBWeaponData*& OutWeaponData) const;
+		const FOBWeaponDefinitionRow*& OutWeaponDefinition) const;
 	bool ResolveEquipmentSlot(
 		const FInventoryData& Item,
 		EOBEquipmentSlot& OutEquipmentSlot) const;
@@ -288,6 +312,11 @@ private:
 	static EOBEquipmentSlot ToEquipmentSlot(EOBWeaponSlot WeaponSlot);
 	FInventoryData* FindBackpackItem(const FGuid& InstanceId);
 	const FInventoryData* FindBackpackItem(const FGuid& InstanceId) const;
+	FInventoryData* FindOwnedItem(const FGuid& InstanceId);
+	const FInventoryData* FindOwnedItem(const FGuid& InstanceId) const;
+	bool InstallAttachmentInternal(const FGuid& WeaponInstanceId, const FGuid& AttachmentInstanceId);
+	bool RemoveAttachmentInternal(const FGuid& WeaponInstanceId, const FGameplayTag& SlotTag);
+	void RefreshActiveWeaponInstance(const FGuid& ChangedInstanceId);
 	void EquipWeaponAtIndex(int32 BackpackIndex);
 	void EquipWeaponInstance(const FGuid& InstanceId);
 	void EquipActiveWeapon();

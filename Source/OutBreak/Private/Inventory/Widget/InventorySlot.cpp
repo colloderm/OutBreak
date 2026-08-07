@@ -12,6 +12,7 @@
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "Inventory/Widget/InventoryDragDropOperation.h"
 #include "Item/OBItemRegistry.h"
+#include "UI/Tooltip/OBItemTooltipLibrary.h"
 
 void UInventorySlot::Update()
 {
@@ -48,6 +49,7 @@ void UInventorySlot::Update()
 	}
 
 	SetSlotMetaData(Icon, InventoryData.ItemStack);
+	SetToolTipText(UOBItemTooltipLibrary::BuildFallbackTooltipText(InventoryData));
 }
 
 void UInventorySlot::SetSlotData(const FInventoryData& Data)
@@ -176,6 +178,7 @@ void UInventorySlot::SetSlotMetaData(UTexture2D* Image, int Stack)
 
 void UInventorySlot::ClearSlot()
 {
+	SetToolTipText(FText::GetEmpty());
 	if (IsValid(ItemImage))
 	{
 		ItemImage->SetBrushFromTexture(nullptr);
