@@ -43,8 +43,12 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session", meta = (ClampMin = "60"))
 	int32 SessionLength = 1200;
 	
-	// [알파 IP-direct 테스트] 이 지역을 호스팅하는 데디 서버 주소(예: "127.0.0.1:7777").
-	// 비우면 매칭 서브시스템의 기본 주소 사용. (실 매칭 붙으면 백엔드가 대체)
+	// [알파 IP-direct 테스트] Level 대신 테스트 데디 서버로 접속할 때만 켠다.
+	// 기본값은 false이므로 에디터에서 Level을 지정하면 해당 맵을 로컬로 연다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session|Test")
+	bool bUseTestServerAddress = false;
+
+	// bUseTestServerAddress가 true일 때 접속할 주소(예: "127.0.0.1:7777").
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Session|Test")
 	FString TestServerAddress;
 
@@ -85,5 +89,26 @@ public:
 		return FVector2D(
 			(WorldLocation.Y - MinY) / SizeY,
 			1.0 - (WorldLocation.X - MinX) / SizeX);
+	}
+
+	/** Inverse of WorldToMapUV. Z is intentionally supplied by server-side ground scanning. */
+	FVector2D MapUVToWorldXY(const FVector2D& UV) const
+	{
+		const double SizeX = FMath::Max(1.0, WorldMapSize.X);
+		const double SizeY = FMath::Max(1.0, WorldMapSize.Y);
+		const double MinX = WorldMapCenter.X - SizeX * 0.5;
+		const double MinY = WorldMapCenter.Y - SizeY * 0.5;
+		return FVector2D(
+			MinX + (1.0 - UV.Y) * SizeX,
+			MinY + UV.X * SizeY);
+	}
+
+	bool ContainsWorldXY(const FVector2D& WorldXY) const
+	{
+		const FVector2D HalfSize = WorldMapSize * 0.5;
+		return WorldXY.X >= WorldMapCenter.X - HalfSize.X
+			&& WorldXY.X <= WorldMapCenter.X + HalfSize.X
+			&& WorldXY.Y >= WorldMapCenter.Y - HalfSize.Y
+			&& WorldXY.Y <= WorldMapCenter.Y + HalfSize.Y;
 	}
 };

@@ -9,6 +9,7 @@
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/Controller/OBPlayerController.h"
 #include "TimerManager.h"
 #include "Components/Overlay.h"
 
@@ -133,9 +134,23 @@ void UOBWorldMapWidget::Refresh()
 			PlaceMarker(Index, TeammateIcon, UV, TeammateColor);
 		}
 
-		for (const FVector_NetQuantize& Loc : MyPS->GetTeammateMapLocations())
+
+		if (GS)
 		{
-			PlaceMarker(Index, TeammateIcon, Map->WorldToMapUV(Loc), TeammateColor);
+			FOBTeamInsertionState InsertionState;
+			if (GS->GetTeamInsertionState(MyPS->GetTeamId(), InsertionState))
+			{
+				if (InsertionState.bHasResolvedLocation)
+				{
+					PlaceMarker(Index, InsertionTargetIcon,
+						Map->WorldToMapUV(InsertionState.ResolvedGroundLocation), InsertionTargetColor);
+				}
+				else if (InsertionState.bHasRequestedLocation)
+				{
+					PlaceMarker(Index, InsertionTargetIcon,
+						Map->WorldToMapUV(InsertionState.RequestedLocation), InsertionTargetColor);
+				}
+			}
 		}
 	}
 
@@ -249,6 +264,8 @@ FReply UOBWorldMapWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
 	}
 
 	bDragging = true;
+	bDragThresholdExceeded = false;
+	MouseDownScreenPos = InMouseEvent.GetScreenSpacePosition();
 	LastDragScreenPos = InMouseEvent.GetScreenSpacePosition();
 
 	// 캡처해야 위젯 밖으로 나가도 드래그가 이어진다.
@@ -259,7 +276,13 @@ FReply UOBWorldMapWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, con
 {
 	if (!bDragging) return FReply::Unhandled();
 
+	const bool bWasDrag = bDragThresholdExceeded;
 	bDragging = false;
+	bDragThresholdExceeded = false;
+	if (!bWasDrag)
+	{
+		TrySelectInsertionPoint(InMouseEvent.GetScreenSpacePosition());
+	}
 	return FReply::Handled().ReleaseMouseCapture();
 }
 
@@ -268,9 +291,54 @@ FReply UOBWorldMapWidget::NativeOnMouseMove(const FGeometry& InGeometry, const F
 	if (!bDragging) return FReply::Unhandled();
 
 	const FVector2D Now = InMouseEvent.GetScreenSpacePosition();
+	if (!bDragThresholdExceeded)
+	{
+		bDragThresholdExceeded = FVector2D::Distance(Now, MouseDownScreenPos) >= ClickDragThreshold;
+		if (!bDragThresholdExceeded)
+		{
+			return FReply::Handled();
+		}
+	}
 	PanOffset += (Now - LastDragScreenPos);
 	LastDragScreenPos = Now;
 
 	ApplyViewTransform();
 	return FReply::Handled();
+}
+
+bool UOBWorldMapWidget::TrySelectInsertionPoint(const FVector2D& ScreenPosition)
+{
+	const UOBExpeditionMapData* Map = GetMapData();
+	const AOBExpeditionGameState* GS = GetWorld() ? GetWorld()->GetGameState<AOBExpeditionGameState>() : nullptr;
+	const AOBPlayerStateBase* PS = GetOwningPlayerState<AOBPlayerStateBase>();
+	AOBPlayerController* PC = Cast<AOBPlayerController>(GetOwningPlayer());
+	if (!Map || !GS || !PS || !PC || GS->GetPhase() != EOBExpeditionPhase::Insertion || !PS->IsPartyLeader() || !IMG_Map)
+	{
+		return false;
+	}
+
+	FOBTeamInsertionState State;
+	if (GS->GetTeamInsertionState(PS->GetTeamId(), State)
+		&& State.Phase != EOBInsertionPhase::WaitingForTarget
+		&& State.Phase != EOBInsertionPhase::Orbiting)
+	{
+		return false;
+	}
+
+	const FGeometry& MapGeometry = IMG_Map->GetCachedGeometry();
+	const FVector2D MapSize = MapGeometry.GetLocalSize();
+	if (MapSize.X <= 1.f || MapSize.Y <= 1.f)
+	{
+		return false;
+	}
+
+	const FVector2D Local = MapGeometry.AbsoluteToLocal(ScreenPosition);
+	const FVector2D UV(Local.X / MapSize.X, Local.Y / MapSize.Y);
+	if (UV.X < 0.f || UV.X > 1.f || UV.Y < 0.f || UV.Y > 1.f)
+	{
+		return false;
+	}
+
+	PC->RequestInsertionPoint(Map->MapUVToWorldXY(UV));
+	return true;
 }

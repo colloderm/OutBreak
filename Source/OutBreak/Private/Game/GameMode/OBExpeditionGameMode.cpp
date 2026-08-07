@@ -9,8 +9,13 @@
 #include "Game/Expedition/OBExpeditionMapData.h"
 #include "Game/Expedition/OBExpeditionSpawnZone.h"
 #include "Game/Expedition/OBExtractionZone.h"
+#include "Game/Expedition/OBExtractionSite.h"
+#include "Game/Expedition/OBHelicopterRoute.h"
+#include "Game/Expedition/OBInsertionHelicopter.h"
+#include "Game/Expedition/OBLandingZoneScannerComponent.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "GameFramework/GameSession.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "GameFramework/PlayerState.h"
@@ -23,10 +28,27 @@
 AOBExpeditionGameMode::AOBExpeditionGameMode()
 {
 	GameStateClass = AOBExpeditionGameState::StaticClass();
+	InsertionHelicopterClass = AOBInsertionHelicopter::StaticClass();
+	LandingZoneScanner = CreateDefaultSubobject<UOBLandingZoneScannerComponent>(TEXT("LandingZoneScanner"));
 }
 
 void AOBExpeditionGameMode::PreInitializeComponents()
 {
+	// Expedition entry has a single authoritative path. Serialized Blueprint
+	// defaults from older assets must not restore SpawnZone/PlayerStart spawning.
+	if (!bEnableHelicopterInsertion)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Insertion] Legacy bEnableHelicopterInsertion=false was ignored; helicopter insertion is mandatory."));
+		bEnableHelicopterInsertion = true;
+	}
+	if (!InsertionHelicopterClass)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Insertion] No helicopter class was configured; using the native logic-only helicopter."));
+		InsertionHelicopterClass = AOBInsertionHelicopter::StaticClass();
+	}
+
 	// GameState는 이 모드의 동작 전제(페이즈/세션타이머/결과창)라 BP 설정을 신뢰하지 않는다.
 	// BP 서브클래스에 옛 값이 직렬화돼 있으면 C++ 생성자 기본값이 조용히 무시되고,
 	// 그러면 SetPhase가 통째로 안 돌아 결과창도 타이머도 죽는다(원인 찾기 매우 어려움).
@@ -87,7 +109,527 @@ void AOBExpeditionGameMode::StartPlay()
 		UE_LOG(LogTemp, Warning, TEXT("[Expedition] GameSession 없음 → 정원 제한 미적용"));
 	}
 	
+	if (InsertionHelicopterClass)
+	{
+		BeginInsertionPhase();
+
+		// StartPlay 이전에 로그인된 로컬/PIE 플레이어는 HandleStartingNewPlayer에서
+		// 기존 PlayerStart 스폰을 보류했다. 삽입 페이즈와 Route 수집이 끝난 지금 태운다.
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* PlayerController = It->Get();
+			if (PlayerController && !PendingInsertionControllers.Contains(PlayerController))
+			{
+				RegisterPlayerForInsertion(PlayerController);
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[Insertion] Insertion phase cannot start because no helicopter class exists; legacy spawn is blocked."));
+	}
+}
+
+void AOBExpeditionGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
+{
+	AOBExpeditionGameState* GS = GetExpeditionGameState();
+	if (!GS)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[Insertion] Player %s remains unspawned because ExpeditionGameState is unavailable; legacy spawn is blocked."),
+			*GetNameSafe(NewPlayer));
+		return;
+	}
+
+	if (GS->GetPhase() == EOBExpeditionPhase::Insertion)
+	{
+		RegisterPlayerForInsertion(NewPlayer);
+		return;
+	}
+
+	// 로컬 PIE/OpenLevel에서는 기존 플레이어 시작 처리가 StartPlay보다 먼저 올 수 있다.
+	// 이때 Super를 호출하면 PlayerStart/SpawnZone에 먼저 스폰되어 헬기 삽입을 우회한다.
+	// StartPlay가 삽입 페이즈를 연 뒤 현재 컨트롤러들을 일괄 등록한다.
+	if (!bInsertionHasStarted && !bInsertionHasCompleted)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[Insertion] %s spawn deferred until insertion phase initialization."),
+			NewPlayer ? *NewPlayer->GetName() : TEXT("UnknownPlayer"));
+		return;
+	}
+
+	if (GS->GetPhase() == EOBExpeditionPhase::InProgress && bAllowLateJoinAtResolvedInsertionPoint && NewPlayer)
+	{
+		const AOBPlayerStateBase* PS = NewPlayer->GetPlayerState<AOBPlayerStateBase>();
+		FOBTeamInsertionState State;
+		if (PS && GS->GetTeamInsertionState(PS->GetTeamId(), State) && State.bHasResolvedLocation)
+		{
+			const FTransform SpawnTransform(FRotator::ZeroRotator,
+				FVector(State.ResolvedGroundLocation) + FVector(0.f, 0.f, 150.f));
+			NewPlayer->SetInitialLocationAndRotation(SpawnTransform.GetLocation(), SpawnTransform.Rotator());
+			RestartPlayerAtTransform(NewPlayer, SpawnTransform);
+			AssignPersonalExtractsFor(NewPlayer, State.ResolvedGroundLocation);
+			if (AOBCharacterBase* Character = Cast<AOBCharacterBase>(NewPlayer->GetPawn()))
+			{
+				Character->HoldUntilGrounded();
+			}
+			return;
+		}
+	}
+
+	UE_LOG(LogTemp, Error,
+		TEXT("[Insertion] Player %s has no valid helicopter/resolved insertion path; legacy spawn is blocked."),
+		*GetNameSafe(NewPlayer));
+}
+
+void AOBExpeditionGameMode::BeginInsertionPhase()
+{
+	AOBExpeditionGameState* GS = GetExpeditionGameState();
+	if (!GS)
+	{
+		return;
+	}
+
+	const int32 Length = ResolveSessionLength();
+	GS->SetSessionLength(Length);
+	GS->SetTimeRemaining(Length);
+	GS->SetFinalMinute(false);
+	GS->SetPhase(EOBExpeditionPhase::Insertion);
+	bInsertionHasStarted = true;
+	bInsertionHasCompleted = false;
+	bExpeditionEnded = false;
+	CollectHelicopterRoutes();
+	UE_LOG(LogTemp, Log, TEXT("[Insertion] Phase started. HelicopterClass=%s Routes=%d"),
+		InsertionHelicopterClass ? *InsertionHelicopterClass->GetName() : TEXT("None"),
+		AvailableInsertionRoutes.Num());
+}
+
+void AOBExpeditionGameMode::CollectHelicopterRoutes()
+{
+	AvailableInsertionRoutes.Reset();
+	TeamInsertionRoutes.Reset();
+	for (TActorIterator<AOBHelicopterRoute> It(GetWorld()); It; ++It)
+	{
+		if (It->GetPurpose() == EOBHelicopterRoutePurpose::InsertionOrbit)
+		{
+			AvailableInsertionRoutes.Add(*It);
+		}
+	}
+	UE_LOG(LogTemp, Log, TEXT("[Insertion] InsertionOrbit routes found = %d"),
+		AvailableInsertionRoutes.Num());
+}
+
+AOBHelicopterRoute* AOBExpeditionGameMode::GetOrAssignInsertionRoute(uint8 TeamId)
+{
+	if (const TObjectPtr<AOBHelicopterRoute>* Existing = TeamInsertionRoutes.Find(TeamId))
+	{
+		return *Existing;
+	}
+
+	int32 SelectedIndex = AvailableInsertionRoutes.IndexOfByPredicate(
+		[TeamId](const AOBHelicopterRoute* Route) { return Route && Route->GetTeamSlot() == TeamId; });
+	if (SelectedIndex == INDEX_NONE)
+	{
+		SelectedIndex = AvailableInsertionRoutes.IndexOfByPredicate(
+			[](const AOBHelicopterRoute* Route) { return Route && Route->GetTeamSlot() == 0; });
+	}
+	if (SelectedIndex == INDEX_NONE)
+	{
+		return nullptr;
+	}
+
+	AOBHelicopterRoute* Route = AvailableInsertionRoutes[SelectedIndex];
+	AvailableInsertionRoutes.RemoveAt(SelectedIndex);
+	TeamInsertionRoutes.Add(TeamId, Route);
+	return Route;
+}
+
+AOBInsertionHelicopter* AOBExpeditionGameMode::GetOrCreateInsertionHelicopter(uint8 TeamId)
+{
+	if (TObjectPtr<AOBInsertionHelicopter>* Existing = TeamInsertionHelicopters.Find(TeamId))
+	{
+		return *Existing;
+	}
+	if (!InsertionHelicopterClass || TeamId == 0)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[Insertion] Helicopter creation rejected. Class=%s TeamId=%d"),
+			InsertionHelicopterClass ? *InsertionHelicopterClass->GetName() : TEXT("None"), TeamId);
+		return nullptr;
+	}
+
+	AOBHelicopterRoute* Route = GetOrAssignInsertionRoute(TeamId);
+	FVector OrbitCenter = FVector::ZeroVector;
+	if (ActiveMapData)
+	{
+		OrbitCenter.X = ActiveMapData->WorldMapCenter.X;
+		OrbitCenter.Y = ActiveMapData->WorldMapCenter.Y;
+	}
+	FTransform SpawnTransform = Route ? Route->GetRouteTransform(0.f) : FTransform(FRotator::ZeroRotator, OrbitCenter);
+	FActorSpawnParameters SpawnParameters;
+	SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AOBInsertionHelicopter* Helicopter = GetWorld()->SpawnActor<AOBInsertionHelicopter>(
+		InsertionHelicopterClass, SpawnTransform, SpawnParameters);
+	if (!Helicopter)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[Insertion] Failed to spawn configured helicopter class %s for Team %d; legacy spawn is blocked."),
+			*GetNameSafe(InsertionHelicopterClass), TeamId);
+		return nullptr;
+	}
+
+	Helicopter->OnInsertionPhaseChanged.AddDynamic(this, &AOBExpeditionGameMode::HandleInsertionHelicopterPhaseChanged);
+	Helicopter->OnPassengerDeployed.AddDynamic(this, &AOBExpeditionGameMode::HandleInsertionPassengerDeployed);
+	Helicopter->OnAllPassengersDeployed.AddDynamic(this, &AOBExpeditionGameMode::HandleAllInsertionPassengersDeployed);
+	Helicopter->InitializeInsertion(TeamId, Route, OrbitCenter);
+	TeamInsertionHelicopters.Add(TeamId, Helicopter);
+
+	FOBTeamInsertionState& State = TeamInsertionRuntimeStates.FindOrAdd(TeamId);
+	State.TeamId = TeamId;
+	State.Helicopter = Helicopter;
+	State.Phase = EOBInsertionPhase::Orbiting;
+	State.StateStartedServerTime = GetExpeditionGameState()->GetServerWorldTimeSeconds();
+	State.SelectionDeadlineServerTime = State.StateStartedServerTime + InsertionSelectionTimeout;
+	GetExpeditionGameState()->SetTeamInsertionState(State);
+
+	FTimerHandle& SelectionTimer = InsertionSelectionTimers.FindOrAdd(TeamId);
+	FTimerDelegate Delegate = FTimerDelegate::CreateUObject(this, &AOBExpeditionGameMode::AutoSelectInsertionPoint, TeamId);
+	GetWorldTimerManager().SetTimer(SelectionTimer, Delegate, InsertionSelectionTimeout, false);
+	return Helicopter;
+}
+
+void AOBExpeditionGameMode::RegisterPlayerForInsertion(APlayerController* NewPlayer)
+{
+	if (!NewPlayer)
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(InsertionCompletionTimer);
+	PendingInsertionControllers.AddUnique(NewPlayer);
+	AOBPlayerStateBase* PS = NewPlayer->GetPlayerState<AOBPlayerStateBase>();
+	if (!PS)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[Insertion] %s has no PlayerState and remains pending; legacy spawn is blocked."),
+			*NewPlayer->GetName());
+		return;
+	}
+	uint8 TeamId = PS->GetTeamId();
+	if (PS && TeamId == 0)
+	{
+		const FString* PartyCode = PartyCodeByController.Find(NewPlayer);
+		TeamId = ResolveTeamForCode(PartyCode ? *PartyCode : FString());
+		PS->SetTeamId(TeamId);
+		UE_LOG(LogTemp, Warning, TEXT("[Insertion] %s had TeamId 0; assigned TeamId %d before seating."),
+			*NewPlayer->GetName(), TeamId);
+	}
+	AOBInsertionHelicopter* Helicopter = GetOrCreateInsertionHelicopter(TeamId);
+	FOBTeamInsertionState* ExistingState = TeamInsertionRuntimeStates.Find(TeamId);
+	const bool bRappelAlreadyStarted = Helicopter
+		&& (Helicopter->GetInsertionPhase() == EOBInsertionPhase::Rappelling
+			|| Helicopter->GetInsertionPhase() == EOBInsertionPhase::Departing
+			|| Helicopter->GetInsertionPhase() == EOBInsertionPhase::Completed);
+	if (bRappelAlreadyStarted && ExistingState && ExistingState->bHasResolvedLocation
+		&& bAllowLateJoinAtResolvedInsertionPoint)
+	{
+		const FTransform SpawnTransform(FRotator::ZeroRotator,
+			FVector(ExistingState->ResolvedGroundLocation) + FVector(0.f, 0.f, 150.f));
+		NewPlayer->SetInitialLocationAndRotation(SpawnTransform.GetLocation(), SpawnTransform.Rotator());
+		RestartPlayerAtTransform(NewPlayer, SpawnTransform);
+		if (!NewPlayer->GetPawn())
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("[Insertion] Late insertion Pawn spawn failed for %s; player remains pending."),
+				*NewPlayer->GetName());
+			return;
+		}
+		AssignPersonalExtractsFor(NewPlayer, ExistingState->ResolvedGroundLocation);
+		if (AOBCharacterBase* Character = Cast<AOBCharacterBase>(NewPlayer->GetPawn()))
+		{
+			Character->HoldUntilGrounded();
+		}
+		PendingInsertionControllers.Remove(NewPlayer);
+		TryCompleteInsertion();
+		return;
+	}
+	if (!Helicopter || Helicopter->GetPassengerCount() >= Helicopter->GetSeatCapacity())
+	{
+		UE_LOG(LogTemp, Error, TEXT("[Insertion] Unable to seat player %s for Team %d; player remains pending and legacy spawn is blocked."),
+			*NewPlayer->GetName(), TeamId);
+		return;
+	}
+
+	if (!SpawnAndSeatInsertionPawn(NewPlayer, Helicopter))
+	{
+		UE_LOG(LogTemp, Error, TEXT("[Insertion] Pawn creation or seat attachment failed for %s."), *NewPlayer->GetName());
+		return;
+	}
+
+	FOBTeamInsertionState& State = TeamInsertionRuntimeStates.FindOrAdd(TeamId);
+	State.TeamId = TeamId;
+	State.Helicopter = Helicopter;
+	State.PassengerCount = Helicopter->GetPassengerCount();
+	GetExpeditionGameState()->SetTeamInsertionState(State);
+}
+
+bool AOBExpeditionGameMode::SpawnAndSeatInsertionPawn(
+	APlayerController* NewPlayer,
+	AOBInsertionHelicopter* Helicopter)
+{
+	if (!NewPlayer || !Helicopter || Helicopter->GetPassengerCount() >= Helicopter->GetSeatCapacity())
+	{
+		return false;
+	}
+
+	const FTransform SeatTransform = Helicopter->GetSeatTransform(Helicopter->GetPassengerCount());
+	NewPlayer->SetInitialLocationAndRotation(SeatTransform.GetLocation(), SeatTransform.Rotator());
+
+	APawn* Pawn = NewPlayer->GetPawn();
+	const bool bCreatedPawn = !IsValid(Pawn);
+	if (bCreatedPawn)
+	{
+		UClass* PawnClass = GetDefaultPawnClassForController(NewPlayer);
+		if (!PawnClass)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[Insertion] No default Pawn class exists for %s."), *NewPlayer->GetName());
+			return false;
+		}
+
+		FActorSpawnParameters SpawnParameters;
+		SpawnParameters.Instigator = GetInstigator();
+		SpawnParameters.ObjectFlags |= RF_Transient;
+		// Cabin seats intentionally overlap the helicopter. The normal restart path
+		// can reject this as Bad Size, so insertion owns an explicit AlwaysSpawn path.
+		SpawnParameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Pawn = GetWorld()->SpawnActor<APawn>(PawnClass, SeatTransform, SpawnParameters);
+		if (!Pawn)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[Insertion] AlwaysSpawn failed for Pawn class %s."), *GetNameSafe(PawnClass));
+			return false;
+		}
+
+		Pawn->SetActorEnableCollision(false);
+		NewPlayer->SetPawn(Pawn);
+		FinishRestartPlayer(NewPlayer, SeatTransform.Rotator());
+		Pawn = NewPlayer->GetPawn();
+	}
+
+	if (!IsValid(Pawn) || !Helicopter->SeatPassenger(NewPlayer))
+	{
+		if (bCreatedPawn && IsValid(Pawn))
+		{
+			NewPlayer->UnPossess();
+			Pawn->Destroy();
+		}
+		return false;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[Insertion] %s seated in %s at %s."),
+		*NewPlayer->GetName(), *Helicopter->GetName(), *SeatTransform.GetLocation().ToCompactString());
+	return true;
+}
+
+void AOBExpeditionGameMode::RequestInsertionPoint(
+	AOBPlayerController* RequestingPlayer,
+	const FVector2D& WorldXY)
+{
+	AOBExpeditionGameState* GS = GetExpeditionGameState();
+	AOBPlayerStateBase* PS = RequestingPlayer ? RequestingPlayer->GetPlayerState<AOBPlayerStateBase>() : nullptr;
+	if (!GS || !PS || GS->GetPhase() != EOBExpeditionPhase::Insertion)
+	{
+		if (RequestingPlayer)
+		{
+			RequestingPlayer->Client_InsertionPointResult(false, FVector::ZeroVector, TEXT("Insertion selection is closed."));
+		}
+		return;
+	}
+	if (!PS->IsPartyLeader())
+	{
+		RequestingPlayer->Client_InsertionPointResult(false, FVector::ZeroVector, TEXT("Only the party leader can select the insertion point."));
+		return;
+	}
+	if (!FMath::IsFinite(WorldXY.X) || !FMath::IsFinite(WorldXY.Y)
+		|| !ActiveMapData || !ActiveMapData->ContainsWorldXY(WorldXY))
+	{
+		RequestingPlayer->Client_InsertionPointResult(false, FVector::ZeroVector, TEXT("The selected point is outside the playable map."));
+		return;
+	}
+
+	const FOBTeamInsertionState* State = TeamInsertionRuntimeStates.Find(PS->GetTeamId());
+	if (!State || (State->Phase != EOBInsertionPhase::Orbiting && State->Phase != EOBInsertionPhase::WaitingForTarget))
+	{
+		RequestingPlayer->Client_InsertionPointResult(false, FVector::ZeroVector, TEXT("This helicopter has already committed to an insertion point."));
+		return;
+	}
+
+	ResolveAndBeginInsertion(PS->GetTeamId(), FVector(WorldXY.X, WorldXY.Y, 0.f), RequestingPlayer);
+}
+
+bool AOBExpeditionGameMode::ResolveAndBeginInsertion(
+	uint8 TeamId,
+	const FVector& RequestedLocation,
+	AOBPlayerController* FeedbackPlayer)
+{
+	TObjectPtr<AOBInsertionHelicopter>* FoundHelicopter = TeamInsertionHelicopters.Find(TeamId);
+	AOBInsertionHelicopter* Helicopter = FoundHelicopter ? FoundHelicopter->Get() : nullptr;
+	FOBTeamInsertionState* State = TeamInsertionRuntimeStates.Find(TeamId);
+	FOBLandingZoneResult LandingZone;
+	if (!Helicopter || !State || !LandingZoneScanner
+		|| !LandingZoneScanner->FindSafeLandingZone(RequestedLocation, LandingZone))
+	{
+		if (FeedbackPlayer)
+		{
+			FeedbackPlayer->Client_InsertionPointResult(false, FVector::ZeroVector,
+				TEXT("No safe landing zone was found near that point."));
+		}
+		return false;
+	}
+
+	State->bHasRequestedLocation = true;
+	State->RequestedLocation = RequestedLocation;
+	State->bHasResolvedLocation = true;
+	State->ResolvedGroundLocation = LandingZone.GroundLocation;
+	State->Phase = EOBInsertionPhase::Approaching;
+	State->StateStartedServerTime = GetExpeditionGameState()->GetServerWorldTimeSeconds();
+	GetExpeditionGameState()->SetTeamInsertionState(*State);
+
+	if (FTimerHandle* Timer = InsertionSelectionTimers.Find(TeamId))
+	{
+		GetWorldTimerManager().ClearTimer(*Timer);
+	}
+	Helicopter->BeginInsertionApproach(LandingZone);
+	if (FeedbackPlayer)
+	{
+		FeedbackPlayer->Client_InsertionPointResult(true, LandingZone.GroundLocation, TEXT("Insertion point confirmed."));
+	}
+	return true;
+}
+
+void AOBExpeditionGameMode::AutoSelectInsertionPoint(uint8 TeamId)
+{
+	FOBTeamInsertionState* State = TeamInsertionRuntimeStates.Find(TeamId);
+	if (!State || (State->Phase != EOBInsertionPhase::Orbiting && State->Phase != EOBInsertionPhase::WaitingForTarget))
+	{
+		return;
+	}
+
+	FVector Requested = FVector::ZeroVector;
+	if (ActiveMapData)
+	{
+		Requested.X = ActiveMapData->WorldMapCenter.X;
+		Requested.Y = ActiveMapData->WorldMapCenter.Y;
+	}
+	else if (State->Helicopter)
+	{
+		Requested = State->Helicopter->GetActorLocation();
+	}
+
+	if (!ResolveAndBeginInsertion(TeamId, Requested, nullptr))
+	{
+		// A failed scan is not a valid deployment coordinate. Keep the party safely
+		// seated and allow another selection instead of dropping at an unchecked Z.
+		State->Phase = EOBInsertionPhase::WaitingForTarget;
+		State->bHasResolvedLocation = false;
+		State->ResolvedGroundLocation = FVector::ZeroVector;
+		State->StateStartedServerTime = GetExpeditionGameState()->GetServerWorldTimeSeconds();
+		GetExpeditionGameState()->SetTeamInsertionState(*State);
+		UE_LOG(LogTemp, Error,
+			TEXT("[Insertion] Auto selection found no safe landing zone for Team %d near %s; passengers remain in helicopter."),
+			TeamId, *Requested.ToCompactString());
+	}
+}
+
+void AOBExpeditionGameMode::HandleInsertionHelicopterPhaseChanged(
+	AOBInsertionHelicopter* Helicopter,
+	EOBInsertionPhase NewPhase)
+{
+	if (Helicopter)
+	{
+		UpdateReplicatedInsertionState(Helicopter->GetTeamId(), NewPhase);
+	}
+}
+
+void AOBExpeditionGameMode::HandleInsertionPassengerDeployed(
+	AOBInsertionHelicopter* Helicopter,
+	AController* Passenger)
+{
+	PendingInsertionControllers.Remove(Passenger);
+	if (Helicopter)
+	{
+		FOBTeamInsertionState& State = TeamInsertionRuntimeStates.FindOrAdd(Helicopter->GetTeamId());
+		++State.DeployedCount;
+		State.PassengerCount = State.DeployedCount + Helicopter->GetPassengerCount();
+		GetExpeditionGameState()->SetTeamInsertionState(State);
+	}
+}
+
+void AOBExpeditionGameMode::HandleAllInsertionPassengersDeployed(AOBInsertionHelicopter* Helicopter)
+{
+	if (!Helicopter)
+	{
+		return;
+	}
+	const uint8 TeamId = Helicopter->GetTeamId();
+	AssignPersonalExtractsForTeam(TeamId, Helicopter->GetResolvedGroundLocation());
+	TryCompleteInsertion();
+}
+
+void AOBExpeditionGameMode::AssignPersonalExtractsForTeam(uint8 TeamId, const FVector& InsertionOrigin)
+{
+	if (!GameState)
+	{
+		return;
+	}
+	for (APlayerState* PlayerState : GameState->PlayerArray)
+	{
+		AOBPlayerStateBase* OBPlayerState = Cast<AOBPlayerStateBase>(PlayerState);
+		if (OBPlayerState && OBPlayerState->GetTeamId() == TeamId)
+		{
+			AssignPersonalExtractsFor(OBPlayerState->GetOwningController(), InsertionOrigin);
+		}
+	}
+}
+
+void AOBExpeditionGameMode::UpdateReplicatedInsertionState(uint8 TeamId, EOBInsertionPhase Phase)
+{
+	FOBTeamInsertionState& State = TeamInsertionRuntimeStates.FindOrAdd(TeamId);
+	State.TeamId = TeamId;
+	State.Phase = Phase;
+	State.StateStartedServerTime = GetExpeditionGameState()->GetServerWorldTimeSeconds();
+	if (TObjectPtr<AOBInsertionHelicopter>* Helicopter = TeamInsertionHelicopters.Find(TeamId))
+	{
+		State.Helicopter = Helicopter->Get();
+		State.PassengerCount = State.DeployedCount + Helicopter->Get()->GetPassengerCount();
+	}
+	GetExpeditionGameState()->SetTeamInsertionState(State);
+}
+
+void AOBExpeditionGameMode::TryCompleteInsertion()
+{
+	if (!bInsertionHasStarted || bInsertionHasCompleted || !PendingInsertionControllers.IsEmpty())
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(InsertionCompletionTimer);
+	GetWorldTimerManager().SetTimer(InsertionCompletionTimer, this,
+		&AOBExpeditionGameMode::CompleteInsertionAfterGracePeriod,
+		FMath::Max(0.01f, InsertionCompletionGraceSeconds), false);
+}
+
+void AOBExpeditionGameMode::CompleteInsertionAfterGracePeriod()
+{
+	if (bInsertionHasCompleted || !PendingInsertionControllers.IsEmpty())
+	{
+		return;
+	}
+	bInsertionHasCompleted = true;
 	StartExpedition();
+}
+
+TSubclassOf<AOBInsertionHelicopter> AOBExpeditionGameMode::GetDefaultExtractionHelicopterClass() const
+{
+	return ExtractionHelicopterClass ? ExtractionHelicopterClass : InsertionHelicopterClass;
 }
 
 void AOBExpeditionGameMode::GenericPlayerInitialization(AController* C)
@@ -143,6 +685,13 @@ AOBExpeditionSpawnZone* AOBExpeditionGameMode::GetOrAssignZoneForTeam(uint8 InTe
 
 AActor* AOBExpeditionGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
+	if (bEnableHelicopterInsertion && !bInsertionHasCompleted)
+	{
+		// Engine callers may still ask for a start while insertion initializes.
+		// Do not collect or assign a legacy SpawnZone in that phase.
+		return nullptr;
+	}
+
 	if (!bZonesCollected)   // ★ 첫 스폰 직전에 확실히 수집(존 배치 이후 시점 보장)
 	{
 		CollectSpawnZones();
@@ -168,8 +717,16 @@ AActor* AOBExpeditionGameMode::ChoosePlayerStart_Implementation(AController* Pla
 
 void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, AActor* StartSpot)
 {
+	if (bEnableHelicopterInsertion && !bInsertionHasCompleted)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[Insertion] Blocked legacy RestartPlayerAtPlayerStart for %s (StartSpot=%s)."),
+			*GetNameSafe(NewPlayer), *GetNameSafe(StartSpot));
+		return;
+	}
+
 	// [개인 탈출] 스폰 지점(존)이 확정된 지금 시점에 스폰기준 배정.
-	if (NewPlayer && StartSpot)
+	if (NewPlayer && StartSpot && (!bEnableHelicopterInsertion || bInsertionHasCompleted))
 	{
 		AssignPersonalExtractsFor(NewPlayer, StartSpot->GetActorLocation());
 	}
@@ -206,10 +763,17 @@ void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, A
 
 void AOBExpeditionGameMode::Logout(AController* Exiting)
 {
+	PendingInsertionControllers.Remove(Exiting);
 	Super::Logout(Exiting);
 	
-	// 남은 인원 기준으로 종료 여부 재평가.
-	CheckEndConditions();
+	if (const AOBExpeditionGameState* GS = GetExpeditionGameState(); GS && GS->GetPhase() == EOBExpeditionPhase::Insertion)
+	{
+		TryCompleteInsertion();
+	}
+	else
+	{
+		CheckEndConditions();
+	}
 	
 	// 개인 탈출구는 이제 팀 공유다. 한 명 나갔다고 파괴하면 남은 팀원의 탈출구가 사라진다.
 	// 팀 전원이 나가도 세션 종료 시 레벨과 함께 정리되므로 개별 파괴는 하지 않는다.
@@ -237,6 +801,7 @@ void AOBExpeditionGameMode::StartExpedition()
 {
 	AOBExpeditionGameState* GS = GetExpeditionGameState();
 	if (!GS) return;
+	if (GS->GetPhase() == EOBExpeditionPhase::InProgress) return;
 	
 	const int32 Len = ResolveSessionLength();
 	GS->SetSessionLength(Len);
@@ -379,6 +944,13 @@ void AOBExpeditionGameMode::CollectPersonalExtractPoints()
 			PersonalExtractPoints.Add(*It);
 		}
 	}
+	for (TActorIterator<AOBExtractionSite> It(GetWorld()); It; ++It)
+	{
+		if (It->ActorHasTag(TEXT("PersonalExtract")))
+		{
+			PersonalExtractPoints.AddUnique(*It);
+		}
+	}
 	
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] PersonalExtractPoints = %d"), PersonalExtractPoints.Num());
 }
@@ -490,7 +1062,8 @@ FString AOBExpeditionGameMode::InitNewPlayer(APlayerController* NewPlayerControl
 		PartyCodeByController.Add(NewPlayerController, PartyCode);
 		
 		// [중요] 팀 배정을 스폰(ChoosePlayerStart) 이전인 여기서 수행.
-		if (AOBPlayerStateBase* PS = NewPlayerController->GetPlayerState<AOBPlayerStateBase>())
+		if (AOBPlayerStateBase* PS = NewPlayerController->GetPlayerState<AOBPlayerStateBase>();
+			PS && PS->GetTeamId() == 0)
 		{
 			PS->SetTeamId(ResolveTeamForCode(PartyCode));
 		}
@@ -743,6 +1316,10 @@ void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVec
 		if (!Zone) continue;
 		
 		Zone->ConfigureAsPersonal(TeamId);			// 팀 전원에게 복제(본인만 X)
+		if (AOBExtractionSite* ExtractionSite = Cast<AOBExtractionSite>(M))
+		{
+			Zone->ConfigureExtractionSite(ExtractionSite);
+		}
 		Zone->SetActiveWindow(StartSec, EndSec);	// 맵 별 활성창
 		UGameplayStatics::FinishSpawningActor(Zone, T);
 		

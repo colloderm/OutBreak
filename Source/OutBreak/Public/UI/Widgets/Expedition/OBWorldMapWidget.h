@@ -49,6 +49,7 @@ protected:
 	// 확대/이동을 공통 부모에 한 번에 적용. 마커는 따로 안 건드려도 따라온다.
 	void ApplyViewTransform();
 	void ResetView();
+	bool TrySelectInsertionPoint(const FVector2D& ScreenPosition);
 
 protected:
 	UPROPERTY(meta = (BindWidget))
@@ -75,6 +76,9 @@ protected:
 	TObjectPtr<UTexture2D> PublicExtractIcon;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Map|Icons")
+	TObjectPtr<UTexture2D> InsertionTargetIcon;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Map|Icons")
 	FVector2D MarkerSize = FVector2D(28.f, 28.f);
 
 	UPROPERTY(EditDefaultsOnly, Category = "Map|Icons")
@@ -89,6 +93,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Map|Icons")
 	FLinearColor PublicExtractColor = FLinearColor(0.3f, 1.f, 0.3f, 1.f);
 
+	UPROPERTY(EditDefaultsOnly, Category = "Map|Icons")
+	FLinearColor InsertionTargetColor = FLinearColor(1.f, 0.35f, 0.1f, 1.f);
+
 	UPROPERTY(EditDefaultsOnly, Category = "Map", Meta = (ClampMin = "0.05"))
 	float RefreshInterval = 0.2f;
 	
@@ -101,6 +108,9 @@ protected:
 	// 휠 한 칸당 배율.
 	UPROPERTY(EditDefaultsOnly, Category = "Map|View", Meta = (ClampMin = "1.01"))
 	float ZoomStep = 1.25f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Map|View", Meta = (ClampMin = "1.0"))
+	float ClickDragThreshold = 6.f;
 
 private:
 	UPROPERTY()
@@ -119,6 +129,8 @@ private:
 	FVector2D PanOffset = FVector2D::ZeroVector;
 
 	bool bDragging = false;
+	bool bDragThresholdExceeded = false;
+	FVector2D MouseDownScreenPos = FVector2D::ZeroVector;
 	FVector2D LastDragScreenPos = FVector2D::ZeroVector;
 	
 };

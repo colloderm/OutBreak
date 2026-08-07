@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "OBGameModeBase.h"
+#include "Game/Expedition/OBHelicopterTypes.h"
 #include "OBExpeditionGameMode.generated.h"
 
 class AOBPlayerStateBase;
@@ -12,6 +13,10 @@ class UOBExpeditionMapCatalog;
 class AOBExpeditionSpawnZone;
 class UOBExpeditionMapData;
 class AOBExpeditionGameState;
+class AOBInsertionHelicopter;
+class AOBHelicopterRoute;
+class UOBLandingZoneScannerComponent;
+class AOBPlayerController;
 
 // 세션 종료 사유. 결과 위젯(Step 8)/로그용.
 UENUM()
@@ -45,6 +50,11 @@ public:
 	
 	// 탈출 성공 처리(ExtractionZone이 호출). 상태=Extracted + 폰 정리 + 종료판정.
 	void NotifyPlayerExtracted(AController* Controller);
+
+	/** Server entry point used by AOBPlayerController's insertion-map RPC. */
+	void RequestInsertionPoint(AOBPlayerController* RequestingPlayer, const FVector2D& WorldXY);
+
+	TSubclassOf<AOBInsertionHelicopter> GetDefaultExtractionHelicopterClass() const;
 	
 	// 팀별 존 배정에 따라 시작지점을 고른다.
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
@@ -69,6 +79,7 @@ public:
 	
 protected:
 	virtual void StartPlay() override;
+	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 	
 	virtual void PreInitializeComponents() override;
 
@@ -85,6 +96,27 @@ protected:
 	void ValidateZoneSeparation() const; // 3~5분 이격 검증
 	
 	void StartExpedition();
+	void BeginInsertionPhase();
+	void RegisterPlayerForInsertion(APlayerController* NewPlayer);
+	bool SpawnAndSeatInsertionPawn(APlayerController* NewPlayer, AOBInsertionHelicopter* Helicopter);
+	AOBInsertionHelicopter* GetOrCreateInsertionHelicopter(uint8 TeamId);
+	AOBHelicopterRoute* GetOrAssignInsertionRoute(uint8 TeamId);
+	void CollectHelicopterRoutes();
+	void AutoSelectInsertionPoint(uint8 TeamId);
+	bool ResolveAndBeginInsertion(uint8 TeamId, const FVector& RequestedLocation, AOBPlayerController* FeedbackPlayer);
+	void TryCompleteInsertion();
+	void CompleteInsertionAfterGracePeriod();
+	void AssignPersonalExtractsForTeam(uint8 TeamId, const FVector& InsertionOrigin);
+	void UpdateReplicatedInsertionState(uint8 TeamId, EOBInsertionPhase Phase);
+
+	UFUNCTION()
+	void HandleInsertionHelicopterPhaseChanged(AOBInsertionHelicopter* Helicopter, EOBInsertionPhase NewPhase);
+
+	UFUNCTION()
+	void HandleInsertionPassengerDeployed(AOBInsertionHelicopter* Helicopter, AController* Passenger);
+
+	UFUNCTION()
+	void HandleAllInsertionPassengersDeployed(AOBInsertionHelicopter* Helicopter);
 
 	void TickSessionTimer();
 
@@ -152,6 +184,30 @@ protected:
 	// 존 간 최소 이격(cm). 미달 시 경고 로그. ~1000m(도보 약 3분).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Spawn")
 	float MinZoneSeparation = 100000.f;
+
+	/** Kept for Blueprint serialization compatibility; false is ignored at runtime. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (DeprecatedProperty, DeprecationMessage = "Expedition entry always uses helicopter insertion."))
+	bool bEnableHelicopterInsertion = true;
+
+	/** Assign BP_OBInsertionHelicopter here. Native class remains a logic-only fallback. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion")
+	TSubclassOf<AOBInsertionHelicopter> InsertionHelicopterClass;
+
+	/** Optional extraction-specific visual child. Falls back to InsertionHelicopterClass. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Extraction")
+	TSubclassOf<AOBInsertionHelicopter> ExtractionHelicopterClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (ClampMin = "1"))
+	float InsertionSelectionTimeout = 30.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (ClampMin = "0"))
+	float InsertionCompletionGraceSeconds = 3.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion")
+	bool bAllowLateJoinAtResolvedInsertionPoint = true;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Expedition|Insertion")
+	TObjectPtr<UOBLandingZoneScannerComponent> LandingZoneScanner;
 	
 	// 개인 탈출구로 스폰할 클래스(BP_ExtractionZone_Personal 지정).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction")
@@ -223,4 +279,22 @@ private:
 	TMap<FString, uint8> PartyTeams;
 
 	TMap<TObjectPtr<AController>, FTimerHandle> BleedOutTimers;
+
+	UPROPERTY(Transient)
+	TMap<uint8, TObjectPtr<AOBInsertionHelicopter>> TeamInsertionHelicopters;
+
+	UPROPERTY(Transient)
+	TMap<uint8, TObjectPtr<AOBHelicopterRoute>> TeamInsertionRoutes;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AOBHelicopterRoute>> AvailableInsertionRoutes;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AController>> PendingInsertionControllers;
+
+	TMap<uint8, FOBTeamInsertionState> TeamInsertionRuntimeStates;
+	TMap<uint8, FTimerHandle> InsertionSelectionTimers;
+	FTimerHandle InsertionCompletionTimer;
+	bool bInsertionHasStarted = false;
+	bool bInsertionHasCompleted = false;
 };

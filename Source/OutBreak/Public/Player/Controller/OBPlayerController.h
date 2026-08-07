@@ -30,6 +30,15 @@ class OUTBREAK_API AOBPlayerController : public APlayerController
 	GENERATED_BODY()
 public:
 	AOBPlayerController();
+
+	/** Called by the authoritative helicopter when this controller enters or leaves transit. */
+	void SetHelicopterTransitView(AActor* NewViewTarget, bool bLocked);
+
+	UFUNCTION(BlueprintPure, Category = "Expedition|Helicopter")
+	bool IsHelicopterTransitLocked() const { return bHelicopterTransitLocked; }
+
+	UFUNCTION(BlueprintCallable, Category = "Expedition|Insertion")
+	void RequestInsertionPoint(const FVector2D& WorldXY);
 	
 	//발사 시 시야 회전 반동 + 카메라 쉐이크 적용.
 	void ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale = 1.f);
@@ -227,6 +236,18 @@ protected:
 	bool bExpeditionStatusBound = false;
 	
 public:
+	UFUNCTION(Server, Reliable)
+	void Server_RequestInsertionPoint(FVector2D WorldXY);
+
+	UFUNCTION(Client, Reliable)
+	void Client_SetHelicopterTransitView(AActor* NewViewTarget, bool bLocked);
+
+	UFUNCTION(Client, Reliable)
+	void Client_InsertionPointResult(bool bAccepted, FVector_NetQuantize ResolvedLocation, const FString& Message);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion Point Result"))
+	void BP_OnInsertionPointResult(bool bAccepted, FVector ResolvedLocation, const FString& Message);
+
 	UFUNCTION(Server, Reliable) 
 	void Server_SetWeaponSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass);
 	
@@ -350,4 +371,7 @@ public:
 		const TArray<FOBItemStack>& StackHaul,
 		const TArray<FInventoryData>& LootedInstances,
 		const TArray<FInventoryData>& ReturnedLoadoutInstances);
+
+private:
+	bool bHelicopterTransitLocked = false;
 };

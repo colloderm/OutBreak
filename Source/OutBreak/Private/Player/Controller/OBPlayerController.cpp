@@ -5,6 +5,7 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
+#include "Ability/Tags/OBGameplayTags.h"
 #include "Character/OBCharacterBase.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -35,6 +36,74 @@ AOBPlayerController::AOBPlayerController()
 	// Default quick-slot keys are 4..9. The actual key mappings remain in the
 	// Enhanced Input Mapping Context; this array exposes the six IA properties.
 	QuickSlotActions.SetNum(6);
+}
+
+void AOBPlayerController::SetHelicopterTransitView(AActor* NewViewTarget, bool bLocked)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	bHelicopterTransitLocked = bLocked;
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+	{
+		ASC->ClearAbilityInput();
+		ASC->SetLooseGameplayTagCount(OBGameplayTags::State_HelicopterTransit, bLocked ? 1 : 0);
+		if (bLocked)
+		{
+			ASC->CancelAbilities();
+		}
+	}
+	AActor* EffectiveTarget = NewViewTarget ? NewViewTarget : GetPawn();
+	if (EffectiveTarget)
+	{
+		SetViewTarget(EffectiveTarget);
+	}
+	Client_SetHelicopterTransitView(EffectiveTarget, bLocked);
+}
+
+void AOBPlayerController::Client_SetHelicopterTransitView_Implementation(AActor* NewViewTarget, bool bLocked)
+{
+	bHelicopterTransitLocked = bLocked;
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+	{
+		ASC->ClearAbilityInput();
+		ASC->SetLooseGameplayTagCount(OBGameplayTags::State_HelicopterTransit, bLocked ? 1 : 0);
+		if (bLocked)
+		{
+			ASC->CancelAbilities();
+		}
+	}
+	AActor* EffectiveTarget = NewViewTarget ? NewViewTarget : GetPawn();
+	if (EffectiveTarget)
+	{
+		SetViewTarget(EffectiveTarget);
+	}
+}
+
+void AOBPlayerController::RequestInsertionPoint(const FVector2D& WorldXY)
+{
+	if (IsLocalController())
+	{
+		Server_RequestInsertionPoint(WorldXY);
+	}
+}
+
+void AOBPlayerController::Server_RequestInsertionPoint_Implementation(FVector2D WorldXY)
+{
+	if (AOBExpeditionGameMode* ExpeditionGameMode = GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>())
+	{
+		ExpeditionGameMode->RequestInsertionPoint(this, WorldXY);
+	}
+}
+
+void AOBPlayerController::Client_InsertionPointResult_Implementation(
+	bool bAccepted,
+	FVector_NetQuantize ResolvedLocation,
+	const FString& Message)
+{
+	BP_OnInsertionPointResult(bAccepted, FVector(ResolvedLocation), Message);
 }
 
 void AOBPlayerController::BeginPlay()
@@ -165,7 +234,14 @@ void AOBPlayerController::Tick(float DeltaSeconds)
 		// 누적 입력을 능력 발동/통지로 처리.
 		if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 		{
-			ASC->ProcessAbilityInput(DeltaSeconds, false);
+			if (bHelicopterTransitLocked)
+			{
+				ASC->ClearAbilityInput();
+			}
+			else
+			{
+				ASC->ProcessAbilityInput(DeltaSeconds, false);
+			}
 		}
 	}
 }
@@ -258,6 +334,8 @@ void AOBPlayerController::SetupInputComponent()
 
 void AOBPlayerController::Input_Move(const FInputActionValue& Value)
 {
+	if (bHelicopterTransitLocked) return;
+
 	AOBCharacterBase* ControlledCharacter = Cast<AOBCharacterBase>(GetPawn());
 	if (!ControlledCharacter) return;
 
@@ -287,6 +365,8 @@ void AOBPlayerController::Input_Look(const FInputActionValue& Value)
 
 void AOBPlayerController::Input_JumpStarted()
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		ControlledCharacter->Jump();
@@ -295,6 +375,8 @@ void AOBPlayerController::Input_JumpStarted()
 
 void AOBPlayerController::Input_JumpCompleted()
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		ControlledCharacter->StopJumping();
@@ -303,6 +385,8 @@ void AOBPlayerController::Input_JumpCompleted()
 
 void AOBPlayerController::Input_InventoryKey()
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (!bInventoryToggle)
 	{
 		InventoryStarted();
@@ -369,6 +453,8 @@ void AOBPlayerController::InventoryCompleted()
 
 void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 	{
 		ASC->AbilityInputTagPressed(InputTag);
@@ -377,6 +463,8 @@ void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 
 void AOBPlayerController::Input_AbilityInputReleased(FGameplayTag InputTag)
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 	{
 		ASC->AbilityInputTagReleased(InputTag);
@@ -390,6 +478,8 @@ UOBAbilitySystemComponent* AOBPlayerController::GetOBAbilitySystemComponent() co
 
 void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (APawn* P = GetPawn())
 	{
 		if (UPlayerInventoryComponent* Inv =
@@ -402,6 +492,8 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 
 void AOBPlayerController::Input_UseQuickSlot(const int32 QuickSlotIndex)
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (APawn* ControlledPawn = GetPawn())
 	{
 		if (UPlayerInventoryComponent* Inventory =
@@ -426,6 +518,8 @@ void AOBPlayerController::AcknowledgePossession(APawn* P)
 
 void AOBPlayerController::Input_Interact()
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (AOBInteractableActor* Target = CurrentInteractable.Get())
 		Target->Interact(this);
 }
