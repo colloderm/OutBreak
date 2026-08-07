@@ -840,18 +840,11 @@ void AOBExpeditionGameMode::CollectPublicExtractsForMap()
 
 	GS->SetPublicExtractLocations(Locations);
 
-	UE_LOG(LogTemp, Log, TEXT("[Map] 공용 탈출구 %d개 수집."), Locations.Num());
-	for (const FVector_NetQuantize& L : Locations)
-	{
-		UE_LOG(LogTemp, Log, TEXT("[Map] 공용 탈출구 World(%.0f, %.0f)"), L.X, L.Y);
-	}
-
 	// 0개면 레벨 배치 존이 스트리밍으로 안 잡힌 것이다.
 	if (Locations.Num() == 0)
 	{
 		UE_LOG(LogTemp, Warning,
-			TEXT("[Map] 공용 탈출구가 0개다. 레벨 배치 AOBExtractionZone의 "
-				 "WorldPartition > Is Spatially Loaded 체크를 해제할 것."));
+			TEXT("[Map] 공용 탈출구가 0개다. 레벨 배치 AOBExtractionZone의 WorldPartition > Is Spatially Loaded 체크를 해제할 것."));
 	}
 }
 
@@ -879,7 +872,7 @@ void AOBExpeditionGameMode::PushPersonalExtractsToTeam(uint8 TeamId)
 		}
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("[Map] Team %d 개인 탈출구 %d개 배포."), TeamId, Locations.Num());
+	// UE_LOG(LogTemp, Log, TEXT("[Map] Team %d 개인 탈출구 %d개 배포."), TeamId, Locations.Num());
 }
 
 void AOBExpeditionGameMode::UpdateTeammateMapLocations()

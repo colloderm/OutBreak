@@ -256,6 +256,14 @@ void AOBPlayerController::SetupInputComponent()
 	}
 }
 
+bool AOBPlayerController::IsInventoryInputBlocked() const
+{
+	AOBCharacterBase* CharacterBase = Cast<AOBCharacterBase>(GetPawn());
+	UPlayerInventoryComponent* Inventory = CharacterBase ? CharacterBase->GetPlayerInventoryComponent() : nullptr;
+	
+	return Inventory && Inventory->IsInventoryOpen();
+}
+
 void AOBPlayerController::Input_Move(const FInputActionValue& Value)
 {
 	AOBCharacterBase* ControlledCharacter = Cast<AOBCharacterBase>(GetPawn());
@@ -273,6 +281,8 @@ void AOBPlayerController::Input_Move(const FInputActionValue& Value)
 
 void AOBPlayerController::Input_Look(const FInputActionValue& Value)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn)
 	{
@@ -287,6 +297,8 @@ void AOBPlayerController::Input_Look(const FInputActionValue& Value)
 
 void AOBPlayerController::Input_JumpStarted()
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		ControlledCharacter->Jump();
@@ -295,6 +307,8 @@ void AOBPlayerController::Input_JumpStarted()
 
 void AOBPlayerController::Input_JumpCompleted()
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		ControlledCharacter->StopJumping();
@@ -327,12 +341,7 @@ void AOBPlayerController::InventoryStarted()
 		CharacterBase->GetPlayerInventoryComponent();
 	if (!IsValid(Inventory))
 	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("%s::%s: PlayerInventoryComponent is invalid."),
-			*GetClass()->GetName(),
-			TEXT(__FUNCTION__));
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: PlayerInventoryComponent is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
 
@@ -345,10 +354,15 @@ void AOBPlayerController::InventoryStarted()
 	FInputModeGameAndUI InputMode;
 	InputMode.SetWidgetToFocus(InventoryWindow->TakeWidget());
 	InputMode.SetHideCursorDuringCapture(false);
-	InputMode.SetLockMouseToViewportBehavior(
-		EMouseLockMode::DoNotLock);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(InputMode);
 	SetShowMouseCursor(true);
+	
+	// 발사/ADS를 누른 채로 인벤토리를 열면 뗀 입력이 안 들어와 눌린 상태로 굳는다.
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+	{
+		ASC->ClearAbilityInput();
+	}	
 }
 
 void AOBPlayerController::InventoryCompleted()
@@ -369,6 +383,8 @@ void AOBPlayerController::InventoryCompleted()
 
 void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 	{
 		ASC->AbilityInputTagPressed(InputTag);
@@ -377,6 +393,8 @@ void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 
 void AOBPlayerController::Input_AbilityInputReleased(FGameplayTag InputTag)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 	{
 		ASC->AbilityInputTagReleased(InputTag);
@@ -390,6 +408,8 @@ UOBAbilitySystemComponent* AOBPlayerController::GetOBAbilitySystemComponent() co
 
 void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (APawn* P = GetPawn())
 	{
 		if (UPlayerInventoryComponent* Inv =
@@ -402,6 +422,8 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 
 void AOBPlayerController::Input_UseQuickSlot(const int32 QuickSlotIndex)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (APawn* ControlledPawn = GetPawn())
 	{
 		if (UPlayerInventoryComponent* Inventory =
@@ -426,6 +448,8 @@ void AOBPlayerController::AcknowledgePossession(APawn* P)
 
 void AOBPlayerController::Input_Interact()
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (AOBInteractableActor* Target = CurrentInteractable.Get())
 		Target->Interact(this);
 }
