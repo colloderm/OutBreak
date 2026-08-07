@@ -19,6 +19,8 @@ void AOBExpeditionGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(AOBExpeditionGameState, SessionLength);
 	DOREPLIFETIME(AOBExpeditionGameState, bFinalMinute);
 	DOREPLIFETIME(AOBExpeditionGameState, LootSeed);
+	DOREPLIFETIME(AOBExpeditionGameState, PublicExtractLocations);
+	DOREPLIFETIME(AOBExpeditionGameState, MapData);
 }
 
 //~ 서버 세터 ---------------------------------------------------------------
@@ -98,3 +100,16 @@ void AOBExpeditionGameState::OnRep_TimeRemaining()
 	OnTimeRemainingChanged.Broadcast(TimeRemaining);
 }
 
+void AOBExpeditionGameState::SetPublicExtractLocations(const TArray<FVector_NetQuantize>& InLocations)
+{
+	if (!HasAuthority()) return;
+	
+	PublicExtractLocations = InLocations;
+}
+
+void AOBExpeditionGameState::SetMapData(UOBExpeditionMapData* InMapData)
+{
+	if (!HasAuthority()) return;
+	
+	MapData = InMapData;
+}

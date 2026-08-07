@@ -6,6 +6,7 @@
 #include "Blueprint/UserWidget.h"
 #include "OBConsumableWidget.generated.h"
 
+class UImage;
 class UPlayerInventoryComponent;
 class UTextBlock;
 
@@ -18,11 +19,22 @@ public:
 	void SetInventory(UPlayerInventoryComponent* InInventory);
 	
 protected:
+	virtual void NativeConstruct() override;
+
+	// 아이콘은 세션 중 바뀌지 않는다. 생성 시 한 번만 채운다.
+	void ApplyIcons();
+	
 	virtual void NativeDestruct() override;
 	void Refresh();
 	
 	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> BandageIcon;
+	
+	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> BandageCountText;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UImage> GrenadeIcon;
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> GrenadeCountText;

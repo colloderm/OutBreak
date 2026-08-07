@@ -44,8 +44,12 @@ void AOBPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AOBPlayerStateBase, SelectedCarryItems);
 	DOREPLIFETIME(AOBPlayerStateBase, SelectedCarryItemInstances);
 	DOREPLIFETIME(AOBPlayerStateBase, PlayerArchetypeId);
-	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, ExtractionProgress, COND_OwnerOnly);
-	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, bIsExtracting,      COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, ExtractionProgress,			COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, bIsExtracting,				COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, PersonalExtractLocations,	COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, TeammateMapLocations,		COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, ExtractionProgress,			COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, bIsExtracting,				COND_OwnerOnly);
 }
 
 void AOBPlayerStateBase::BeginPlay()
@@ -324,4 +328,17 @@ void AOBPlayerStateBase::CopyProperties(APlayerState* NewPlayerState)
 		PS->SelectedCarryItemInstances = SelectedCarryItemInstances;
 		PS->bReady = bReady;
 	}
+}
+
+void AOBPlayerStateBase::SetPersonalExtractLocations(const TArray<FVector_NetQuantize>& InLocations)
+{
+	if (!HasAuthority()) return;
+	
+	PersonalExtractLocations = InLocations;
+}
+
+void AOBPlayerStateBase::SetTeammateMapLocations(const TArray<FVector_NetQuantize>& InLocations)
+{
+	if (!HasAuthority()) return;
+	TeammateMapLocations = InLocations;
 }

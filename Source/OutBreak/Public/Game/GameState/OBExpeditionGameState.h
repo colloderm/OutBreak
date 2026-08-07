@@ -7,6 +7,7 @@
 #include "Game/Expedition/OBExpeditionTypes.h"
 #include "OBExpeditionGameState.generated.h"
 
+class UOBExpeditionMapData;
 class AOBPlayerStateBase;
 // HUD/위젯이 "페이즈가 바뀌었다"를 이벤트로 구독하기 위한 것.
 // - 왜 델리게이트인가: 위젯이 매 프레임 Tick으로 폴링하지 않고, 값이 바뀔 때만 콜백받게 하려고.
@@ -73,6 +74,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	int32 GetLootSeed() const { return LootSeed; }
 	
+	// [지도] 공용 탈출구 위치. 전원 공유.
+	const TArray<FVector_NetQuantize>& GetPublicExtractLocations() const { return PublicExtractLocations; }
+	void SetPublicExtractLocations(const TArray<FVector_NetQuantize>& InLocations);
+	
+	// [지도] 클라가 지도 텍스처/월드 범위를 알아야 한다. 서버 GameMode의 ActiveMapData를 그대로 싣는다.
+	const UOBExpeditionMapData* GetMapData() const { return MapData; }
+	void SetMapData(UOBExpeditionMapData* InMapData);
+	
 public:
 	//~ HUD 구독용 델리게이트 인스턴스 ----------------------------------------
 
@@ -112,4 +121,11 @@ protected:
 	// [복제] 세션 루팅 시드. 시작 시 1회 세팅되므로 OnRep 불필요.
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
 	int32 LootSeed = 0;
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	TArray<FVector_NetQuantize> PublicExtractLocations;
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	TObjectPtr<UOBExpeditionMapData> MapData;
+	
 };

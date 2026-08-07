@@ -73,6 +73,14 @@ public:
 	// - AI/적(플레이어 아님)은 항상 false → 정상 피해.
 	static bool AreSameTeam(const AActor* A, const AActor* B);
 	
+	// [지도] 우리 팀에 배정된 개인 탈출구 위치.
+	const TArray<FVector_NetQuantize>& GetPersonalExtractLocations() const { return PersonalExtractLocations; }
+	void SetPersonalExtractLocations(const TArray<FVector_NetQuantize>& InLocations);
+	
+	// [지도] 우리 팀원 위치(나 제외). 소유자 전용이라 적에게 새지 않는다.
+	const TArray<FVector_NetQuantize>& GetTeammateMapLocations() const { return TeammateMapLocations; }
+	void SetTeammateMapLocations(const TArray<FVector_NetQuantize>& InLocations);
+	
 public:
 	// 로비 UI 갱신.
 	DECLARE_MULTICAST_DELEGATE(FOBOnLobbyStateChanged);
@@ -147,6 +155,13 @@ protected:
 	// 솔로=true(자기 자신이 리더). 파티 시 팀장만 true → "탐사 시작" 버튼 게이팅.
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Party")
 	bool bIsPartyLeader = true;
+	
+	// 다른 팀에 새면 개인 탈출구의 의미가 없어진다. 소유자 전용 복제.
+	UPROPERTY(Replicated)
+	TArray<FVector_NetQuantize> PersonalExtractLocations;
+	
+	UPROPERTY(Replicated)
+	TArray<FVector_NetQuantize> TeammateMapLocations;
 	
 private:
 	bool bPlayerStatsInitialized = false;

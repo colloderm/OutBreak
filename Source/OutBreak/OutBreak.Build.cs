@@ -28,7 +28,6 @@ public class OutBreak : ModuleRules
 			"PhysicsCore",
 			"AnimationBudgetAllocator",
 			"Navmesh",
-			"AIModule",
 			"StateTreeModule",
 			"GameplayStateTreeModule"
 		});

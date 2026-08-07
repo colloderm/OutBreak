@@ -11,6 +11,7 @@
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "UI/HUD/OBConsumableWidget.h"
+#include "UI/Widgets/Expedition/OBWorldMapWidget.h"
 #include "View/MVVMView.h"
 
 void AOBHUD::BeginPlay()
@@ -41,6 +42,13 @@ void AOBHUD::BeginPlay()
 	{
 		CrosshairWidget = CreateWidget<UUserWidget>(PC, CrosshairWidgetClass);
 		if (CrosshairWidget) CrosshairWidget->AddToViewport();
+	}
+	
+	// 전체 지도. 상시 생성해 두고 숨긴다(M키가 토글).
+	if (WorldMapWidgetClass)
+	{
+		WorldMapWidget = CreateWidget<UOBWorldMapWidget>(PC, WorldMapWidgetClass);
+		if (WorldMapWidget) WorldMapWidget->AddToViewport(50);
 	}
 }
 
@@ -152,4 +160,12 @@ void AOBHUD::BindConsumablesToCharacter(AOBCharacterBase* Character)
 	
 	if (ConsumableWidget)
 		ConsumableWidget->SetInventory(Inventory); // 리스폰 시 재 바인딩
+}
+
+void AOBHUD::ToggleWorldMap()
+{
+	if (WorldMapWidget)
+	{
+		WorldMapWidget->SetMapOpen(!WorldMapWidget->IsMapOpen());
+	}
 }

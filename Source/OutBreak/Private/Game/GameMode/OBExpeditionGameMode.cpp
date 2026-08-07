@@ -59,6 +59,21 @@ void AOBExpeditionGameMode::StartPlay()
 {
 	Super::StartPlay();
 	
+	// 레벨 배치 공용 탈출구 수집. MapData가 필요 없으니 먼저 해도 된다.
+	CollectPublicExtractsForMap();
+
+	ActiveMapData = ResolveMapData();
+
+	// [순서 주의] 반드시 ResolveMapData 뒤여야 한다. 앞이면 null이 실린다.
+	if (AOBExpeditionGameState* GS = GetGameState<AOBExpeditionGameState>())
+	{
+		GS->SetMapData(ActiveMapData);
+	}
+
+	// 지도용 팀원 위치 갱신. 초당 1회면 도보 속도에 충분하다.
+	GetWorldTimerManager().SetTimer(
+		TeammateMapTimer, this, &AOBExpeditionGameMode::UpdateTeammateMapLocations, 1.f, true);
+	
 	ActiveMapData = ResolveMapData();
 	
 	// [데디 정원 강제] GameSession은 InitGame 단계에서 이미 생성됨.
@@ -678,8 +693,12 @@ void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVec
 		return;
 	}
 	
-	// 팀 단위 1회. 뒤늦게 들어온 팀원은 이미 배정된 탈출구를 그대로 공유한다.
-	if (PersonalZones.Contains(TeamId)) return;
+	// 팀 단위 1회 배정. 뒤늦게 합류한 팀원에게는 좌표만 다시 실어 준다.
+	if (PersonalZones.Contains(TeamId))
+	{
+		PushPersonalExtractsToTeam(TeamId);
+		return;
+	}
 	
 	if (!bPersonalPointsCollected)
 	{
@@ -736,6 +755,8 @@ void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVec
 		}
 #endif
 	}
+	
+	PushPersonalExtractsToTeam(TeamId);
 	
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] Team %d 개인탈출 %d개 배정(팀 공유)"), TeamId, Zones.Num());
 }
@@ -801,4 +822,93 @@ void AOBExpeditionGameMode::NotifyPlayerExtracted(AController* Controller)
 
 	// 남은 인원 재평가 → 전원 Extracted/Dead면 세션 종료.
 	CheckEndConditions();
+}
+
+void AOBExpeditionGameMode::CollectPublicExtractsForMap()
+{
+	AOBExpeditionGameState* GS = GetGameState<AOBExpeditionGameState>();
+	if (!GS) return;
+
+	TArray<FVector_NetQuantize> Locations;
+	for (TActorIterator<AOBExtractionZone> It(GetWorld()); It; ++It)
+	{
+		if (AOBExtractionZone* Zone = *It)
+		{
+			Locations.Add(FVector_NetQuantize(Zone->GetActorLocation()));
+		}
+	}
+
+	GS->SetPublicExtractLocations(Locations);
+
+	UE_LOG(LogTemp, Log, TEXT("[Map] 공용 탈출구 %d개 수집."), Locations.Num());
+	for (const FVector_NetQuantize& L : Locations)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[Map] 공용 탈출구 World(%.0f, %.0f)"), L.X, L.Y);
+	}
+
+	// 0개면 레벨 배치 존이 스트리밍으로 안 잡힌 것이다.
+	if (Locations.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Map] 공용 탈출구가 0개다. 레벨 배치 AOBExtractionZone의 "
+				 "WorldPartition > Is Spatially Loaded 체크를 해제할 것."));
+	}
+}
+
+void AOBExpeditionGameMode::PushPersonalExtractsToTeam(uint8 TeamId)
+{
+	const FOBPersonalZoneList* Found = PersonalZones.Find(TeamId);
+	if (!Found) return;
+
+	TArray<FVector_NetQuantize> Locations;
+	for (const TObjectPtr<AOBExtractionZone>& Zone : Found->Zones)
+	{
+		if (Zone)
+		{
+			Locations.Add(FVector_NetQuantize(Zone->GetActorLocation()));
+		}
+	}
+
+	// 같은 팀 전원의 PlayerState에 싣는다. 각자 소유자 전용으로만 복제된다.
+	for (APlayerState* PS : GameState->PlayerArray)
+	{
+		AOBPlayerStateBase* OBPS = Cast<AOBPlayerStateBase>(PS);
+		if (OBPS && OBPS->GetTeamId() == TeamId)
+		{
+			OBPS->SetPersonalExtractLocations(Locations);
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[Map] Team %d 개인 탈출구 %d개 배포."), TeamId, Locations.Num());
+}
+
+void AOBExpeditionGameMode::UpdateTeammateMapLocations()
+{
+	if (!GameState) return;
+
+	for (APlayerState* PS : GameState->PlayerArray)
+	{
+		AOBPlayerStateBase* Me = Cast<AOBPlayerStateBase>(PS);
+		if (!Me) continue;
+
+		TArray<FVector_NetQuantize> Locations;
+		for (APlayerState* Other : GameState->PlayerArray)
+		{
+			const AOBPlayerStateBase* OtherPS = Cast<AOBPlayerStateBase>(Other);
+			if (!OtherPS || OtherPS == Me) continue;
+			
+			// TeamId 0 = 미배정. 여기 걸러내지 않으면 미배정끼리 한 팀으로 보인다.
+			if (OtherPS->GetTeamId() == 0 || OtherPS->GetTeamId() != Me->GetTeamId()) continue;
+			
+			// 죽거나 탈출한 팀원은 지도에서 뺀다.
+			if (OtherPS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive) continue;
+
+			if (const APawn* Pawn = OtherPS->GetPawn())
+			{
+				Locations.Add(FVector_NetQuantize(Pawn->GetActorLocation()));
+			}
+		}
+
+		Me->SetTeammateMapLocations(Locations);
+	}
 }
