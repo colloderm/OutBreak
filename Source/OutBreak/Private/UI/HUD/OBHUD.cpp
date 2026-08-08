@@ -131,6 +131,9 @@ void AOBHUD::BindAmmoToCharacter(AOBCharacterBase* Character)
 	if (AmmoViewModel)
 	{
 		AmmoViewModel->SetInventory(Inventory);
+		//Equipment->OnWeaponChanged.AddUObject(this, &AOBHUD::HandleWeaponChanged);
+		// 폰 변경마다 재호출되므로 중복 구독을 막는다.
+		Equipment->OnWeaponChanged.RemoveAll(this);
 		Equipment->OnWeaponChanged.AddUObject(this, &AOBHUD::HandleWeaponChanged);
 		AmmoViewModel->SetWeapon(Equipment->GetCurrentWeapon());
 	}

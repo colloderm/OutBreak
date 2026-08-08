@@ -23,8 +23,12 @@ void UOBWorldMapWidget::NativeConstruct()
 
 void UOBWorldMapWidget::NativeDestruct()
 {
-	GetWorld()->GetTimerManager().ClearTimer(RefreshTimer);
-	
+	//GetWorld()->GetTimerManager().ClearTimer(RefreshTimer);
+	// 레벨 전환/PIE 종료 중에는 GetWorld()가 null이 될 수 있다.
+	if (UWorld* W = GetWorld())
+	{
+		W->GetTimerManager().ClearTimer(RefreshTimer);
+	}
 	Super::NativeDestruct();
 }
 

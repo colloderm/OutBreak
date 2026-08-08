@@ -201,6 +201,13 @@ void UOBEquipmentComponent::AttachWeaponToOwner()
 
 	const FAttachmentTransformRules AttachRules(EAttachmentRule::SnapToTarget, true);
 	CurrentWeapon->AttachToComponent(TargetMesh, AttachRules, SocketToUse);
+	
+	// SnapToTarget 직후 상대 트랜스폼은 Identity다. 즉 Identity를 넣으면 기존과 동일 →
+	// 오프셋을 지정하지 않은 무기는 영향 없다.
+	if (Definition)
+	{
+		CurrentWeapon->SetActorRelativeTransform(Definition->Visual.AttachOffset);
+	}
 }
 
 void UOBEquipmentComponent::ApplyCosmeticEquip()

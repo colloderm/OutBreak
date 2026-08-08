@@ -74,6 +74,25 @@ namespace OBGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_Pistol,			"Item.Weapon.Pistol");
 	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_FireAxe,			"Item.Weapon.FireAxe");
 	
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_M4,				"Item.Weapon.M4");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_AK110,			"Item.Weapon.AK110");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_ACWI,			"Item.Weapon.ACWI");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_N90,				"Item.Weapon.N90");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_GTM,				"Item.Weapon.GTM");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_PP9,				"Item.Weapon.PP9");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_V014,			"Item.Weapon.V014");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_M890,			"Item.Weapon.M890");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_Remore046,		"Item.Weapon.Remore046");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_CM2000,			"Item.Weapon.CM2000");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_SCB750,			"Item.Weapon.SCB750");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_DE42,			"Item.Weapon.DE42");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_NFP16,			"Item.Weapon.NFP16");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_Judge45,			"Item.Weapon.Judge45");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_PR9,				"Item.Weapon.PR9");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_Knife1,			"Item.Weapon.Knife1");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_Knife2,			"Item.Weapon.Knife2");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Weapon_Knife3,			"Item.Weapon.Knife3");
+	
 	UE_DEFINE_GAMEPLAY_TAG(Item_Valuable_Watch,			"Item.Valuable.Watch");
 	UE_DEFINE_GAMEPLAY_TAG(Item_Valuable_Gold,			"Item.Valuable.Gold");
 	
@@ -86,7 +105,25 @@ namespace OBGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(AttachmentSlot_Stock,           "AttachmentSlot.Stock");
 	UE_DEFINE_GAMEPLAY_TAG(AttachmentSlot_Grip,            "AttachmentSlot.Grip");
 	UE_DEFINE_GAMEPLAY_TAG(AttachmentSlot_Melee_Mod,       "AttachmentSlot.Melee.Mod");
+	UE_DEFINE_GAMEPLAY_TAG(AttachmentSlot_ForeEnd,         "AttachmentSlot.ForeEnd");
 	
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_Silencer,          "Item.Attachment.Silencer");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_MuzzleBrake,       "Item.Attachment.MuzzleBrake");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_FlashHider,        "Item.Attachment.FlashHider");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_SquaredSuppressor, "Item.Attachment.SquaredSuppressor");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_GripVerticalA,     "Item.Attachment.GripVerticalA");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_GripVerticalB,     "Item.Attachment.GripVerticalB");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_GripVerticalC,     "Item.Attachment.GripVerticalC");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_GripAngled,        "Item.Attachment.GripAngled");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_Bipod,             "Item.Attachment.Bipod");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_LaserSight,        "Item.Attachment.LaserSight");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_Bayonet,           "Item.Attachment.Bayonet");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_RedDot,            "Item.Attachment.RedDot");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_Holographic,       "Item.Attachment.Holographic");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_Reflex,            "Item.Attachment.Reflex");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_ACOG,              "Item.Attachment.ACOG");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_ScopeB10,          "Item.Attachment.ScopeB10");
+	UE_DEFINE_GAMEPLAY_TAG(Item_Attachment_ScopeSVS16,        "Item.Attachment.ScopeSVS16");
 	
 	UE_DEFINE_GAMEPLAY_TAG(TAG_StateTree_Event_TargetSighted, "StateTree.Vent.TargetSighted");
 	UE_DEFINE_GAMEPLAY_TAG(TAG_StateTree_Event_MemoryUpdated, "StateTree.Event.MemoryUpdated");

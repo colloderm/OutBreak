@@ -86,6 +86,20 @@ struct OUTBREAK_API FOBWeaponCommonSpec
 	TSoftObjectPtr<UOBAbilitySet> AbilitySet;
 };
 
+// 무기 메시에 포함돼 있지 않지만 항상 붙어 있는 파츠(아이언사이트, 탄창).
+// 교체 대상이 아니므로 부착물 슬롯으로 만들지 않는다.
+USTRUCT(BlueprintType)
+struct OUTBREAK_API FOBWeaponFixedPart
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	FName Socket = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	TSoftObjectPtr<UStaticMesh> Mesh;
+};
+
 USTRUCT(BlueprintType)
 struct OUTBREAK_API FOBWeaponVisualSpec
 {
@@ -96,6 +110,14 @@ struct OUTBREAK_API FOBWeaponVisualSpec
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
 	FName AttachSocket = TEXT("hand_r_Socket");
+	
+	// 손 소켓에 붙인 뒤 적용할 무기별 보정. hand_r_Socket은 전 무기 공용이라
+	// 소켓을 옮기면 다른 무기가 전부 어긋난다. 무기마다 원점 위치가 다른 걸 여기서 흡수한다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	FTransform AttachOffset = FTransform::Identity;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Visual")
+	TArray<FOBWeaponFixedPart> FixedParts;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animation")
 	TSoftObjectPtr<UBlendSpace> OverlayLocomotion;

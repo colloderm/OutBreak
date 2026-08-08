@@ -89,26 +89,17 @@ void AOBWeaponBase::InitializeFromItemInstance(const FInventoryData& ItemInstanc
 	}
 
 	ItemTag = ItemInstance.ItemTag;
-	ItemInstanceId = ItemInstance.InstanceId.IsValid()
-		? ItemInstance.InstanceId
-		: FGuid::NewGuid();
+	ItemInstanceId = ItemInstance.InstanceId.IsValid() ? ItemInstance.InstanceId : FGuid::NewGuid();
 	ResolvedStats = NewStats;
 	InstalledAttachments = ItemInstance.Attachments;
-	if (const FOBWeaponDefinitionRow* Definition = GetWeaponDefinition())
-	{
-		if (USkeletalMesh* Mesh = Definition->Visual.WeaponMesh.LoadSynchronous())
-		{
-			WeaponMesh->SetSkeletalMeshAsset(Mesh);
-		}
-		MuzzleSocketName = Definition->Ranged.MuzzleSocket;
-	}
+	
 	CurrentAmmo = ResolvedStats.WeaponType == EOBWeaponType::Ranged
 		? FMath::Clamp(
 			ItemInstance.MagazineAmmo >= 0 ? ItemInstance.MagazineAmmo : ResolvedStats.MagazineSize,
 			0,
 			ResolvedStats.MagazineSize)
 		: 0;
-	RebuildAttachmentVisuals();
+	ApplyWeaponVisuals();
 	OnAmmoChanged.Broadcast();
 }
 
@@ -188,8 +179,24 @@ void AOBWeaponBase::OnRep_Ammo()
 
 void AOBWeaponBase::OnRep_WeaponInstance()
 {
-	RebuildAttachmentVisuals();
+	ApplyWeaponVisuals();
 	OnAmmoChanged.Broadcast();
+}
+
+void AOBWeaponBase::ApplyWeaponVisuals()
+{
+	if (const FOBWeaponDefinitionRow* Definition = GetWeaponDefinition())
+	{
+		if (WeaponMesh)
+		{
+			if (USkeletalMesh* Mesh = Definition->Visual.WeaponMesh.LoadSynchronous())
+			{
+				WeaponMesh->SetSkeletalMeshAsset(Mesh);
+			}
+		}
+		MuzzleSocketName = Definition->Ranged.MuzzleSocket;
+	}
+	RebuildAttachmentVisuals();
 }
 
 void AOBWeaponBase::RebuildAttachmentVisuals()
@@ -203,21 +210,26 @@ void AOBWeaponBase::RebuildAttachmentVisuals()
 	}
 	AttachmentMeshComponents.Reset();
 
-	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
 	const FOBWeaponDefinitionRow* WeaponDefinition = GetWeaponDefinition();
-	if (!GameData || !WeaponDefinition || !WeaponMesh)
+	if (!WeaponDefinition || !WeaponMesh) return;
+
+	// 고정 파츠 먼저. 부착물과 같은 배열로 관리해야 무기 교체 시 한 번에 정리된다.
+	for (const FOBWeaponFixedPart& FixedPart : WeaponDefinition->Visual.FixedParts)
 	{
-		return;
+		SpawnAttachmentMesh(FixedPart.Mesh.LoadSynchronous(), FixedPart.Socket);
 	}
+
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	if (!GameData) return;
 
 	for (const FOBInstalledAttachment& Installed : InstalledAttachments)
 	{
 		const FOBAttachmentDefinitionRow* Attachment = GameData->FindAttachment(Installed.ItemTag);
 		UStaticMesh* Mesh = Attachment ? Attachment->Mesh.LoadSynchronous() : nullptr;
-		if (!Attachment || !Mesh)
-		{
-			continue;
-		}
+		if (!Attachment || !Mesh) continue;
+
+		// 부착물 행의 소켓이 슬롯 소켓보다 우선한다.
+		// Squared Suppressor처럼 같은 슬롯이라도 다른 소켓을 쓰는 파츠가 있다.
 		FName Socket = Attachment->AttachSocket;
 		if (Socket.IsNone())
 		{
@@ -231,25 +243,28 @@ void AOBWeaponBase::RebuildAttachmentVisuals()
 			}
 		}
 
-		UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(this);
-		Component->SetStaticMesh(Mesh);
-		Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		Component->SetIsReplicated(false);
-		Component->RegisterComponent();
-		Component->AttachToComponent(
-			WeaponMesh,
-			FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-			Socket);
-		AttachmentMeshComponents.Add(Component);
+		SpawnAttachmentMesh(Mesh, Socket);
 	}
+}
+
+void AOBWeaponBase::SpawnAttachmentMesh(UStaticMesh* Mesh, FName Socket)
+{
+	if (!Mesh || !WeaponMesh) return;
+
+	UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(this);
+	Component->SetStaticMesh(Mesh);
+	Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Component->SetIsReplicated(false);
+	Component->RegisterComponent();
+	Component->AttachToComponent(WeaponMesh, FAttachmentTransformRules::SnapToTargetIncludingScale, Socket);
+	AttachmentMeshComponents.Add(Component);
 }
 
 void AOBWeaponBase::SetCurrentAmmo(int32 NewAmmo)
 {
 	if (!HasAuthority()) return;
-	const int32 MagazineSize = ItemTag.IsValid()
-		? ResolvedStats.MagazineSize
-		: (WeaponData ? WeaponData->MagazineSize : 0);
+	const int32 MagazineSize = ItemTag.IsValid() ? ResolvedStats.MagazineSize : (WeaponData ? WeaponData->MagazineSize : 0);
 	CurrentAmmo = FMath::Clamp(NewAmmo, 0, MagazineSize);
+	
 	OnAmmoChanged.Broadcast();
 }
