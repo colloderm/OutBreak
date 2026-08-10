@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerState.h"
 #include "AbilitySystemInterface.h"
 #include "Game/Expedition/OBExpeditionTypes.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/Data/OBItemTypes.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "OBPlayerStateBase.generated.h"
@@ -25,16 +26,25 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual void CopyProperties(APlayerState* NewPlayerState) override;
+	virtual void BeginPlay() override;
 	
 	UOBAttributeSetBase* GetAttributeSet() const { return AttributeSet; }
 	UOBAbilitySystemComponent* GetOBAbilitySystemComponent() const { return AbilitySystemComponent; }
+
+	UFUNCTION(BlueprintCallable, Category = "Player|Stats")
+	void InitializePlayerStatsFromData();
+
+	UFUNCTION(BlueprintPure, Category = "Player|Stats")
+	FName GetPlayerArchetypeId() const { return PlayerArchetypeId; }
 	
 	// 로비 선택(서버).
 	void SetWeaponForSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass);
 	void SetReady(bool bInReady);
 
 	const TArray<TSubclassOf<AOBWeaponBase>>& GetSelectedWeapons() const { return SelectedWeapons; }
+	const TArray<FInventoryData>& GetSelectedWeaponInstances() const { return SelectedWeaponInstances; }
 	const TArray<FOBItemStack>& GetSelectedCarryItems() const { return SelectedCarryItems; }
+	const TArray<FInventoryData>& GetSelectedCarryItemInstances() const { return SelectedCarryItemInstances; }
 	bool IsReady() const { return bReady; }
 	
 	EOBPlayerExpeditionStatus GetExpeditionStatus() const { return ExpeditionStatus; }
@@ -51,12 +61,25 @@ public:
 	
 	// 클라가 GameInstance Loadout을 한 번에 밀어넣을 때 사용(세션 진입 시).
 	void SetSelectedWeaponsBulk(const TArray<TSubclassOf<AOBWeaponBase>>& InWeapons);
+	void SetSelectedWeaponInstancesBulk(const TArray<FInventoryData>& InWeapons);
 	
 	void SetCarryItemsBulk(const TArray<FOBItemStack>& InItems);
+	void SetCarryItemInstancesBulk(const TArray<FInventoryData>& InItems);
+	void SetCarryLoadoutBulk(
+		const TArray<FOBItemStack>& InStackItems,
+		const TArray<FInventoryData>& InItemInstances);
 	
 	// 프렌들리 파이어 판정: 두 액터가 모두 플레이어이고 같은 팀(TeamId>0)이면 true.
 	// - AI/적(플레이어 아님)은 항상 false → 정상 피해.
 	static bool AreSameTeam(const AActor* A, const AActor* B);
+	
+	// [지도] 우리 팀에 배정된 개인 탈출구 위치.
+	const TArray<FVector_NetQuantize>& GetPersonalExtractLocations() const { return PersonalExtractLocations; }
+	void SetPersonalExtractLocations(const TArray<FVector_NetQuantize>& InLocations);
+	
+	// [지도] 우리 팀원 위치(나 제외). 소유자 전용이라 적에게 새지 않는다.
+	const TArray<FVector_NetQuantize>& GetTeammateMapLocations() const { return TeammateMapLocations; }
+	void SetTeammateMapLocations(const TArray<FVector_NetQuantize>& InLocations);
 	
 public:
 	// 로비 UI 갱신.
@@ -91,12 +114,21 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UOBAttributeSetBase> AttributeSet;
 
+	UPROPERTY(EditDefaultsOnly, Replicated, BlueprintReadOnly, Category = "Player|Stats")
+	FName PlayerArchetypeId = NAME_None;
+
 	UPROPERTY(ReplicatedUsing = OnRep_SelectedWeapons, BlueprintReadOnly, Category = "Lobby")
 	TArray<TSubclassOf<AOBWeaponBase>> SelectedWeapons;
+
+	UPROPERTY(ReplicatedUsing = OnRep_SelectedWeapons, BlueprintReadOnly, Category = "Lobby")
+	TArray<FInventoryData> SelectedWeaponInstances;
 	
 	// 반입 아이템. 클라가 push하고 서버가 스폰 시 가방에 채운다.
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Lobby")
 	TArray<FOBItemStack> SelectedCarryItems;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Lobby")
+	TArray<FInventoryData> SelectedCarryItemInstances;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Ready, BlueprintReadOnly, Category = "Lobby")
 	bool bReady = false;
@@ -124,7 +156,16 @@ protected:
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Party")
 	bool bIsPartyLeader = true;
 	
+	// 다른 팀에 새면 개인 탈출구의 의미가 없어진다. 소유자 전용 복제.
+	UPROPERTY(Replicated)
+	TArray<FVector_NetQuantize> PersonalExtractLocations;
+	
+	UPROPERTY(Replicated)
+	TArray<FVector_NetQuantize> TeammateMapLocations;
+	
 private:
+	bool bPlayerStatsInitialized = false;
+
 	// 로드아웃/통화(클라 소유 GameInstance) 반영. OnRep + 서버 세터 양쪽에서 호출.
 	void ApplyExpeditionStatusToLoadout();
 };

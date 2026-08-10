@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Game/Expedition/OBExpeditionTypes.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/Data/OBItemTypes.h"
 #include "OBPlayerController.generated.h"
 
@@ -14,7 +15,9 @@ class UWorld;
 class AOBInteractableActor;
 class UUserWidget;
 class AOBWeaponBase;
+class AOBInsertionHelicopter;
 enum class EOBWeaponSlot : uint8;
+enum class EOBInsertionPhase : uint8;
 class UOBAbilitySystemComponent;
 class UCameraShakeBase;
 class UOBInputConfig;
@@ -22,6 +25,7 @@ struct FGameplayTag;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
+struct FInputKeyEventArgs;
 
 UCLASS()
 class OUTBREAK_API AOBPlayerController : public APlayerController
@@ -29,6 +33,21 @@ class OUTBREAK_API AOBPlayerController : public APlayerController
 	GENERATED_BODY()
 public:
 	AOBPlayerController();
+
+	/** Called by the authoritative helicopter when this controller enters or leaves transit. */
+	void SetHelicopterTransitView(AActor* NewViewTarget, bool bLocked);
+
+	UFUNCTION(BlueprintPure, Category = "Expedition|Helicopter")
+	bool IsHelicopterTransitLocked() const { return bHelicopterTransitLocked; }
+
+	UFUNCTION(BlueprintCallable, Category = "Expedition|Insertion")
+	void RequestInsertionPoint(const FVector2D& WorldXY);
+
+	/** Keyboard fallback used while the insertion map owns Slate focus. */
+	void ToggleInsertionMapFromFocusedWidget();
+
+	/** View-trace fallback used while the insertion map owns Slate focus. */
+	void RequestInsertionPointFromFocusedWidget();
 	
 	//발사 시 시야 회전 반동 + 카메라 쉐이크 적용.
 	void ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale = 1.f);
@@ -71,10 +90,16 @@ private:
 	bool IsInteractableOccluded(const FVector& ViewLocation, const AOBInteractableActor* Candidate) const;
 	
 	bool bInventoryToggle;
+	
+	// 인벤토리가 떠 있는 동안 게임플레이 입력을 막는다.
+	// bInventoryToggle이 아니라 위젯 실제 상태를 본다(EndPlay 등에서 따로 닫히면 어긋난다).
+	bool IsInventoryInputBlocked() const;
+	
 protected:
 	//~ APlayerController interface
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
+	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
 	//~ End interface
 	
 	// 클라: PlayerState가 복제되어 들어온 시점 → 사망상태 구독.
@@ -88,6 +113,8 @@ protected:
 	void Input_InventoryKey();
 	void InventoryStarted();
 	void InventoryCompleted();
+	
+	void Input_ToggleMap();
 	
 	// 능력 입력 핸들러(눌림/뗌).
 	void Input_AbilityInputPressed(FGameplayTag InputTag);
@@ -130,9 +157,55 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> InventoryAction;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> MapAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	int32 InputMappingPriority = 0;
+
+	/** Optional high-priority context containing only insertion UI actions. */
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Insertion")
+	TObjectPtr<UInputMappingContext> InsertionMappingContext;
+
+	/** Optional dedicated map action in InsertionMappingContext. Existing MapAction remains a fallback. */
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Insertion")
+	TObjectPtr<UInputAction> InsertionMapAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input|Insertion")
+	int32 InsertionInputMappingPriority = 100;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion", meta = (ClampMin = "0.0"))
+	float InsertionViewBlendSeconds = 0.35f;
+
+	/** Pitch applied when the camera returns from the helicopter to the deployed character. */
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Camera", meta = (ClampMin = "-89.0", ClampMax = "89.0"))
+	float InsertionExitCameraPitch = -10.f;
+
+	/** A camera cut avoids blending through the large helicopter-to-ground separation. */
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Camera")
+	bool bCutCameraOnInsertionExit = true;
+
+	/** Maximum world distance used by the in-helicopter Interact/E targeting trace. */
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Trace", meta = (ClampMin = "1000.0"))
+	float InsertionTargetTraceDistance = 500000.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Trace")
+	TEnumAsByte<ECollisionChannel> InsertionTargetTraceChannel = ECC_Visibility;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Trace")
+	bool bDrawInsertionTargetTrace = true;
+
+	/** Receives E/M directly from PlayerController even when insertion Input Actions are not configured. */
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Debug")
+	bool bEnableRawInsertionKeyFallback = true;
+
+	/** Shows the insertion input/trace state on screen in addition to the Output Log. */
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Debug")
+	bool bShowInsertionDebugMessages = true;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Debug", meta = (ClampMin = "0.1"))
+	float InsertionDebugMessageDuration = 6.f;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UOBInputConfig> InputConfig;
@@ -144,8 +217,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Weapon")
 	TObjectPtr<UInputAction> SlotMeleeAction;
 
-	// Array index is the quick-slot index. Assign IA_QuickSlot1..N in order.
-	UPROPERTY(EditDefaultsOnly, Category = "Input|QuickSlot")
+	/*
+	 * Fixed input order for the six default quick slots:
+	 * [0] = keyboard 4, [1] = 5, ... [5] = 9.
+	 * Create the Input Action assets and map them to those keys in the active
+	 * Input Mapping Context, then assign the actions here in the same order.
+	 */
+	UPROPERTY(EditDefaultsOnly, Category = "Input|QuickSlot",
+		meta = (EditFixedSize))
 	TArray<TObjectPtr<UInputAction>> QuickSlotActions;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -215,6 +294,53 @@ protected:
 	bool bExpeditionStatusBound = false;
 	
 public:
+	UFUNCTION(Server, Reliable)
+	void Server_RequestInsertionPoint(FVector2D WorldXY);
+
+	UFUNCTION(Client, Reliable)
+	void Client_SetHelicopterTransitView(AActor* NewViewTarget, bool bLocked);
+
+	UFUNCTION(Client, Reliable)
+	void Client_BeginInsertionPresentation(
+		AOBInsertionHelicopter* Helicopter,
+		float SelectionDeadlineServerTime,
+		bool bCanSelectTarget);
+
+	UFUNCTION(Client, Reliable)
+	void Client_UpdateInsertionPresentation(
+		EOBInsertionPhase Phase,
+		const FString& StatusMessage,
+		bool bForceMapOpen);
+
+	UFUNCTION(Client, Reliable)
+	void Client_EndInsertionPresentation(APawn* RestoredPawn);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion Presentation Started"))
+	void BP_OnInsertionPresentationStarted(
+		AOBInsertionHelicopter* Helicopter,
+		float SelectionDeadlineServerTime,
+		bool bCanSelectTarget);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion Presentation Updated"))
+	void BP_OnInsertionPresentationUpdated(EOBInsertionPhase Phase, const FString& StatusMessage, bool bForceMapOpen);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion Presentation Ended"))
+	void BP_OnInsertionPresentationEnded(APawn* RestoredPawn);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion View Trace"))
+	void BP_OnInsertionViewTrace(
+		bool bBlockingHit,
+		FVector TraceStart,
+		FVector TraceEnd,
+		FVector HitLocation,
+		const FString& Message);
+
+	UFUNCTION(Client, Reliable)
+	void Client_InsertionPointResult(bool bAccepted, FVector_NetQuantize ResolvedLocation, const FString& Message);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion Point Result"))
+	void BP_OnInsertionPointResult(bool bAccepted, FVector ResolvedLocation, const FString& Message);
+
 	UFUNCTION(Server, Reliable) 
 	void Server_SetWeaponSlot(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBase> WeaponClass);
 	
@@ -227,13 +353,24 @@ public:
 	// 클라 → 서버: 내 GameInstance Loadout을 PlayerState로 적용.
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyLoadout(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
+
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyLoadoutInstances(const TArray<FInventoryData>& Weapons);
 	
 	UFUNCTION(Server, Reliable)
 	void Server_ApplyCarryItems(const TArray<FOBItemStack>& Items);
+
+	UFUNCTION(Server, Reliable)
+	void Server_ApplyCarryLoadout(
+		const TArray<FOBItemStack>& StackItems,
+		const TArray<FInventoryData>& ItemInstances);
 	
 	// 가방에 다 못 들어간 반입분을 창고로 되돌린다.
 	UFUNCTION(Client, Reliable)
 	void Client_ReturnCarryLeftover(const TArray<FOBItemStack>& Items);
+
+	UFUNCTION(Client, Reliable)
+	void Client_ReturnCarryItemInstances(const TArray<FInventoryData>& Items);
 	
 	// 파티 리더십을 서버 PlayerState에 반영(게이팅용).
 	UFUNCTION(Server, Reliable)
@@ -243,6 +380,18 @@ public:
 	// 콘솔(`)에 OBSuicide 입력 → 즉시 사망. 사망/관전/전멸 흐름 테스트용.
 	UFUNCTION(Exec)
 	void OBSuicide();
+
+	/** Prints the complete local insertion input/UI/view state to the log. */
+	UFUNCTION(Exec)
+	void OBInsertionDump();
+
+	/** Diagnostic escape hatch that reopens the insertion map locally. */
+	UFUNCTION(Exec)
+	void OBInsertionOpenMap();
+
+	/** Executes the same helicopter view trace as the E key. */
+	UFUNCTION(Exec)
+	void OBInsertionTrace();
 	
 	UFUNCTION(Server, Reliable)
 	void Server_Suicide();
@@ -263,6 +412,9 @@ public:
 	// 소유 커넥션을 가진 컨트롤러가 대신 받는다.
 	UFUNCTION(Server, Reliable)
 	void Server_TakeLoot(AOBLootContainer* Container, FGameplayTag ItemTag, int32 Count);
+
+	UFUNCTION(Server, Reliable)
+	void Server_TakeLootInstance(AOBLootContainer* Container, FGuid InstanceId, int32 Count);
 
 	UFUNCTION(Server, Reliable)
 	void Server_TakeAllLoot(AOBLootContainer* Container);
@@ -318,4 +470,39 @@ public:
 	// 창고는 GameInstance 서브시스템이라 서버가 직접 못 건드린다. 이 경로가 유일하다.
 	UFUNCTION(Client, Reliable)
 	void Client_ApplyExtractionResult(const TArray<FOBItemStack>& Haul);
+
+	UFUNCTION(Client, Reliable)
+	void Client_ApplyExtractionResultV2(
+		const TArray<FOBItemStack>& StackHaul,
+		const TArray<FInventoryData>& LootedInstances,
+		const TArray<FInventoryData>& ReturnedLoadoutInstances);
+
+private:
+	void EnterInsertionInputMode(bool bCanSelectTarget);
+	void ExitInsertionInputMode();
+	void TryOpenInsertionMap();
+	void HandleInsertionMapToggle(const TCHAR* InputSource);
+	void HandleInsertionTraceRequest(const TCHAR* InputSource);
+	void TryRequestInsertionPointFromView();
+	void ReportLocalInsertionPointFailure(const FString& Message, const FVector& Location = FVector::ZeroVector);
+	void RestoreGameplayViewAndInput(APawn* RestoredPawn, const TCHAR* Reason);
+	void ApplyInsertionExitCamera(APawn* RestoredPawn);
+	void ShowInsertionDebugMessage(
+		const FString& Message,
+		const FColor& Color,
+		float Duration = -1.f,
+		int32 MessageKey = -1) const;
+
+	bool bHelicopterTransitLocked = false;
+	bool bInsertionPresentationActive = false;
+	bool bCanSelectInsertionTarget = false;
+	bool bInsertionTargetSelectionAvailable = false;
+	bool bInsertionMappingContextAdded = false;
+	int32 InsertionMapOpenAttempts = 0;
+	float InsertionSelectionDeadlineServerTime = 0.f;
+	float LastInsertionMapInputRealTime = -1000.f;
+	float LastInsertionTraceInputRealTime = -1000.f;
+	float LastInsertionLookDebugRealTime = -1000.f;
+	TWeakObjectPtr<AOBInsertionHelicopter> InsertionHelicopter;
+	FTimerHandle InsertionMapOpenRetryTimer;
 };

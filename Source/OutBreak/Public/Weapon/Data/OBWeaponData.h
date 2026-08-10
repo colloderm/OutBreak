@@ -72,6 +72,10 @@ public:
 	// 기동성. 장착 중 이동속도 배율. 1.0=페널티 없음, 낮을수록 무거운 무기.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat", Meta = (ClampMin = "0.1", ClampMax = "1.0"))
 	float MobilityMultiplier = 1.0f;
+	
+	// 머리 명중 시 배율. 1.0이면 부위 판정 없음.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Damage", Meta = (ClampMin = "1.0"))
+	float HeadshotMultiplier = 1.0f;
 
 	// --- GAS 연동 ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|GAS")
@@ -219,7 +223,7 @@ public:
 	
 	// 발사 시 화면 집중 펄스(연사는 작게).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Combat|Feel",
-		Meta = (EditCondition = "WeaponType == EOBWeaponType::Melee", EditConditionHides))
+		Meta = (EditCondition = "WeaponType == EOBWeaponType::Ranged", EditConditionHides))
 	float FireFocusPulse = 0.12f;
 	
 	// ===== 근접 전용 (WeaponType == Melee 일 때만 표시) =====

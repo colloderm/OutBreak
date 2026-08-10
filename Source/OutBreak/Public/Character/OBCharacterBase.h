@@ -7,6 +7,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
 #include "GenericTeamAgentInterface.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/Data/OBItemTypes.h"
 #include "OBCharacterBase.generated.h"
 
@@ -43,9 +44,6 @@ public:
 	// 복제 등록
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
-	// 조준 트레이스용 카메라(서버에도 컨트롤 회전 복제로 위치 유효).
-	UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-	
 	UFUNCTION(BlueprintPure, Category = "OB|Death")
 	bool IsDead() const { return bIsDead; }
 	
@@ -70,6 +68,9 @@ public:
 	
 	// 스폰 이후 늘어난 것만. 정산은 "레벨에서 주운 것"만 창고로 보낸다.
 	TArray<FOBItemStack> GetBagGainsSinceSpawn();
+	TArray<FOBItemStack> GetExtractionStackGains();
+	TArray<FInventoryData> GetLootedUniqueItemInstances();
+	TArray<FInventoryData> GetReturnedLoadoutItemInstances();
 	
 	// 조준 상태(서버). 이동 감속 + 복제 상태
 	void SetAiming(bool bnewAiming);
@@ -87,7 +88,7 @@ public:
 	// 스프린트 카메라 랙 토글. BP 스프린트 시작(true)/종료(false)에서 호출.
 	UFUNCTION(BlueprintCallable, Category = "OB|Camera")
 	void SetSprintCameraLag(bool bSprinting);
-	
+
 	// 스프린트 입력 상태. BP의 스프린트 시작(true)/종료(false)에서 이걸 호출한다.
 	// 카메라 랙까지 함께 처리하므로 SetSprintCameraLag을 따로 부를 필요 없다.
 	UFUNCTION(BlueprintCallable, Category = "OB|Movement")
@@ -123,6 +124,13 @@ public:
 	
 	// 서버: 반입 아이템을 가방에 채운다. 한 번만 실행된다.
 	void ApplyCarryItems();
+	
+	// 서버: 무기·초기지급·정산 기준선·반입을 한 번에 확정한다.
+	// 로드아웃 push가 늦게 와도 PlayerState가 여기로 다시 들어온다.
+	void FinalizeSpawnLoadout();
+	
+	// 서버: 마지막 피격 방향/부위를 기록한다. 래그돌 시작 시 임펄스로 쓴다.
+	void NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection);
 	
 public:
 	/*
@@ -177,6 +185,12 @@ protected:
 	
 	UFUNCTION() 
 	void OnRep_IsDowned();
+	
+	void FinalizeSpawnLoadoutFallback();
+	void FinalizeSpawnLoadoutInternal(const TArray<TSubclassOf<AOBWeaponBase>>& Weapons);
+	void FinalizeSpawnLoadoutInstancesInternal(const TArray<FInventoryData>& Weapons);
+	void CompleteSpawnInventorySetup();
+	void CaptureSpawnInventorySnapshot();
 	
 protected:
 	UPROPERTY()
@@ -254,9 +268,28 @@ protected:
 	
 	// 초기 지급이 끝난 시점의 가방(서버 전용). 정산에서 빼는 기준선.
 	TArray<FOBItemStack> SpawnBagSnapshot;
+	TSet<FGuid> SpawnInstanceIds;
 	
 	// 반입 지급 중복 방지(PossessedBy와 PS push 양쪽에서 불릴 수 있다).
 	bool bCarryItemsApplied = false;
+	
+	// 로비 로드아웃을 기다리는 시간. 지나면 PawnData 기본 무기로 진행한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Loadout", Meta = (ClampMin = "0.1", Units = "s"))
+	float LoadoutWaitSeconds = 3.f;
+
+	FTimerHandle LoadoutWaitTimer;
+	bool bSpawnLoadoutApplied = false;
+	
+	// 래그돌 임펄스 세기. 캐릭터 질량에 맞춰 BP에서 조정한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Death", Meta = (ClampMin = "0.0"))
+	float RagdollImpulseStrength = 12000.f;
+
+	// 방향은 복제해야 클라에서도 같은 쪽으로 쓰러진다.
+	UPROPERTY(Replicated)
+	FVector_NetQuantizeNormal LastHitDirection = FVector::ZeroVector;
+
+	UPROPERTY(Replicated)
+	FName LastHitBoneName = NAME_None;
 	
 private:
 	void PollGround();

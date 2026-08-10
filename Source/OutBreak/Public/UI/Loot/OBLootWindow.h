@@ -32,6 +32,7 @@ public:
 
 	// 엔트리가 부른다. 요청만 보내고 목록은 복제가 돌아오면 갱신된다.
 	void RequestTake(const FGameplayTag& ItemTag, int32 Count);
+	void RequestTakeInstance(const FGuid& InstanceId, int32 Count);
 
 	UFUNCTION(BlueprintCallable, Category = "Loot")
 	void RequestTakeAll();

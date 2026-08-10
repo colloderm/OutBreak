@@ -9,6 +9,7 @@
 #include "Weapon/OBWeaponBase.h"
 #include "Weapon/Data/OBWeaponCatalog.h"
 #include "Weapon/Data/OBWeaponData.h"
+#include "Data/OBGameDataSubsystem.h"
 
 const FString UOBLoadoutSubsystem::SlotName = TEXT("OBPlayerProfile");
 
@@ -18,6 +19,23 @@ namespace
 	const FName ShopAction_PurchaseBulk(TEXT("PurchaseBulk"));
 	const FName ShopAction_SellOne(TEXT("SellOne"));
 	const FName ShopAction_SellAll(TEXT("SellAll"));
+
+	bool UsesPersistentInstance(const FOBItemDefinitionRow* Definition)
+	{
+		return Definition &&
+			(Definition->Category == EOBItemCategory::Weapon ||
+			 Definition->Category == EOBItemCategory::Equipment ||
+			 Definition->Category == EOBItemCategory::Attachment);
+	}
+
+	FInventoryData MakePersistentInstance(const FGameplayTag& ItemTag)
+	{
+		FInventoryData Item;
+		Item.ItemTag = ItemTag;
+		Item.ItemStack = 1;
+		Item.InstanceId = FGuid::NewGuid();
+		return Item;
+	}
 
 	// 무기 클래스에서 슬롯/스탯을 얻는다. 슬롯은 무기 스펙의 소유라 ItemDefinition에 중복 저장하지 않았다.
 	const UOBWeaponData* WeaponDataOf(TSubclassOf<AOBWeaponBase> WeaponClass)
@@ -86,16 +104,28 @@ namespace
 	}
 
 	// 무기만 상세 스탯을 갖는다. 상점을 여는 순간 목록에 뜬 무기 수만큼만 로드된다.
-	void AppendWeaponStats(FShopItemViewData& Item, const UOBWeaponData* WData)
+	void AppendWeaponStats(FShopItemViewData& Item, const FOBItemDefinitionRow& Def)
 	{
-		if (!WData) return;
+		const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+		const FOBWeaponDefinitionRow* Weapon = GameData
+			? GameData->FindWeapon(Def.ItemTag)
+			: nullptr;
+		if (!Weapon) return;
 
-		AddStat(Item, TEXT("Damage"),   TEXT("데미지"), FText::AsNumber(WData->BaseDamage), 0);
-		AddStat(Item, TEXT("RPM"),      TEXT("연사력"), FText::AsNumber(WData->RoundsPerMinute), 1);
-		AddStat(Item, TEXT("Spread"),   TEXT("탄퍼짐"), FText::FromString(FString::Printf(TEXT("%.2f°"), WData->BaseSpreadDegrees)), 2);
-		AddStat(Item, TEXT("Recoil"),   TEXT("반동"),   FText::FromString(FString::Printf(TEXT("%.1f"), WData->VerticalRecoil)), 3);
-		AddStat(Item, TEXT("Magazine"), TEXT("탄창"),   FText::AsNumber(WData->MagazineSize), 4);
-		AddStat(Item, TEXT("Mobility"), TEXT("기동성"), FText::FromString(FString::Printf(TEXT("x%.2f"), WData->MobilityMultiplier)), 5);
+		AddStat(Item, TEXT("Damage"), TEXT("데미지"), FText::AsNumber(Weapon->Common.BaseDamage), 0);
+		if (Weapon->WeaponType == EOBWeaponType::Ranged)
+		{
+			AddStat(Item, TEXT("RPM"), TEXT("연사력"), FText::AsNumber(Weapon->Ranged.RoundsPerMinute), 1);
+			AddStat(Item, TEXT("Spread"), TEXT("탄퍼짐"), FText::FromString(FString::Printf(TEXT("%.2f°"), Weapon->Ranged.BaseSpreadDegrees)), 2);
+			AddStat(Item, TEXT("Recoil"), TEXT("반동"), FText::FromString(FString::Printf(TEXT("%.1f"), Weapon->Ranged.VerticalRecoil)), 3);
+			AddStat(Item, TEXT("Magazine"), TEXT("탄창"), FText::AsNumber(Weapon->Ranged.MagazineSize), 4);
+		}
+		else
+		{
+			AddStat(Item, TEXT("Reach"), TEXT("사거리"), FText::FromString(FString::Printf(TEXT("%.0f cm"), Weapon->Melee.Reach)), 1);
+			AddStat(Item, TEXT("Arc"), TEXT("공격각"), FText::FromString(FString::Printf(TEXT("%.0f°"), Weapon->Melee.ArcDegrees)), 2);
+		}
+		AddStat(Item, TEXT("Mobility"), TEXT("기동성"), FText::FromString(FString::Printf(TEXT("x%.2f"), Weapon->Common.MobilityMultiplier)), 5);
 	}
 	
 	// 무기 아이템이면 WeaponData를, 아니면 null. 상점을 여는 순간 목록에 뜬 무기 수만큼만 로드된다.
@@ -108,7 +138,11 @@ namespace
 	// 왼쪽 카테고리 목록은 실제로 존재하는 항목에서만 만든다(빈 카테고리를 띄우지 않는다).
 	void MaterializeCategories(const TSet<EOBItemCategory>& Present, FShopWindowViewData& View)
 	{
-		for (int32 i = 0; i <= static_cast<int32>(EOBItemCategory::Material); ++i)
+		// 열거형 끝까지 돈다. 상수(Material)로 고정하면 뒤에 값이 추가될 때 조용히 누락된다.
+		const UEnum* CategoryEnum = StaticEnum<EOBItemCategory>();
+		const int32 CategoryCount = CategoryEnum->NumEnums() - 1;   // -1 은 UHT가 붙이는 _MAX
+
+		for (int32 i = 0; i < CategoryCount; ++i)
 		{
 			const EOBItemCategory C = static_cast<EOBItemCategory>(i);
 			if (!Present.Contains(C)) continue;
@@ -161,10 +195,17 @@ void UOBLoadoutSubsystem::SetWeapon(EOBWeaponSlot Slot, TSubclassOf<AOBWeaponBas
 			return;
 		}
 		CurrentLoadout.SlotWeapons.Add(Slot, Tag);
+
+		FInventoryData* Existing = CurrentLoadout.SlotWeaponInstances.Find(Slot);
+		if (!Existing || Existing->ItemTag != Tag)
+		{
+			CurrentLoadout.SlotWeaponInstances.Add(Slot, MakePersistentInstance(Tag));
+		}
 	}
 	else
 	{
 		CurrentLoadout.SlotWeapons.Remove(Slot);
+		CurrentLoadout.SlotWeaponInstances.Remove(Slot);
 	}
 
 	// "선택 즉시 저장" 요구사항.
@@ -191,9 +232,23 @@ TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetSelectedClasses() con
 	return Out;
 }
 
+TArray<FInventoryData> UOBLoadoutSubsystem::GetSelectedWeaponInstances() const
+{
+	TArray<FInventoryData> Out;
+	for (const TPair<EOBWeaponSlot, FInventoryData>& Pair : CurrentLoadout.SlotWeaponInstances)
+	{
+		if (Pair.Value.ItemTag.IsValid() && Pair.Value.ItemStack > 0)
+		{
+			Out.Add(Pair.Value);
+		}
+	}
+	return Out;
+}
+
 void UOBLoadoutSubsystem::ClearLoadout()
 {
 	CurrentLoadout.SlotWeapons.Empty();
+	CurrentLoadout.SlotWeaponInstances.Empty();
 	SaveToDisk();
 }
 
@@ -223,47 +278,112 @@ void UOBLoadoutSubsystem::AddStashItems(const TArray<FOBItemStack>& Items)
 	}
 }
 
+void UOBLoadoutSubsystem::AddStashItemInstances(
+	const TArray<FInventoryData>& Items)
+{
+	bool bChanged = false;
+	for (const FInventoryData& Item : Items)
+	{
+		bChanged |= AddStashItemInstanceInternal(Item);
+	}
+	if (bChanged)
+	{
+		SaveToDisk();
+	}
+}
+
+void UOBLoadoutSubsystem::ApplyExtractionResult(
+	const TArray<FOBItemStack>& StackItems,
+	const TArray<FInventoryData>& LootedInstances,
+	const TArray<FInventoryData>& ReturnedLoadoutInstances)
+{
+	for (const FOBItemStack& Stack : StackItems)
+	{
+		AddStashItemInternal(Stack.ItemTag, Stack.Count);
+	}
+	for (const FInventoryData& Item : LootedInstances)
+	{
+		CurrentLoadout.CarryItemInstances.RemoveAll(
+			[&Item](const FInventoryData& Carry)
+			{
+				return Item.InstanceId.IsValid() && Carry.InstanceId == Item.InstanceId;
+			});
+		AddStashItemInstanceInternal(Item);
+	}
+	TSet<FGuid> ReturnedIds;
+	for (const FInventoryData& Returned : ReturnedLoadoutInstances)
+	{
+		if (Returned.InstanceId.IsValid()) ReturnedIds.Add(Returned.InstanceId);
+	}
+	for (auto It = CurrentLoadout.SlotWeaponInstances.CreateIterator(); It; ++It)
+	{
+		if (!ReturnedIds.Contains(It.Value().InstanceId))
+		{
+			CurrentLoadout.SlotWeapons.Remove(It.Key());
+			It.RemoveCurrent();
+		}
+	}
+	for (const FInventoryData& Returned : ReturnedLoadoutInstances)
+	{
+		if (!Returned.InstanceId.IsValid()) continue;
+		for (TPair<EOBWeaponSlot, FInventoryData>& Pair : CurrentLoadout.SlotWeaponInstances)
+		{
+			if (Pair.Value.InstanceId == Returned.InstanceId)
+			{
+				Pair.Value = Returned;
+				CurrentLoadout.SlotWeapons.Add(Pair.Key, Returned.ItemTag);
+				break;
+			}
+		}
+	}
+	SaveToDisk();
+}
+
 bool UOBLoadoutSubsystem::RemoveStashItem(const FGameplayTag& ItemTag, int32 Count)
 {
-	if (!ItemTag.IsValid() || Count <= 0) return false;
-
-	const int32 Index = CurrentLoadout.StashItems.IndexOfByPredicate(
-		[&ItemTag](const FOBItemStack& S) { return S.ItemTag == ItemTag; });
-	if (Index == INDEX_NONE) return false;
-
-	// 부분 차감은 하지 않는다. 실패하면 창고는 그대로다.
-	if (CurrentLoadout.StashItems[Index].Count < Count) return false;
-
-	CurrentLoadout.StashItems[Index].Count -= Count;
-	if (CurrentLoadout.StashItems[Index].Count <= 0)
-	{
-		CurrentLoadout.StashItems.RemoveAt(Index);
-	}
-
+	if (!RemoveStashItemsInternal(ItemTag, Count)) return false;
 	SaveToDisk();
 	return true;
 }
 
 int32 UOBLoadoutSubsystem::GetStashCount(const FGameplayTag& ItemTag) const
 {
+	int32 Count = 0;
 	for (const FOBItemStack& Stack : CurrentLoadout.StashItems)
 	{
-		if (Stack.ItemTag == ItemTag) return Stack.Count;
+		if (Stack.ItemTag == ItemTag) Count += Stack.Count;
 	}
-	return 0;
+	for (const FInventoryData& Item : CurrentLoadout.StashItemInstances)
+	{
+		if (Item.ItemTag == ItemTag && Item.ItemStack > 0) Count += Item.ItemStack;
+	}
+	return Count;
+}
+
+TArray<FOBItemStack> UOBLoadoutSubsystem::GetStashItems() const
+{
+	TArray<FOBItemStack> Out = CurrentLoadout.StashItems;
+	for (const FInventoryData& Item : CurrentLoadout.StashItemInstances)
+	{
+		if (Item.ItemTag.IsValid() && Item.ItemStack > 0)
+		{
+			OBItemStacks::Add(Out, Item.ItemTag, Item.ItemStack);
+		}
+	}
+	return Out;
 }
 
 TArray<TSubclassOf<AOBWeaponBase>> UOBLoadoutSubsystem::GetOwnedClasses() const
 {
 	TArray<TSubclassOf<AOBWeaponBase>> Out;
-	for (const FOBItemStack& Stack : CurrentLoadout.StashItems)
+	for (const FOBItemStack& Stack : GetStashItems())
 	{
 		if (Stack.IsEmpty()) continue;
 
 		// 창고에는 소모품/귀중품도 섞여 있다. 작업대 리스트는 무기만 본다.
 		if (TSubclassOf<AOBWeaponBase> Loaded = ResolveWeaponClass(Stack.ItemTag))
 		{
-			Out.Add(Loaded);
+			Out.AddUnique(Loaded);
 		}
 	}
 	return Out;
@@ -290,19 +410,33 @@ void UOBLoadoutSubsystem::EquipFromStash(TSubclassOf<AOBWeaponBase> WeaponClass)
 	const FGameplayTag Tag = UOBItemRegistry::FindTagForWeaponClass(WeaponClass);
 	if (!Tag.IsValid()) return;
 
-	const UOBWeaponData* WData = WeaponDataOf(WeaponClass);
-	if (!WData) return;
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	const FOBWeaponDefinitionRow* WeaponDefinition = GameData
+		? GameData->FindWeapon(Tag)
+		: nullptr;
+	if (!WeaponDefinition) return;
 
 	// 창고에 없으면(이미 장착이거나 미보유) 장착 불가.
-	if (!RemoveStashItem(Tag, 1)) return;
+	TArray<FInventoryData> RemovedInstances;
+	if (!RemoveStashItemsInternal(Tag, 1, &RemovedInstances)) return;
+	FInventoryData NewInstance = RemovedInstances.IsEmpty()
+		? MakePersistentInstance(Tag)
+		: RemovedInstances[0];
 
 	// 그 슬롯에 이미 무기가 있으면 창고로 반환(스왑).
-	if (const FGameplayTag* Old = CurrentLoadout.SlotWeapons.Find(WData->WeaponSlot))
+	if (const FInventoryData* OldInstance = CurrentLoadout.SlotWeaponInstances.Find(WeaponDefinition->WeaponSlot))
 	{
-		AddStashItem(*Old, 1);
+		const FInventoryData OldCopy = *OldInstance;
+		CurrentLoadout.SlotWeaponInstances.Remove(WeaponDefinition->WeaponSlot);
+		AddStashItemInstanceInternal(OldCopy);
+	}
+	else if (const FGameplayTag* Old = CurrentLoadout.SlotWeapons.Find(WeaponDefinition->WeaponSlot))
+	{
+		AddStashItemInternal(*Old, 1);
 	}
 
-	CurrentLoadout.SlotWeapons.Add(WData->WeaponSlot, Tag);
+	CurrentLoadout.SlotWeapons.Add(WeaponDefinition->WeaponSlot, Tag);
+	CurrentLoadout.SlotWeaponInstances.Add(WeaponDefinition->WeaponSlot, MoveTemp(NewInstance));
 
 	SaveToDisk();
 }
@@ -317,6 +451,11 @@ bool UOBLoadoutSubsystem::HasAnyWeapon() const
 
 		const FOBItemDefinitionRow* Def = UOBItemRegistry::FindItem(Stack.ItemTag);
 		if (Def && Def->Category == EOBItemCategory::Weapon) return true;
+	}
+	for (const FInventoryData& Item : CurrentLoadout.StashItemInstances)
+	{
+		const FOBItemDefinitionRow* Def = UOBItemRegistry::FindItem(Item.ItemTag);
+		if (Item.ItemStack > 0 && Def && Def->Category == EOBItemCategory::Weapon) return true;
 	}
 	return false;
 }
@@ -360,13 +499,16 @@ int32 UOBLoadoutSubsystem::GrantMissingStarters(const TArray<TSubclassOf<AOBWeap
 		// 불변식 유지: 한 아이템은 창고 OR 슬롯 중 한 곳에만 존재한다.
 		if (IsTagOwnedOrEquipped(Tag)) continue;
 
-		const UOBWeaponData* WData = WeaponDataOf(WClass);
-		if (!WData) continue;
+		const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+		const FOBWeaponDefinitionRow* WeaponDefinition = GameData
+			? GameData->FindWeapon(Tag)
+			: nullptr;
+		if (!WeaponDefinition) continue;
 
 		// 이미 찬 슬롯은 건너뛴다. 빈 슬롯만 메우는 게 목적이지 무료 교체가 아니다.
-		if (CurrentLoadout.SlotWeapons.Contains(WData->WeaponSlot)) continue;
+		if (CurrentLoadout.SlotWeapons.Contains(WeaponDefinition->WeaponSlot)) continue;
 
-		CurrentLoadout.SlotWeapons.Add(WData->WeaponSlot, Tag);
+		CurrentLoadout.SlotWeapons.Add(WeaponDefinition->WeaponSlot, Tag);
 		++Granted;
 	}
 
@@ -448,7 +590,7 @@ void UOBLoadoutSubsystem::AppendBuyItems(FShopWindowViewData& View, TSet<EOBItem
 		Item.StockQuantity = 1;
 		Item.OwnedQuantity = bWeapon ? (bOwned ? 1 : 0) : GetStashCount(Def->ItemTag);
 
-		AppendWeaponStats(Item, WData);
+		AppendWeaponStats(Item, *Def);
 		AddStat(Item, TEXT("BuyPrice"), TEXT("가격"), FText::AsNumber(Def->BuyPrice), 10);
 		AddStat(Item, TEXT("Weight"),   TEXT("무게"), FText::FromString(FString::Printf(TEXT("%.2f kg"), Def->Weight)), 11);
 
@@ -493,7 +635,7 @@ void UOBLoadoutSubsystem::AppendBuyItems(FShopWindowViewData& View, TSet<EOBItem
 
 void UOBLoadoutSubsystem::AppendSellItems(FShopWindowViewData& View, TSet<EOBItemCategory>& OutCategories) const
 {
-	for (const FOBItemStack& Stack : CurrentLoadout.StashItems)
+	for (const FOBItemStack& Stack : GetStashItems())
 	{
 		if (Stack.IsEmpty()) continue;
 
@@ -507,7 +649,7 @@ void UOBLoadoutSubsystem::AppendSellItems(FShopWindowViewData& View, TSet<EOBIte
 		Item.StockQuantity = Stack.Count;
 		Item.OwnedQuantity = Stack.Count;
 
-		AppendWeaponStats(Item, WData);
+		AppendWeaponStats(Item, *Def);
 		AddStat(Item, TEXT("SellPrice"), TEXT("개당 판매가"), FText::AsNumber(Def->SellPrice), 10);
 		AddStat(Item, TEXT("Owned"),     TEXT("보유"),        FText::AsNumber(Stack.Count), 11);
 		AddStat(Item, TEXT("Weight"),    TEXT("무게"),        FText::FromString(FString::Printf(TEXT("%.2f kg"), Def->Weight)), 12);
@@ -545,6 +687,14 @@ void UOBLoadoutSubsystem::AppendSellItems(FShopWindowViewData& View, TSet<EOBIte
 bool UOBLoadoutSubsystem::AddStashItemInternal(const FGameplayTag& ItemTag, int32 Count)
 {
 	if (!ItemTag.IsValid() || Count <= 0) return false;
+	if (UsesPersistentInstance(UOBItemRegistry::FindItem(ItemTag)))
+	{
+		for (int32 Index = 0; Index < Count; ++Index)
+		{
+			AddStashItemInstanceInternal(MakePersistentInstance(ItemTag));
+		}
+		return true;
+	}
 
 	// 창고는 칸 제한이 없어서 MaxStack을 적용하지 않고 태그당 한 항목으로 합친다.
 	const int32 Index = CurrentLoadout.StashItems.IndexOfByPredicate(
@@ -560,6 +710,62 @@ bool UOBLoadoutSubsystem::AddStashItemInternal(const FGameplayTag& ItemTag, int3
 	else
 	{
 		CurrentLoadout.StashItems.Emplace(ItemTag, Count);
+	}
+	return true;
+}
+
+bool UOBLoadoutSubsystem::ContainsPersistentInstance(const FGuid& InstanceId) const
+{
+	if (!InstanceId.IsValid()) return false;
+	if (CurrentLoadout.StashItemInstances.ContainsByPredicate(
+		[&InstanceId](const FInventoryData& Item) { return Item.InstanceId == InstanceId; })) return true;
+	if (CurrentLoadout.CarryItemInstances.ContainsByPredicate(
+		[&InstanceId](const FInventoryData& Item) { return Item.InstanceId == InstanceId; })) return true;
+	for (const TPair<EOBWeaponSlot, FInventoryData>& Pair : CurrentLoadout.SlotWeaponInstances)
+	{
+		if (Pair.Value.InstanceId == InstanceId) return true;
+	}
+	return false;
+}
+
+bool UOBLoadoutSubsystem::AddStashItemInstanceInternal(const FInventoryData& Item)
+{
+	if (!Item.ItemTag.IsValid() || Item.ItemStack <= 0) return false;
+	FInventoryData Copy = Item;
+	Copy.ItemStack = 1;
+	if (!Copy.InstanceId.IsValid()) Copy.InstanceId = FGuid::NewGuid();
+	if (ContainsPersistentInstance(Copy.InstanceId)) return false;
+	CurrentLoadout.StashItemInstances.Add(MoveTemp(Copy));
+	return true;
+}
+
+bool UOBLoadoutSubsystem::RemoveStashItemsInternal(
+	const FGameplayTag& ItemTag,
+	int32 Count,
+	TArray<FInventoryData>* OutRemovedInstances)
+{
+	if (!ItemTag.IsValid() || Count <= 0 || GetStashCount(ItemTag) < Count) return false;
+	if (OutRemovedInstances) OutRemovedInstances->Reset();
+
+	for (int32 Index = CurrentLoadout.StashItemInstances.Num() - 1;
+		Index >= 0 && Count > 0; --Index)
+	{
+		if (CurrentLoadout.StashItemInstances[Index].ItemTag != ItemTag) continue;
+		if (OutRemovedInstances) OutRemovedInstances->Add(CurrentLoadout.StashItemInstances[Index]);
+		CurrentLoadout.StashItemInstances.RemoveAt(Index);
+		--Count;
+	}
+
+	if (Count > 0)
+	{
+		const int32 Index = CurrentLoadout.StashItems.IndexOfByPredicate(
+			[&ItemTag](const FOBItemStack& Stack) { return Stack.ItemTag == ItemTag; });
+		check(Index != INDEX_NONE && CurrentLoadout.StashItems[Index].Count >= Count);
+		CurrentLoadout.StashItems[Index].Count -= Count;
+		if (CurrentLoadout.StashItems[Index].Count <= 0)
+		{
+			CurrentLoadout.StashItems.RemoveAt(Index);
+		}
 	}
 	return true;
 }
@@ -605,6 +811,54 @@ bool UOBLoadoutSubsystem::TrySell(const FGameplayTag& ItemTag, int32 Count)
 	return true;
 }
 
+void UOBLoadoutSubsystem::NormalizeInstanceStorage()
+{
+	CurrentLoadout.DataVersion = 2;
+
+	for (const TPair<EOBWeaponSlot, FGameplayTag>& Pair : CurrentLoadout.SlotWeapons)
+	{
+		FInventoryData* Instance = CurrentLoadout.SlotWeaponInstances.Find(Pair.Key);
+		if (!Instance || Instance->ItemTag != Pair.Value)
+		{
+			CurrentLoadout.SlotWeaponInstances.Add(Pair.Key, MakePersistentInstance(Pair.Value));
+			continue;
+		}
+		Instance->ItemStack = 1;
+		if (!Instance->InstanceId.IsValid()) Instance->InstanceId = FGuid::NewGuid();
+	}
+	for (auto It = CurrentLoadout.SlotWeaponInstances.CreateIterator(); It; ++It)
+	{
+		if (!CurrentLoadout.SlotWeapons.Contains(It.Key())) It.RemoveCurrent();
+	}
+
+	auto MigrateStacks = [](TArray<FOBItemStack>& Stacks, TArray<FInventoryData>& Instances)
+	{
+		for (int32 Index = Stacks.Num() - 1; Index >= 0; --Index)
+		{
+			const FOBItemStack Stack = Stacks[Index];
+			if (!UsesPersistentInstance(UOBItemRegistry::FindItem(Stack.ItemTag))) continue;
+			for (int32 ItemIndex = 0; ItemIndex < Stack.Count; ++ItemIndex)
+			{
+				Instances.Add(MakePersistentInstance(Stack.ItemTag));
+			}
+			Stacks.RemoveAt(Index);
+		}
+	};
+	MigrateStacks(CurrentLoadout.StashItems, CurrentLoadout.StashItemInstances);
+	MigrateStacks(CurrentLoadout.CarryItems, CurrentLoadout.CarryItemInstances);
+
+	for (FInventoryData& Item : CurrentLoadout.StashItemInstances)
+	{
+		Item.ItemStack = 1;
+		if (!Item.InstanceId.IsValid()) Item.InstanceId = FGuid::NewGuid();
+	}
+	for (FInventoryData& Item : CurrentLoadout.CarryItemInstances)
+	{
+		Item.ItemStack = 1;
+		if (!Item.InstanceId.IsValid()) Item.InstanceId = FGuid::NewGuid();
+	}
+}
+
 void UOBLoadoutSubsystem::SaveToDisk()
 {
 	UOBSaveGame* Save = Cast<UOBSaveGame>(
@@ -629,29 +883,54 @@ void UOBLoadoutSubsystem::LoadFromDisk()
 	{
 		CurrentLoadout = Save->Loadout;
 		CurrentCurrency = Save->Currency;
+		NormalizeInstanceStorage();
+		SaveToDisk();
 	}
 }
 
 bool UOBLoadoutSubsystem::AddCarryItem(const FGameplayTag& ItemTag, int32 Count)
 {
 	// 창고에서 먼저 뺀다. 부분 차감을 안 하므로 실패하면 아무 일도 안 일어난다.
-	if (!RemoveStashItem(ItemTag, Count)) return false;
-
-	OBItemStacks::Add(CurrentLoadout.CarryItems, ItemTag, Count);
+	TArray<FInventoryData> RemovedInstances;
+	if (!RemoveStashItemsInternal(ItemTag, Count, &RemovedInstances)) return false;
+	if (!RemovedInstances.IsEmpty())
+	{
+		CurrentLoadout.CarryItemInstances.Append(RemovedInstances);
+	}
+	const int32 StackCount = Count - RemovedInstances.Num();
+	if (StackCount > 0)
+	{
+		OBItemStacks::Add(CurrentLoadout.CarryItems, ItemTag, StackCount);
+	}
 	SaveToDisk();
 	return true;
 }
 
 bool UOBLoadoutSubsystem::RemoveCarryItem(const FGameplayTag& ItemTag, int32 Count)
 {
-	if (!ItemTag.IsValid() || Count <= 0) return false;
+	if (!ItemTag.IsValid() || Count <= 0 || GetCarryCount(ItemTag) < Count) return false;
+
+	for (int32 InstanceIndex = CurrentLoadout.CarryItemInstances.Num() - 1;
+		InstanceIndex >= 0 && Count > 0; --InstanceIndex)
+	{
+		if (CurrentLoadout.CarryItemInstances[InstanceIndex].ItemTag != ItemTag) continue;
+		FInventoryData Item = CurrentLoadout.CarryItemInstances[InstanceIndex];
+		CurrentLoadout.CarryItemInstances.RemoveAt(InstanceIndex);
+		AddStashItemInstanceInternal(Item);
+		--Count;
+	}
+	if (Count <= 0)
+	{
+		SaveToDisk();
+		return true;
+	}
 
 	const int32 Index = CurrentLoadout.CarryItems.IndexOfByPredicate(
 		[&ItemTag](const FOBItemStack& S)
 		{
 			return S.ItemTag == ItemTag;
 		});
-	if (Index == INDEX_NONE || CurrentLoadout.CarryItems[Index].Count < Count) return false;
+	check(Index != INDEX_NONE && CurrentLoadout.CarryItems[Index].Count >= Count);
 
 	CurrentLoadout.CarryItems[Index].Count -= Count;
 	if (CurrentLoadout.CarryItems[Index].Count <= 0)
@@ -664,20 +943,59 @@ bool UOBLoadoutSubsystem::RemoveCarryItem(const FGameplayTag& ItemTag, int32 Cou
 	return true;
 }
 
+void UOBLoadoutSubsystem::ReturnCarryItemInstances(
+	const TArray<FInventoryData>& Items)
+{
+	bool bChanged = false;
+	for (const FInventoryData& Returned : Items)
+	{
+		const int32 Index = CurrentLoadout.CarryItemInstances.IndexOfByPredicate(
+			[&Returned](const FInventoryData& Carry)
+			{
+				return Returned.InstanceId.IsValid() && Carry.InstanceId == Returned.InstanceId;
+			});
+		if (Index == INDEX_NONE) continue;
+		FInventoryData Item = CurrentLoadout.CarryItemInstances[Index];
+		CurrentLoadout.CarryItemInstances.RemoveAt(Index);
+		bChanged |= AddStashItemInstanceInternal(Item);
+	}
+	if (bChanged) SaveToDisk();
+}
+
 void UOBLoadoutSubsystem::ClearCarryItems()
 {
-	if (CurrentLoadout.CarryItems.IsEmpty()) return;
+	if (CurrentLoadout.CarryItems.IsEmpty() && CurrentLoadout.CarryItemInstances.IsEmpty()) return;
 
 	CurrentLoadout.CarryItems.Empty();
+	CurrentLoadout.CarryItemInstances.Empty();
 	SaveToDisk();
 }
 
 int32 UOBLoadoutSubsystem::GetCarryCount(const FGameplayTag& ItemTag) const
 {
+	int32 Count = 0;
 	const FOBItemStack* Found = CurrentLoadout.CarryItems.FindByPredicate(
 		[&ItemTag](const FOBItemStack& S)
 		{
 			return S.ItemTag == ItemTag;
 		});
-	return Found ? Found->Count : 0;
+	Count += Found ? Found->Count : 0;
+	for (const FInventoryData& Item : CurrentLoadout.CarryItemInstances)
+	{
+		if (Item.ItemTag == ItemTag && Item.ItemStack > 0) Count += Item.ItemStack;
+	}
+	return Count;
+}
+
+TArray<FOBItemStack> UOBLoadoutSubsystem::GetCarryItems() const
+{
+	TArray<FOBItemStack> Out = CurrentLoadout.CarryItems;
+	for (const FInventoryData& Item : CurrentLoadout.CarryItemInstances)
+	{
+		if (Item.ItemTag.IsValid() && Item.ItemStack > 0)
+		{
+			OBItemStacks::Add(Out, Item.ItemTag, Item.ItemStack);
+		}
+	}
+	return Out;
 }

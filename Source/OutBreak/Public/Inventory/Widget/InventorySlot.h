@@ -36,6 +36,15 @@ public:
 	void SetQuickSlotContext(
 		UPlayerInventoryComponent* InInventory,
 		int32 QuickSlotIndex);
+	
+	// 부착물 표시 칸 전용 컨텍스트. 이게 설정된 칸만 우클릭 해제가 동작한다.
+	// 가방/퀵슬롯 칸은 이 값이 비어 있어 기존 동작 그대로다.
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Attachment")
+	void SetAttachmentContext(
+		UPlayerInventoryComponent* InInventory,
+		const FGuid& InWeaponInstanceId,
+		const FGameplayTag& InAttachmentSlotTag,
+		const FInventoryData& Data);
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
 	FInventoryItemHandle GetSlotHandle() const { return SlotHandle; }
@@ -66,6 +75,12 @@ private:
 
 	UPROPERTY(Transient)
 	FInventoryItemHandle SlotHandle;
+	
+	UPROPERTY(Transient)
+	FGuid AttachmentWeaponInstanceId;
+
+	UPROPERTY(Transient)
+	FGameplayTag AttachmentSlotTag;
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> ItemImage;

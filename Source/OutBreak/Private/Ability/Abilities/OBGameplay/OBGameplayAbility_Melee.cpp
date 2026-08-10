@@ -3,6 +3,7 @@
 #include "Ability/Abilities/OBGameplay/OBGameplayAbility_Melee.h"
 
 #include "Ability/Tags/OBGameplayTags.h"
+#include "Ability/Attributes/OBAttributeSetBase.h"
 #include "Character/OBCharacterBase.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Weapon/OBWeaponBase.h"
@@ -32,15 +33,30 @@ void UOBGameplayAbility_Melee::ActivateAbility(const FGameplayAbilitySpecHandle 
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
 	AOBWeaponBase* Weapon = GetEquippedWeapon();
-	UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
-	if (!Data || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+	const FOBWeaponDefinitionRow* Definition = Weapon ? Weapon->GetWeaponDefinition() : nullptr;
+	const FOBResolvedWeaponStats* Stats = Weapon ? &Weapon->GetResolvedStats() : nullptr;
+	UAbilitySystemComponent* OwnerASC = GetAbilitySystemComponentFromActorInfo();
+	const UOBAttributeSetBase* Attributes = OwnerASC
+		? OwnerASC->GetSet<UOBAttributeSetBase>()
+		: nullptr;
+	if (!Definition || !Stats || Stats->WeaponType != EOBWeaponType::Melee ||
+		(Attributes && Attributes->GetStamina() < Stats->MeleeStaminaCost) ||
+		!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	if (HasAuthority(&ActivationInfo) && OwnerASC && Stats->MeleeStaminaCost > 0.f)
+	{
+		OwnerASC->ApplyModToAttribute(
+			UOBAttributeSetBase::GetStaminaAttribute(),
+			EGameplayModOp::Additive,
+			-Stats->MeleeStaminaCost);
+	}
 	
-	float Len = DefaultAttackTime;
-	if (UAnimMontage* Montage = Data->AttackMontage) // 근접은 AttackMontage = 스윙 몽타주로 사용
+	float Len = Stats->MeleeAttackDuration > 0.f ? Stats->MeleeAttackDuration : DefaultAttackTime;
+	UAnimMontage* Montage = Definition->Visual.AttackMontage.LoadSynchronous();
+	if (Montage)
 	{
 		Len = Montage->GetPlayLength();
 		UAbilityTask_PlayMontageAndWait* MT = 
@@ -52,12 +68,14 @@ void UOBGameplayAbility_Melee::ActivateAbility(const FGameplayAbilitySpecHandle 
 	}
 	
 	// 타격 판정 타이밍(접촉 순간)
-	UAbilityTask_WaitDelay* HitTask = UAbilityTask_WaitDelay::WaitDelay(this, FMath::Clamp(HitTime, 0.01f, Len));
+	UAbilityTask_WaitDelay* HitTask = UAbilityTask_WaitDelay::WaitDelay(
+		this,
+		FMath::Clamp(Stats->MeleeHitTime, 0.01f, Len));
 	HitTask->OnFinish.AddDynamic(this, &UOBGameplayAbility_Melee::OnHitWindow);
 	HitTask->ReadyForActivation();
 	
 	// 몽타주 없으면 Len 후 종료
-	if (!Data->AttackMontage)
+	if (!Montage)
 	{
 		UAbilityTask_WaitDelay* EndTask = UAbilityTask_WaitDelay::WaitDelay(this, Len);
 		EndTask->OnFinish.AddDynamic(this, &UOBGameplayAbility_Melee::OnAttackFinished);
@@ -77,15 +95,16 @@ void UOBGameplayAbility_Melee::PerformMeleeTrace()
 {
 	AOBCharacterBase* Char = GetOBCharacterFromActorInfo();
 	AOBWeaponBase* Weapon = GetEquippedWeapon();
-	UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
-	if (!Char || !Data || !GetWorld()) return;
+	const FOBWeaponDefinitionRow* Definition = Weapon ? Weapon->GetWeaponDefinition() : nullptr;
+	const FOBResolvedWeaponStats* Stats = Weapon ? &Weapon->GetResolvedStats() : nullptr;
+	if (!Char || !Definition || !Stats || Stats->WeaponType != EOBWeaponType::Melee || !GetWorld()) return;
 
-	const FVector Start = Char->GetActorLocation() + FVector(0, 0, TraceHeight);
+	const FVector Start = Char->GetActorLocation() + FVector(0, 0, Stats->MeleeTraceHeight);
 	const FVector Dir = Char->GetBaseAimRotation().Vector();
 	
 	// 전방 리치 중심의 스피어 오버랩(반경 내 다중 대상).
-	const FVector Center = Start + Dir * (Data->Range * 0.5f);
-	const float SphereRadius = Data->Range * 0.5f + MeleeRadius;
+	const FVector Center = Start;
+	const float SphereRadius = Stats->MeleeReach + Stats->MeleeSweepRadius;
 	
 	TArray<FOverlapResult> Overlaps;
 	FCollisionQueryParams Params;
@@ -107,6 +126,7 @@ void UOBGameplayAbility_Melee::PerformMeleeTrace()
 
 	// --- 히트 처리 + 임팩트 연출 ---
 	TSet<UAbilitySystemComponent*> AlreadyHit;
+	const float FacingDot = FMath::Cos(FMath::DegreesToRadians(Stats->MeleeArcDegrees * 0.5f));
 	for (const FOverlapResult& H : Overlaps)
 	{
 		AActor* HitActor = H.GetActor();
@@ -114,21 +134,21 @@ void UOBGameplayAbility_Melee::PerformMeleeTrace()
 		
 		// 전방 판정(뒤/옆 과도 타격 방지).
 		const FVector ToTarget = (HitActor->GetActorLocation() - Start).GetSafeNormal();
-		if (FVector::DotProduct(Dir, ToTarget) < MinFacingDot) continue;
+		if (FVector::DotProduct(Dir, ToTarget) < FacingDot) continue;
 
 		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(HitActor);
 		if (!TargetASC || AlreadyHit.Contains(TargetASC)) continue;
 		AlreadyHit.Add(TargetASC);
 
 		// 데미지 (같은 팀이면 스킵 → 팀킬 OFF, 임팩트 연출은 아래에서 유지)
-		if (Data->DamageEffect && !AOBPlayerStateBase::AreSameTeam(Char, HitActor))
+		if (Definition->Common.DamageEffect && !AOBPlayerStateBase::AreSameTeam(Char, HitActor))
 		{
 			FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
 			Ctx.AddInstigator(Char, Weapon);
-			FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(Data->DamageEffect, 1.f, Ctx);
+			FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(Definition->Common.DamageEffect, 1.f, Ctx);
 			if (Spec.IsValid())
 			{
-				Spec.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, Data->BaseDamage);
+				Spec.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, Stats->Damage);
 				SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
 			}
 		}
@@ -136,11 +156,15 @@ void UOBGameplayAbility_Melee::PerformMeleeTrace()
 		// 임팩트 연출(오버랩엔 ImpactPoint 없음 → 대상 가슴 높이, Normal은 공격자 방향).
 		{
 			FGameplayCueParameters ImpactCue;
-			ImpactCue.Location = HitActor->GetActorLocation() + FVector(0, 0, TraceHeight * 0.5f);
+			ImpactCue.Location = HitActor->GetActorLocation() + FVector(0, 0, Stats->MeleeTraceHeight * 0.5f);
 			ImpactCue.Normal = -ToTarget; // VFX가 공격자 쪽을 향하도록
 			ImpactCue.Instigator = Char;
 			ImpactCue.SourceObject = Weapon;
 			SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Melee_Impact, ImpactCue);
+		}
+		if (Stats->MeleeMaxTargets > 0 && AlreadyHit.Num() >= Stats->MeleeMaxTargets)
+		{
+			break;
 		}
 	}
 }

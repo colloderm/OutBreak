@@ -11,6 +11,7 @@ class UCurveFloat;
 class UPhysicalMaterial;
 class UStaticMesh;
 class USoundCue;
+class UNiagaraSystem;
 
 USTRUCT(BlueprintType)
 struct FEnemyLimbMesh
@@ -57,6 +58,39 @@ struct FEnemyPhysicalReact
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	TObjectPtr<UPhysicalMaterial> PM_Leg_L;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UAnimMontage> Hit_Montage_Head;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UAnimMontage> Hit_Montage_RightShoulder;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UAnimMontage> Hit_Montage_LeftSholder;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UAnimMontage> Hit_Montage_RightLeg;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UAnimMontage> Hit_Montage_LeftLeg;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UAnimMontage> Hit_Montage_Spine;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UNiagaraSystem> Blood_Splatter;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UNiagaraSystem> Blood_BulletHit;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<UNiagaraSystem> Blood_Splatter_Direction;
+	
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	float BlendWeight_Anim_Physics = 0.5;
+	
+	
 };
 
 USTRUCT(BlueprintType)
@@ -147,7 +181,7 @@ class OUTBREAK_API UEnemyAsset : public UPrimaryDataAsset
 	
 public:
 	const FEnemyPhysicalReact* GetPhysicalReact() const { return &PhysicalReact; } 
-	const FEnemyLimbMesh* GetLimbMeshes() const { return &LimbMeshes; } 
+	const FEnemyLimbMesh* GetLimbMeshes() const { return &LimbMeshes; }
 	const FTraversalSetting* GetTraversalSetting() const { return &TraversalSetting; } 
 	const FEnemySoundAsset* GetSoundAssets() const { return &SoundAssets; }
 	

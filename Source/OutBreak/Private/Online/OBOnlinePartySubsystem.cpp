@@ -8,6 +8,12 @@
 #include "OnlineSubsystemNames.h"
 #include "Interfaces/OnlinePresenceInterface.h"
 
+namespace
+{
+	// 리더 → 멤버 출발 신호 키. 양쪽이 같은 이름을 써야 해서 상수로 둔다.
+	const FName OB_TravelKey(TEXT("TRAVEL"));
+}
+
 static const FName PARTY_SESSION_NAME(TEXT("OBParty"));
 static const int32 PARTY_MAX = 3;
 
@@ -248,8 +254,10 @@ void UOBOnlinePartySubsystem::LeaderStartExpedition(const FString& ServerAddress
 	if (Named && bIsLeader)
 	{
 		FOnlineSessionSettings Updated = Named->SessionSettings;
-		Updated.Set(FName("TRAVEL"), ServerAddress, EOnlineDataAdvertisementType::ViaOnlineService);
+		Updated.Set(OB_TravelKey, ServerAddress, EOnlineDataAdvertisementType::ViaOnlineService);
 		Session->UpdateSession(PARTY_SESSION_NAME, Updated, true);
+
+		UE_LOG(LogTemp, Log, TEXT("[Online] 출발 신호 브로드캐스트: %s"), *ServerAddress);
 	}
 	
 	bTraveled = true;
@@ -274,14 +282,10 @@ void UOBOnlinePartySubsystem::PollLeaderStart()
 	if (!Named) return;
 	
 	FString Addr;
-	if (Named->SessionSettings.Get(FName("TRABEL"), Addr) && !Addr.IsEmpty())
+	if (Named->SessionSettings.Get(OB_TravelKey, Addr) && !Addr.IsEmpty())
 	{
 		bTraveled = true;
-		if (UWorld* W = GetGameInstance()->GetWorld())
-		{
-			W->GetTimerManager().ClearTimer(FollowTimer);
-			TravelToServer(Addr); // 멤버: 리더가 준 주소 + 내 로비ID로 이동
-		}
+		UE_LOG(LogTemp, Log, TEXT("[Online] 리더 출발 신호 수신: %s"), *Addr);
 	}
 }
 

@@ -10,12 +10,26 @@
 #include "Core/OBCollisionChannels.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Abilities/GameplayAbilityTargetTypes.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
-#include "Camera/CameraComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "GameplayPrediction.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
+#include "AI/EnemyCharacter.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogOBWeaponAim, Log, All);
+
+namespace
+{
+	// UE 마네킹 스켈레톤 기준. 다른 스켈레톤을 쓰는 적이 생기면 데이터로 뺀다.
+	bool IsHeadBone(const FName BoneName)
+	{
+		return BoneName == TEXT("head") || BoneName == TEXT("neck_01");
+	}
+}
 
 UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -43,15 +57,46 @@ void UOBGameplayAbility_RangedWeapon::ActivateAbility(
 	
 	CurrentFireMode = GetFireMode();
 	ShotsFired = 0;
+	PendingServerAimShots = 0;
+	bRemoteAimDelegateBound = false;
 
-	// 첫 발 즉시.
-	FireOneShot();
+	const bool bRemoteAuthoritativeInstance =
+		HasAuthority(&ActivationInfo) && ActorInfo && !ActorInfo->IsLocallyControlled();
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (bRemoteAuthoritativeInstance && ASC)
+	{
+		ASC->AbilityTargetDataSetDelegate(Handle, ActivationInfo.GetActivationPredictionKey())
+			.AddUObject(this, &UOBGameplayAbility_RangedWeapon::HandleAimTargetData);
+		bRemoteAimDelegateBound = true;
+	}
+
+	// 첫 발 즉시. 요청을 만들지 못했다면 FireOneShot이 능력을 종료한다.
+	if (!FireOneShot())
+	{
+		return;
+	}
 	++ShotsFired;
+
+	// Target data may have reached the PlayerState ASC before the server ability
+	// finished activating. Consume it only after FireOneShot issued the matching
+	// authoritative shot token.
+	if (bRemoteAuthoritativeInstance && ASC)
+	{
+		ASC->CallReplicatedTargetDataDelegatesIfSet(
+			Handle,
+			ActivationInfo.GetActivationPredictionKey());
+	}
 
 	// 단발: 1발 후 종료. (홀드해도 OnInputTriggered라 재발동 안 됨)
 	if (CurrentFireMode == EOBWeaponFireMode::Single)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+		// A remote server instance stays alive until its prediction-key target data
+		// arrives. The locally predicted client sends data before ending, so RPC
+		// ordering on the ASC guarantees target data precedes the replicated end.
+		if (!bRemoteAuthoritativeInstance)
+		{
+			EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+		}
 		return;
 	}
 
@@ -86,12 +131,20 @@ void UOBGameplayAbility_RangedWeapon::FireLoop()
 		}
 	}
 	
-	FireOneShot();
+	if (!FireOneShot())
+	{
+		return;
+	}
 	++ShotsFired;
 
 	if (CurrentFireMode == EOBWeaponFireMode::Burst && ShotsFired >= GetBurstCount())
 	{
-		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		const bool bRemoteServerStillWaitingForAim = bRemoteAimDelegateBound
+			&& PendingServerAimShots > 0;
+		if (!bRemoteServerStillWaitingForAim)
+		{
+			EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		}
 	}
 }
 
@@ -105,10 +158,22 @@ void UOBGameplayAbility_RangedWeapon::EndAbility(
 	const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo, 
 	const FGameplayAbilityActivationInfo ActivationInfo, bool bReplicateEndAbility, bool bWasCancelled)
 {
+	if (bRemoteAimDelegateBound)
+	{
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+		{
+			ASC->AbilityTargetDataSetDelegate(Handle, ActivationInfo.GetActivationPredictionKey())
+				.RemoveAll(this);
+		}
+		bRemoteAimDelegateBound = false;
+	}
+	PendingServerAimShots = 0;
+
 	// 반복 타이머 정리.
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(FireTimerHandle);
+		World->GetTimerManager().ClearTimer(AimTargetDataTimeoutHandle);
 	}
 	
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
@@ -126,14 +191,14 @@ bool UOBGameplayAbility_RangedWeapon::CanActivateAbility(const FGameplayAbilityS
 	return true;
 }
 
-void UOBGameplayAbility_RangedWeapon::FireOneShot()
+bool UOBGameplayAbility_RangedWeapon::FireOneShot()
 {
 	// 발사 도중 스프린트를 누르면 연사/점사를 즉시 끊는다.
 	// CanActivateAbility는 시작만 막으므로 매 발마다 여기서 다시 본다.
 	if (IsOwnerSprinting())
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-		return;
+		return false;
 	}
 	
 	AOBWeaponBase* Weapon = GetEquippedWeapon();
@@ -142,47 +207,101 @@ void UOBGameplayAbility_RangedWeapon::FireOneShot()
 	if (!Weapon || !Weapon->HasAmmo())
 	{
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
-		return;
+		return false;
 	}
 
-	// 탄약 소모(서버 권위).
+	// Remote full-auto can have one or more server shot requests waiting for
+	// client TargetData. Treat those requests as reservations so latency cannot
+	// queue more shots than the magazine can authorize.
+	if (HasAuthority(&CurrentActivationInfo)
+		&& Weapon->GetCurrentAmmo() <= PendingServerAimShots)
+	{
+		UE_LOG(LogOBWeaponAim, Verbose,
+			TEXT("[WeaponAim] Shot request stopped by reserved ammo Character=%s Ammo=%d Pending=%d"),
+			*GetNameSafe(GetOBCharacterFromActorInfo()), Weapon->GetCurrentAmmo(), PendingServerAimShots);
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+		return false;
+	}
+
+	// Capture the evaluated gameplay view before recoil mutates ControlRotation.
+	// GetPlayerViewPoint resolves PlayerCameraManager, including Gameplay Cameras'
+	// transient output camera, instead of the unused native FollowCamera component.
+	FGameplayAbilityTargetDataHandle LocalAimTargetData;
+	const bool bHasLocalAimTargetData = CurrentActorInfo
+		&& CurrentActorInfo->IsLocallyControlled()
+		&& BuildLocalAimTargetData(LocalAimTargetData);
+
+	if (CurrentActorInfo && CurrentActorInfo->IsLocallyControlled() && !bHasLocalAimTargetData)
+	{
+		AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
+		UE_LOG(LogOBWeaponAim, Error,
+			TEXT("[WeaponAim] Local shot cancelled: no evaluated player view Ability=%s Character=%s Controller=%s"),
+			*GetName(), *GetNameSafe(Character),
+			*GetNameSafe(Character ? Character->GetController() : nullptr));
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return false;
+	}
+
+	// 서버는 여기서 탄약을 소모하지 않는다. 한 발의 승인 토큰만 예약하고,
+	// TargetData 검증이 끝난 CommitServerShot에서 탄약/연출/피해를 함께 커밋한다.
 	if (HasAuthority(&CurrentActivationInfo))
 	{
-		Weapon->ConsumeAmmo(1);
+		++PendingServerAimShots;
+
+		const bool bRemoteAuthoritativeInstance = CurrentActorInfo
+			&& !CurrentActorInfo->IsLocallyControlled();
+		if (bRemoteAuthoritativeInstance)
+		{
+			if (UWorld* World = GetWorld(); World
+				&& !World->GetTimerManager().IsTimerActive(AimTargetDataTimeoutHandle))
+			{
+				World->GetTimerManager().SetTimer(
+					AimTargetDataTimeoutHandle,
+					this,
+					&UOBGameplayAbility_RangedWeapon::HandleAimTargetDataTimeout,
+					FMath::Max(0.1f, AimTargetDataTimeoutSeconds),
+					false);
+			}
+		}
 	}
 	
 	// 반동/카메라 쉐이크: 소유 클라. 조준 중이면 감소
 	if (CurrentActorInfo && CurrentActorInfo->IsLocallyControlled())
 	{
-		if (UOBWeaponData* Data = Weapon->GetWeaponData())
+		if (Weapon->GetResolvedStats().WeaponType == EOBWeaponType::Ranged)
 		{
+			const FOBResolvedWeaponStats& Stats = Weapon->GetResolvedStats();
+			const FOBWeaponDefinitionRow* Definition = Weapon->GetWeaponDefinition();
 			if (AOBCharacterBase* Char = GetOBCharacterFromActorInfo())
 			{
 				Char->NotifyFired();
 				
 				// 조준 중이면 반동 배율 적용.
-				const float RecoilMult = Char->IsAiming() ? Data->ADSRecoilMultiplier : 1.0f;
+				const float RecoilMult = Char->IsAiming() ? Stats.ADSRecoilMultiplier : 1.0f;
 				
 				if (AOBPlayerController* PC = Cast<AOBPlayerController>(Char->GetController()))
 				{
 					PC->ApplyWeaponRecoil(
-						Data->VerticalRecoil * RecoilMult,
-						Data->HorizontalRecoil * RecoilMult,
-						Data->RecoilRecoverySpeed,
-						Data->FireCameraShake,
-						Data->FireCameraShakeScale * RecoilMult);
+						Stats.VerticalRecoil * RecoilMult,
+						Stats.HorizontalRecoil * RecoilMult,
+						Stats.RecoilRecoverySpeed,
+						Definition ? Definition->Ranged.FireCameraShake : nullptr,
+						(Definition ? Definition->Ranged.FireCameraShakeScale : 1.f) * RecoilMult);
 					
-					Char->AddFireFocusPulse(Data->FireFocusPulse);  // 화면 집중 펄스
+					Char->AddFireFocusPulse(Stats.FireFocusPulse);
 				}
 			}
 		}
 	}
 
-	// 트레이스/데미지/큐/몽타주: 서버에서만 수행.
-	if (HasAuthority(&CurrentActivationInfo))
+	// Each predicted local shot carries exactly one evaluated camera view. Remote
+	// server instances never invent a view from a non-rendering camera component.
+	if (bHasLocalAimTargetData)
 	{
-		PerformServerWeaponTrace();
+		SubmitLocalAimTargetData(LocalAimTargetData);
 	}
+
+	return true;
 }
 
 AOBWeaponBase* UOBGameplayAbility_RangedWeapon::GetEquippedWeapon() const
@@ -201,10 +320,7 @@ EOBWeaponFireMode UOBGameplayAbility_RangedWeapon::GetFireMode() const
 {
 	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
 	{
-		if (UOBWeaponData* Data = Weapon->GetWeaponData())
-		{
-			return Data->FireMode;
-		}
+		return Weapon->GetResolvedStats().FireMode;
 	}
 	return EOBWeaponFireMode::Single;
 }
@@ -213,10 +329,7 @@ int32 UOBGameplayAbility_RangedWeapon::GetBurstCount() const
 {
 	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
 	{
-		if (UOBWeaponData* Data = Weapon->GetWeaponData())
-		{
-			return FMath::Max(1, Data->BurstCount);
-		}
+		return FMath::Max(1, Weapon->GetResolvedStats().BurstCount);
 	}
 	return 3;
 }
@@ -225,10 +338,8 @@ float UOBGameplayAbility_RangedWeapon::GetFireInterval() const
 {
 	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
 	{
-		if (UOBWeaponData* Data = Weapon->GetWeaponData())
-		{
-			return (Data->RoundsPerMinute > 0.0f) ? (60.0f / Data->RoundsPerMinute) : 0.1f;
-		}
+		const float RPM = Weapon->GetResolvedStats().RoundsPerMinute;
+		return RPM > 0.f ? 60.f / RPM : 0.1f;
 	}
 	return 0.1f;
 }
@@ -247,29 +358,226 @@ bool UOBGameplayAbility_RangedWeapon::IsOwnerSprinting() const
 	return Char->IsSprintInputHeld() && Char->GetVelocity().SizeSquared2D() > 1.f;
 }
 
-void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
+bool UOBGameplayAbility_RangedWeapon::BuildLocalAimTargetData(
+	FGameplayAbilityTargetDataHandle& OutTargetData) const
 {
-	AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
-	AOBWeaponBase* Weapon = GetEquippedWeapon();
-	if (!Character || !Weapon) return;
-
-	UOBWeaponData* WeaponData = Weapon->GetWeaponData();
-	if (!WeaponData) return;
-
-	// 1) 카메라에서 전방으로 트레이스해 실제 조준점을 구한다(크로스헤어=화면 중앙과 일치).
-	FVector CamLoc;
-	FRotator CamRot;
-	if (UCameraComponent* Cam = Character->GetFollowCamera())
+	const AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
+	const APlayerController* PlayerController = Character
+		? Cast<APlayerController>(Character->GetController())
+		: nullptr;
+	const AOBWeaponBase* Weapon = GetEquippedWeapon();
+	if (!Character || !PlayerController || !PlayerController->IsLocalController() || !Weapon
+		|| PlayerController->GetViewTarget() != Character)
 	{
-		CamLoc = Cam->GetComponentLocation();
-		CamRot = Cam->GetComponentRotation();
+		return false;
+	}
+
+	FVector ViewOrigin;
+	FRotator ViewRotation;
+	PlayerController->GetPlayerViewPoint(ViewOrigin, ViewRotation);
+	if (ViewOrigin.ContainsNaN() || ViewRotation.ContainsNaN())
+	{
+		return false;
+	}
+
+	const float Range = FMath::Max(100.f, Weapon->GetResolvedStats().Range);
+	auto* AimData = new FGameplayAbilityTargetData_LocationInfo();
+	AimData->SourceLocation.LocationType = EGameplayAbilityTargetingLocationType::LiteralTransform;
+	AimData->SourceLocation.LiteralTransform = FTransform(ViewRotation, ViewOrigin);
+	AimData->TargetLocation.LocationType = EGameplayAbilityTargetingLocationType::LiteralTransform;
+	AimData->TargetLocation.LiteralTransform = FTransform(
+		ViewRotation,
+		ViewOrigin + ViewRotation.Vector() * Range);
+	OutTargetData.Add(AimData);
+
+	UE_LOG(LogOBWeaponAim, Log,
+		TEXT("[WeaponAim] Local view captured Character=%s Controller=%s ViewTarget=%s Origin=%s Rotation=%s PawnOffset=%.1f Range=%.0f"),
+		*Character->GetName(), *PlayerController->GetName(),
+		*GetNameSafe(PlayerController->GetViewTarget()), *ViewOrigin.ToCompactString(),
+		*ViewRotation.ToCompactString(), FVector::Distance(ViewOrigin, Character->GetActorLocation()), Range);
+	return true;
+}
+
+void UOBGameplayAbility_RangedWeapon::SubmitLocalAimTargetData(
+	const FGameplayAbilityTargetDataHandle& TargetData)
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (!ASC || TargetData.Num() == 0)
+	{
+		return;
+	}
+
+	if (HasAuthority(&CurrentActivationInfo))
+	{
+		HandleAimTargetData(TargetData, FGameplayTag());
+		return;
+	}
+
+	FScopedPredictionWindow ScopedPrediction(ASC, true);
+	ASC->CallServerSetReplicatedTargetData(
+		CurrentSpecHandle,
+		CurrentActivationInfo.GetActivationPredictionKey(),
+		TargetData,
+		FGameplayTag(),
+		ASC->ScopedPredictionKey);
+}
+
+void UOBGameplayAbility_RangedWeapon::HandleAimTargetData(
+	const FGameplayAbilityTargetDataHandle& TargetData,
+	FGameplayTag ActivationTag)
+{
+	(void)ActivationTag;
+	if (!HasAuthority(&CurrentActivationInfo))
+	{
+		return;
+	}
+
+	FGameplayAbilityTargetDataHandle ReceivedData = TargetData;
+	if (bRemoteAimDelegateBound)
+	{
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+		{
+			ASC->ConsumeClientReplicatedTargetData(
+				CurrentSpecHandle,
+				CurrentActivationInfo.GetActivationPredictionKey());
+		}
+	}
+
+	if (PendingServerAimShots <= 0)
+	{
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponAim] Rejected target data without an authoritative shot Character=%s DataCount=%d"),
+			*GetNameSafe(GetOBCharacterFromActorInfo()), ReceivedData.Num());
+		return;
+	}
+	--PendingServerAimShots;
+
+	const FGameplayAbilityTargetData* AimData = ReceivedData.Num() > 0 ? ReceivedData.Get(0) : nullptr;
+	if (!AimData || !AimData->HasOrigin() || !AimData->HasEndPoint())
+	{
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponAim] Rejected malformed target data Character=%s DataCount=%d"),
+			*GetNameSafe(GetOBCharacterFromActorInfo()), ReceivedData.Num());
 	}
 	else
 	{
-		Character->GetActorEyesViewPoint(CamLoc, CamRot); // 폴백
+		const FVector ViewOrigin = AimData->GetOrigin().GetLocation();
+		const FVector ViewDirection = (AimData->GetEndPoint() - ViewOrigin).GetSafeNormal();
+		CommitServerShot(ViewOrigin, ViewDirection);
+	}
+
+	if (bRemoteAimDelegateBound)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(AimTargetDataTimeoutHandle);
+			if (PendingServerAimShots > 0)
+			{
+				World->GetTimerManager().SetTimer(
+					AimTargetDataTimeoutHandle,
+					this,
+					&UOBGameplayAbility_RangedWeapon::HandleAimTargetDataTimeout,
+					FMath::Max(0.1f, AimTargetDataTimeoutSeconds),
+					false);
+			}
+		}
+	}
+
+	const bool bRemoteSingleComplete = CurrentFireMode == EOBWeaponFireMode::Single;
+	const bool bRemoteBurstComplete = CurrentFireMode == EOBWeaponFireMode::Burst
+		&& ShotsFired >= GetBurstCount()
+		&& PendingServerAimShots == 0;
+	if (bRemoteAimDelegateBound && (bRemoteSingleComplete || bRemoteBurstComplete) && IsActive())
+	{
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
+	}
+}
+
+void UOBGameplayAbility_RangedWeapon::HandleAimTargetDataTimeout()
+{
+	if (!HasAuthority(&CurrentActivationInfo) || !IsActive() || PendingServerAimShots <= 0)
+	{
+		return;
+	}
+
+	UE_LOG(LogOBWeaponAim, Error,
+		TEXT("[WeaponAim] TargetData timeout; cancelling uncommitted server shots Character=%s Pending=%d Timeout=%.2fs"),
+		*GetNameSafe(GetOBCharacterFromActorInfo()), PendingServerAimShots,
+		FMath::Max(0.1f, AimTargetDataTimeoutSeconds));
+
+	// No ammo has been consumed for these pending requests, so cancellation does
+	// not require a refund and cannot leave a half-fired authoritative shot.
+	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+}
+
+bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
+	const FVector& ViewOrigin,
+	const FVector& ViewDirection)
+{
+	AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
+	AOBWeaponBase* Weapon = GetEquippedWeapon();
+	if (!Character || !Weapon || ViewOrigin.ContainsNaN() || ViewDirection.ContainsNaN()
+		|| ViewDirection.IsNearlyZero())
+	{
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponAim] Rejected server shot with invalid source Character=%s Weapon=%s Origin=%s Direction=%s"),
+			*GetNameSafe(Character), *GetNameSafe(Weapon), *ViewOrigin.ToCompactString(),
+			*ViewDirection.ToCompactString());
+		return false;
+	}
+
+	const FOBResolvedWeaponStats& Stats = Weapon->GetResolvedStats();
+	const FOBWeaponDefinitionRow* WeaponDefinition = Weapon->GetWeaponDefinition();
+	if (Stats.WeaponType != EOBWeaponType::Ranged || !WeaponDefinition)
+	{
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponAim] Rejected server shot with unresolved ranged weapon Character=%s Weapon=%s"),
+			*Character->GetName(), *Weapon->GetName());
+		return false;
+	}
+
+	const FVector NormalizedViewDirection = ViewDirection.GetSafeNormal();
+	const FVector PawnViewOrigin = Character->GetPawnViewLocation();
+	const float CameraDistance = FVector::Distance(ViewOrigin, Character->GetActorLocation());
+	const FVector ServerAimDirection = Character->GetBaseAimRotation().Vector().GetSafeNormal();
+	const float AimDot = FMath::Clamp(
+		FVector::DotProduct(NormalizedViewDirection, ServerAimDirection),
+		-1.f,
+		1.f);
+	const float AimErrorDegrees = FMath::RadiansToDegrees(FMath::Acos(AimDot));
+	if (CameraDistance > FMath::Max(100.f, MaxValidatedCameraDistance)
+		|| AimErrorDegrees > FMath::Clamp(MaxValidatedAimAngleDegrees, 0.f, 89.f))
+	{
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponAim] Rejected client view Character=%s Origin=%s CameraDistance=%.1f/%.1f Direction=%s AimError=%.1f/%.1f ServerAim=%s"),
+			*Character->GetName(), *ViewOrigin.ToCompactString(), CameraDistance,
+			MaxValidatedCameraDistance, *NormalizedViewDirection.ToCompactString(), AimErrorDegrees,
+			MaxValidatedAimAngleDegrees, *ServerAimDirection.ToCompactString());
+		return false;
+	}
+
+	FCollisionQueryParams CameraValidationParams(
+		SCENE_QUERY_STAT(OBCameraOriginValidation),
+		/*bTraceComplex=*/true);
+	CameraValidationParams.AddIgnoredActor(Character);
+	CameraValidationParams.AddIgnoredActor(Weapon);
+	FHitResult CameraObstruction;
+	if (GetWorld()->LineTraceSingleByChannel(
+		CameraObstruction,
+		PawnViewOrigin,
+		ViewOrigin,
+		OB_TraceChannel_CameraProbe,
+		CameraValidationParams)
+		&& FVector::DistSquared(CameraObstruction.ImpactPoint, ViewOrigin) > FMath::Square(20.f))
+	{
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponAim] Rejected camera origin behind obstruction Character=%s PawnView=%s Origin=%s Hit=%s Actor=%s"),
+			*Character->GetName(), *PawnViewOrigin.ToCompactString(), *ViewOrigin.ToCompactString(),
+			*CameraObstruction.ImpactPoint.ToCompactString(), *GetNameSafe(CameraObstruction.GetActor()));
+		return false;
 	}
 	
-	const FVector CamEnd = CamLoc + CamRot.Vector() * WeaponData->Range;
+	const FVector CamEnd = ViewOrigin + NormalizedViewDirection * Stats.Range;
 	
 	FCollisionQueryParams AimParams(SCENE_QUERY_STAT(OBAimProbe), /*bTraceComplex=*/true);
 	AimParams.AddIgnoredActor(Character);
@@ -278,17 +586,23 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	// 카메라~머즐 사이 벽에 맞으면 조준점을 그 지점으로. 아니면 먼 지점.
 	FHitResult AimHit;
 	FVector AimPoint = GetWorld()->LineTraceSingleByChannel(
-		AimHit, CamLoc, CamEnd, OB_TraceChannel_Weapon, AimParams) 
+		AimHit, ViewOrigin, CamEnd, OB_TraceChannel_Weapon, AimParams)
 		? AimHit.ImpactPoint : CamEnd;
 	
 	// 2) 실제 탄환은 머즐에서 조준점으로. 여기에 스프레드 콘 적용.
 	const FVector MuzzleLoc = Weapon->GetMuzzleLocation();
 	
 	// 카메라가 벽에 끼면 조준점이 머즐 뒤에 잡혀 탄이 뒤로 나간다. 카메라 전방으로 폴백.
-	if (FVector::DotProduct(AimPoint - MuzzleLoc, CamRot.Vector()) <= 0.f)
+	if (FVector::DotProduct(AimPoint - MuzzleLoc, NormalizedViewDirection) <= 0.f)
 	{
-		AimPoint = MuzzleLoc + CamRot.Vector() * WeaponData->Range;
+		AimPoint = MuzzleLoc + NormalizedViewDirection * Stats.Range;
 	}
+
+	UE_LOG(LogOBWeaponAim, Log,
+		TEXT("[WeaponAim] Server view accepted Character=%s Origin=%s PawnOffset=%.1f Direction=%s AimError=%.1f AimPoint=%s AimActor=%s Muzzle=%s"),
+		*Character->GetName(), *ViewOrigin.ToCompactString(), CameraDistance,
+		*NormalizedViewDirection.ToCompactString(), AimErrorDegrees, *AimPoint.ToCompactString(),
+		*GetNameSafe(AimHit.GetActor()), *MuzzleLoc.ToCompactString());
 	
 	const FVector AimDir = (AimPoint - MuzzleLoc).GetSafeNormal();
 	
@@ -310,32 +624,47 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 	
 	QueryParams.bReturnPhysicalMaterial = true;
 	
-	// 소스 ASC를 먼저 확보(발사 큐는 명중 여부와 무관하게 발생).
+	// 모든 검증과 조준점 산출이 끝난 뒤에만 승인된 한 발을 커밋한다.
+	// 이 지점 전에는 탄약, 서버 Cue, 몽타주, 피해 중 어떤 것도 변경하지 않는다.
 	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
-	
-	// --- 발사 큐: 총구 화염 + 사격음. 탄자 수와 무관하게 1회 ---
-	if (SourceASC)
+	if (!Weapon->HasAmmo() || !SourceASC)
 	{
-		FGameplayCueParameters FireCueParams;
-		FireCueParams.Location = MuzzleLoc;
-		FireCueParams.Instigator = Character;
-		FireCueParams.SourceObject = Weapon;
-		SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Fire, FireCueParams);
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponFire] Authoritative shot not committed Character=%s Weapon=%s Ammo=%d ASC=%s"),
+			*Character->GetName(), *Weapon->GetName(), Weapon->GetCurrentAmmo(),
+			*GetNameSafe(SourceASC));
+		return false;
 	}
+
+	const int32 AmmoBeforeShot = Weapon->GetCurrentAmmo();
+	Weapon->ConsumeAmmo(1);
+
+	// --- 발사 큐: 총구 화염 + 사격음. 탄자 수와 무관하게 1회 ---
+	FGameplayCueParameters FireCueParams;
+	FireCueParams.Location = MuzzleLoc;
+	FireCueParams.Instigator = Character;
+	FireCueParams.SourceObject = Weapon;
+	SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Fire, FireCueParams);
 	
 	// 발사 반동 몽타주(모든 클라에 복제). 명중 여부와 무관.
-	if (WeaponData->AttackMontage)
+	UAnimMontage* AttackMontage = WeaponDefinition->Visual.AttackMontage.LoadSynchronous();
+	if (AttackMontage)
 	{
-		Character->Multicast_PlayFireMontage(WeaponData->AttackMontage);
+		Character->Multicast_PlayFireMontage(AttackMontage);
 	}
+
+	UE_LOG(LogOBWeaponAim, Log,
+		TEXT("[WeaponFire] Authoritative shot committed Character=%s Weapon=%s Ammo=%d->%d FireCue=%s Montage=%s"),
+		*Character->GetName(), *Weapon->GetName(), AmmoBeforeShot, Weapon->GetCurrentAmmo(),
+		*OBGameplayTags::GameplayCue_Weapon_Fire.GetTag().ToString(), *GetNameSafe(AttackMontage));
 	
 	// --- 탄자 루프: 샷건은 1회 발사에 여러 발이 각자 퍼진다 ---
 	// ponytail: 탄자마다 임팩트 큐를 개별 멀티캐스트. 8발이면 8회 — 대역폭이 문제되면 큐 1회로 묶을 것.
-	const int32 Pellets = FMath::Max(1, WeaponData->PelletsPerShot);
+	const int32 Pellets = FMath::Max(1, Stats.PelletsPerShot);
 	for (int32 PelletIndex = 0; PelletIndex < Pellets; ++PelletIndex)
 	{
 		const FVector ShotDirection = (SpreadRadians > 0.f) ? FMath::VRandCone(AimDir, SpreadRadians) : AimDir;
-		const FVector TraceEnd = TraceStart + ShotDirection * WeaponData->Range;
+		const FVector TraceEnd = TraceStart + ShotDirection * Stats.Range;
 		
 		FHitResult Hit;
 		const bool bHit = GetWorld()->LineTraceSingleByChannel(
@@ -347,7 +676,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		{
 			UGameplayStatics::ApplyPointDamage(
 				HitActor,
-				WeaponData->BaseDamage,
+				Stats.Damage,
 				ShotDirection,
 				Hit,
 				nullptr,
@@ -364,7 +693,7 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		}
 #endif
 
-		if (!bHit || !Hit.GetActor()) return; // 빗나감: 발사 큐만 재생하고 종료.
+		if (!bHit || !Hit.GetActor()) continue; // 빗나감: 발사 큐만 재생하고 종료.
 	
 		// --- 피격 큐: 탄착 이펙트 (명중 지점) ---
 		if (SourceASC)
@@ -377,23 +706,45 @@ void UOBGameplayAbility_RangedWeapon::PerformServerWeaponTrace()
 		}
 	
 		// 같은 팀이면 무기 피해 무시(탄착 이펙트는 이미 재생됨).
-		if (AOBPlayerStateBase::AreSameTeam(Character, Hit.GetActor())) return;
+		if (AOBPlayerStateBase::AreSameTeam(Character, Hit.GetActor())) continue;
 
 		// --- 데미지 적용 ---
 		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Hit.GetActor());
-		if (!TargetASC || !WeaponData->DamageEffect || !SourceASC) continue;
+		if (!TargetASC || !WeaponDefinition->Common.DamageEffect || !SourceASC) continue;
 
 		// 데미지 GE 스펙 생성 + SetByCaller로 무기 데미지 주입.
 		FGameplayEffectContextHandle Context = SourceASC->MakeEffectContext();
 		Context.AddSourceObject(Weapon);
 		Context.AddHitResult(Hit);
 
-		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(WeaponData->DamageEffect, GetAbilityLevel(), Context);
+		FGameplayEffectSpecHandle SpecHandle = SourceASC->MakeOutgoingSpec(WeaponDefinition->Common.DamageEffect, GetAbilityLevel(), Context);
 
 		if (SpecHandle.IsValid())
 		{
-			SpecHandle.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, WeaponData->BaseDamage);
+			float FinalDamage = Stats.Damage;
+
+			const bool bHeadshot =
+				Stats.HeadshotMultiplier > 1.f && IsHeadBone(Hit.BoneName);
+			if (bHeadshot)
+			{
+				FinalDamage *= Stats.HeadshotMultiplier;
+			}
+
+			SpecHandle.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, FinalDamage);
 			SourceASC->ApplyGameplayEffectSpecToTarget(*SpecHandle.Data, TargetASC);
+			
+			// 사망 시 래그돌이 맞은 방향으로 쓰러지도록 기록.
+			// ponytail: 피격 대상 타입이 셋째로 늘어나면 인터페이스로 뺀다. 둘이면 캐스트가 더 싸다.
+			if (AOBCharacterBase* HitChar = Cast<AOBCharacterBase>(Hit.GetActor()))
+			{
+				HitChar->NotifyHitForRagdoll(Hit.BoneName, ShotDirection);
+			}
+			else if (AEnemyCharacter* HitEnemy = Cast<AEnemyCharacter>(Hit.GetActor()))
+			{
+				HitEnemy->NotifyHitForRagdoll(Hit.BoneName, ShotDirection);
+			}
 		}
 	}
+
+	return true;
 }

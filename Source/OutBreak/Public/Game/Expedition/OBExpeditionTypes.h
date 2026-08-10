@@ -11,7 +11,8 @@ enum class EOBExpeditionPhase : uint8
 {
 	Warmup     UMETA(DisplayName = "Warmup"),      // 로드/시작 대기
 	InProgress UMETA(DisplayName = "In Progress"), // 진행(타이머 가동)
-	Ended      UMETA(DisplayName = "Ended")        // 종료(결과/복귀)
+	Ended      UMETA(DisplayName = "Ended"),       // 종료(결과/복귀)
+	Insertion  UMETA(DisplayName = "Insertion")
 };
 
 // 플레이어 개인 결과 상태.

@@ -8,6 +8,7 @@
 #include "OBGameplayAbility_RangedWeapon.generated.h"
 
 class AOBWeaponBase;
+struct FGameplayAbilityTargetDataHandle;
 
 /*
  * 왜 존재하는가?
@@ -45,8 +46,8 @@ protected:
 		const FGameplayTagContainer* TargetTags = nullptr,
 		OUT FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
 
-	// 단발 1회: 반동(클라) + 트레이스/데미지/큐/몽타주(서버).
-	void FireOneShot();
+	// 단발 1회 요청: 로컬 예측 반동 + 서버 TargetData 승인 대기.
+	bool FireOneShot();
 
 	// 점사/연사 타이머 콜백.
 	void FireLoop();
@@ -55,8 +56,23 @@ protected:
 	UFUNCTION()
 	void OnFireInputReleased(float TimeHeld);
 
-	// 서버 트레이스
-	void PerformServerWeaponTrace();
+	/** Captures the owning client's evaluated PlayerCameraManager view for one shot. */
+	bool BuildLocalAimTargetData(FGameplayAbilityTargetDataHandle& OutTargetData) const;
+
+	/** Sends predicted client aim through GAS' prediction-key target-data channel. */
+	void SubmitLocalAimTargetData(const FGameplayAbilityTargetDataHandle& TargetData);
+
+	/** Server callback for both local-host and replicated client shot views. */
+	void HandleAimTargetData(const FGameplayAbilityTargetDataHandle& TargetData, FGameplayTag ActivationTag);
+
+	/** Cancels a remote authoritative ability whose client never supplied aim data. */
+	void HandleAimTargetDataTimeout();
+
+	/**
+	 * Validates the submitted view, then atomically commits ammo, fire presentation,
+	 * muzzle-origin ballistics, and damage on the server.
+	 */
+	bool CommitServerShot(const FVector& ViewOrigin, const FVector& ViewDirection);
 	AOBWeaponBase* GetEquippedWeapon() const;
 	
 	// 무기 데이터 조회 헬퍼.
@@ -70,6 +86,18 @@ protected:
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Debug")
 	bool bDrawDebugTrace = false;
+
+	/** Maximum distance allowed between the server pawn and a client camera origin. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Targeting|Validation", meta = (ClampMin = "100.0"))
+	float MaxValidatedCameraDistance = 1200.f;
+
+	/** Maximum angle between submitted camera direction and replicated control aim. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Targeting|Validation", meta = (ClampMin = "0.0", ClampMax = "89.0"))
+	float MaxValidatedAimAngleDegrees = 30.f;
+
+	/** Maximum time a remote server shot may wait for its matching client view. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "OB|Targeting|Validation", meta = (ClampMin = "0.1"))
+	float AimTargetDataTimeoutSeconds = 1.f;
 	
 private:
 	// 소유 캐릭터가 스프린트(고속) 중인지. 발사 게이트 공용.
@@ -78,8 +106,14 @@ private:
 private:
 	// 점사/연사 반복 타이머.
 	FTimerHandle FireTimerHandle;
+	// 서버가 가장 오래 대기 중인 TargetData를 감시하는 타이머.
+	FTimerHandle AimTargetDataTimeoutHandle;
 	// 이번 활성화에서 쏜 발 수.
 	int32 ShotsFired = 0;
 	// 이번 활성화의 발사 모드.
 	EOBWeaponFireMode CurrentFireMode = EOBWeaponFireMode::Single;
+
+	/** Server-issued shots waiting for exactly one matching client view each. */
+	int32 PendingServerAimShots = 0;
+	bool bRemoteAimDelegateBound = false;
 };

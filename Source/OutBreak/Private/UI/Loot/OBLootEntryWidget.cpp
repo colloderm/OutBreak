@@ -5,7 +5,9 @@
 #include "Components/Button.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Inventory/Data/InventoryData.h"
 #include "Item/OBItemRegistry.h"
+#include "UI/Tooltip/OBItemTooltipLibrary.h"
 
 void UOBLootEntryWidget::NativeConstruct()
 {
@@ -19,6 +21,7 @@ void UOBLootEntryWidget::NativeConstruct()
 
 void UOBLootEntryWidget::SetEntry(const FGameplayTag& InItemTag, int32 InCount)
 {
+	InstanceId.Invalidate();
 	ItemTag = InItemTag;
 	Count = InCount;
 
@@ -38,7 +41,36 @@ void UOBLootEntryWidget::SetEntry(const FGameplayTag& InItemTag, int32 InCount)
 	}
 }
 
+void UOBLootEntryWidget::SetItemInstance(const FInventoryData& InItemInstance)
+{
+	SetEntry(InItemInstance.ItemTag, InItemInstance.ItemStack);
+	InstanceId = InItemInstance.InstanceId;
+	SetToolTipText(UOBItemTooltipLibrary::BuildFallbackTooltipText(InItemInstance));
+}
+
 void UOBLootEntryWidget::HandleTakeClicked()
 {
-	OnEntryClicked.ExecuteIfBound(ItemTag, Count);
+	const int32 RequestedCount = ResolveClickCount();
+	if (InstanceId.IsValid())
+	{
+		OnInstanceClicked.ExecuteIfBound(InstanceId, RequestedCount);
+	}
+	else
+	{
+		OnEntryClicked.ExecuteIfBound(ItemTag, RequestedCount);
+	}
+}
+
+int32 UOBLootEntryWidget::ResolveClickCount() const
+{
+	if (Count <= 1) return Count;
+
+	// UButton의 OnClicked는 수정키를 안 넘겨준다. 클릭 시점의 키보드 상태를 직접 읽는다.
+	if (!FSlateApplication::IsInitialized()) return Count;
+
+	const FModifierKeysState Mods = FSlateApplication::Get().GetModifierKeys();
+	if (Mods.IsControlDown()) return 1;
+	if (Mods.IsShiftDown())   return FMath::DivideAndRoundUp(Count, 2);
+	
+	return Count;
 }

@@ -55,15 +55,31 @@ public:
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
 	                           FActorComponentTickFunction* ThisTickFunction) override;
 	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	
 	void ApplyDamage(float DamageAmount);
 	void ActionPhysical(const FHitResult& HitResult, float DamageAmount);
+	void BloodVFX(const FHitResult& HitResult);
 
 	ELocomotionWalkRunState EvaluateLocomotionState() const;
 
 	UFUNCTION(BlueprintPure, Category = "Physical|State")
 	EEnemyMissingArmState GetMissingArmState() const;
 private:
-	void ActionLimb(UStaticMesh* MeshAsset, FName BoneName, float Damage);
+	// 조각 메시는 뼈 이름으로 찾는다. 호출부마다 넘기면 클라에서 재현할 수 없다.
+	void ActionLimb(FName BoneName, float Damage);
+
+	// 서버·클라 공통 파괴 연출. 상태 판정은 ActionLimb/OnRep에서만 한다.
+	void ApplyLimbDestruction(FName BoneName);
+
+	UStaticMesh* GetLimbMesh(FName BoneName) const;
+
+	UFUNCTION()
+	void OnRep_DestroyedLimbs();
+
+	// TMap은 복제 불가라 파괴된 뼈만 배열로 복제한다.
+	UPROPERTY(ReplicatedUsing = OnRep_DestroyedLimbs)
+	TArray<FName> DestroyedLimbs;
 	
 	float Health = 175.f;
 	

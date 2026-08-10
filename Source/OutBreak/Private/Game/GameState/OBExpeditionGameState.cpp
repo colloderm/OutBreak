@@ -19,6 +19,9 @@ void AOBExpeditionGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(AOBExpeditionGameState, SessionLength);
 	DOREPLIFETIME(AOBExpeditionGameState, bFinalMinute);
 	DOREPLIFETIME(AOBExpeditionGameState, LootSeed);
+	DOREPLIFETIME(AOBExpeditionGameState, PublicExtractLocations);
+	DOREPLIFETIME(AOBExpeditionGameState, MapData);
+	DOREPLIFETIME(AOBExpeditionGameState, TeamInsertionStates);
 }
 
 //~ 서버 세터 ---------------------------------------------------------------
@@ -66,6 +69,50 @@ void AOBExpeditionGameState::SetLootSeed(int32 InSeed)
 	LootSeed = InSeed;
 }
 
+void AOBExpeditionGameState::SetTeamInsertionState(const FOBTeamInsertionState& NewState)
+{
+	if (!HasAuthority() || NewState.TeamId == 0)
+	{
+		return;
+	}
+
+	const int32 ExistingIndex = TeamInsertionStates.IndexOfByPredicate(
+		[&NewState](const FOBTeamInsertionState& Entry) { return Entry.TeamId == NewState.TeamId; });
+	if (ExistingIndex == INDEX_NONE)
+	{
+		TeamInsertionStates.Add(NewState);
+	}
+	else
+	{
+		TeamInsertionStates[ExistingIndex] = NewState;
+	}
+	OnTeamInsertionStatesChanged.Broadcast();
+	ForceNetUpdate();
+}
+
+void AOBExpeditionGameState::RemoveTeamInsertionState(uint8 TeamId)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	TeamInsertionStates.RemoveAll([TeamId](const FOBTeamInsertionState& Entry) { return Entry.TeamId == TeamId; });
+	OnTeamInsertionStatesChanged.Broadcast();
+	ForceNetUpdate();
+}
+
+bool AOBExpeditionGameState::GetTeamInsertionState(uint8 TeamId, FOBTeamInsertionState& OutState) const
+{
+	if (const FOBTeamInsertionState* Found = TeamInsertionStates.FindByPredicate(
+		[TeamId](const FOBTeamInsertionState& Entry) { return Entry.TeamId == TeamId; }))
+	{
+		OutState = *Found;
+		return true;
+	}
+	OutState = FOBTeamInsertionState();
+	return false;
+}
+
 TArray<AOBPlayerStateBase*> AOBExpeditionGameState::GetExpeditionPlayers() const
 {
 	TArray<AOBPlayerStateBase*> Out;
@@ -98,3 +145,21 @@ void AOBExpeditionGameState::OnRep_TimeRemaining()
 	OnTimeRemainingChanged.Broadcast(TimeRemaining);
 }
 
+void AOBExpeditionGameState::OnRep_TeamInsertionStates()
+{
+	OnTeamInsertionStatesChanged.Broadcast();
+}
+
+void AOBExpeditionGameState::SetPublicExtractLocations(const TArray<FVector_NetQuantize>& InLocations)
+{
+	if (!HasAuthority()) return;
+	
+	PublicExtractLocations = InLocations;
+}
+
+void AOBExpeditionGameState::SetMapData(UOBExpeditionMapData* InMapData)
+{
+	if (!HasAuthority()) return;
+	
+	MapData = InMapData;
+}

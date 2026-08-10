@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
+#include "GameFramework/GameplayCameraComponentBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
@@ -23,12 +24,17 @@
 #include "DrawDebugHelpers.h"
 #include "Character/Animation/OBAnimInstance.h"
 #include "Character/Components/OBCharacterMovementComponent.h"
-#include "Weapon/Data/OBWeaponData.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "TimerManager.h"
 #include "AI/EnemyController.h"
 #include "Item/Loot/OBLootContainer.h"
+#include "Item/Data/OBItemDefinition.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "Player/Controller/OBPlayerController.h"
+#include "Data/OBGameDataSubsystem.h"
+#include "Player/Data/OBPlayerStatData.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogOBCameraProvider, Log, All);
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
 {
@@ -80,6 +86,17 @@ AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
 void AOBCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Gameplay Cameras owns the evaluated view for player Blueprints that carry
+	// this component. Disable the inherited native camera once, at provider setup,
+	// so AActor::CalcCamera never selects two competing camera providers.
+	if (FollowCamera && FindComponentByClass<UGameplayCameraComponentBase>())
+	{
+		FollowCamera->Deactivate();
+		UE_LOG(LogOBCameraProvider, Log,
+			TEXT("[CameraProvider] Gameplay Camera selected Character=%s NativeFollowCameraActive=false"),
+			*GetName());
+	}
 	
 	if (EquipmentComponent)
 	{
@@ -110,6 +127,8 @@ void AOBCharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AOBCharacterBase, bIsDead);
 	DOREPLIFETIME(AOBCharacterBase, bIsAiming);
 	DOREPLIFETIME(AOBCharacterBase, bIsDowned);
+	DOREPLIFETIME(AOBCharacterBase, LastHitDirection);
+	DOREPLIFETIME(AOBCharacterBase, LastHitBoneName);
 }
 
 void AOBCharacterBase::HandleDeath()
@@ -246,6 +265,14 @@ void AOBCharacterBase::StartRagdoll()
 	MeshComp->SetAllBodiesSimulatePhysics(true);
 	MeshComp->SetSimulatePhysics(true);
 	MeshComp->WakeAllRigidBodies();
+	
+	// 맞은 방향으로 쓰러진다. 방향이 없으면(낙사·출혈 등) 그냥 무너진다.
+	if (!LastHitDirection.IsNearlyZero() && RagdollImpulseStrength > 0.f)
+	{
+		const FName Bone = (LastHitBoneName != NAME_None) ? LastHitBoneName : MeshComp->GetBoneName(0);
+
+		MeshComp->AddImpulse(LastHitDirection * RagdollImpulseStrength, Bone, /*bVelChange=*/false);
+	}
 }
 
 void AOBCharacterBase::SetAiming(bool bnewAiming)
@@ -263,29 +290,30 @@ void AOBCharacterBase::OnRep_isAiming()
 void AOBCharacterBase::UpdateAimingState()
 {
 	// 현재 무기 데이터
-	UOBWeaponData* Data = nullptr;
-	if (EquipmentComponent)
-	{
-		if (AOBWeaponBase* Weapon = EquipmentComponent->GetCurrentWeapon())
-		{
-			Data = Weapon->GetWeaponData();
-		}
-	}
+	const AOBWeaponBase* Weapon = EquipmentComponent
+		? EquipmentComponent->GetCurrentWeapon()
+		: nullptr;
+	const FOBResolvedWeaponStats* Stats = Weapon && Weapon->GetItemTag().IsValid()
+		? &Weapon->GetResolvedStats()
+		: nullptr;
 	
 	// 이동 감속(모든 머신: 복제된 bIsAiming + 공유 WeaponData)
 	if (UOBCharacterMovementComponent* MoveComp = Cast<UOBCharacterMovementComponent>(GetCharacterMovement()))
 	{
 		// 기동성(무기 무게) × ADS 감속. 맨손 = 1.0(최고속).
-		const float Mobility = Data ? Data->MobilityMultiplier : 1.0f;
-		const float AimMult  = (bIsAiming && Data) ? Data->ADSSpeedMultiplier : 1.0f;
+		const float PlayerMoveMultiplier = AttributeSet
+			? AttributeSet->GetMoveSpeedMultiplier()
+			: 1.f;
+		const float Mobility = (Stats ? Stats->MobilityMultiplier : 1.0f) * PlayerMoveMultiplier;
+		const float AimMult  = (bIsAiming && Stats) ? Stats->ADSSpeedMultiplier : 1.0f;
 		MoveComp->SetSpeedMultipliers(Mobility, AimMult);
 	}
 	
 	// 카메라 FOV 블렌드(조준하는 본인만)
 	if (IsLocallyControlled() && FollowCamera)
 	{
-		TargetCameraFOV = (bIsAiming && Data) ? Data->ADSFOV : DefaultCameraFOV;
-		CameraBlendSpeed = Data ? Data->ADSBlendSpeed : 12.f;
+		TargetCameraFOV = (bIsAiming && Stats) ? Stats->ADSFOV : DefaultCameraFOV;
+		CameraBlendSpeed = Stats ? Stats->ADSBlendSpeed : 12.f;
 		
 		// 조준 중이면 은은한 집중 유지.
 		CombatFocusTarget = bIsAiming ? AimFocusBaseline : 0.f;
@@ -300,20 +328,33 @@ void AOBCharacterBase::HandleWeaponChanged(AOBWeaponBase* NewWeapon)
 {
 	// 속도·FOV·지향 갱신 로직이 전부 여기 모여 있으므로 그대로 재사용.
 	UpdateAimingState();
+
+	// 인벤토리 프리뷰 캡처는 ShowOnly 목록만 그린다. 무기는 캐릭터와 별개 액터라
+	// 넣어주지 않으면 손이 빈 채로 찍힌다. 캐릭터 메시는 BP에서
+	// ShowOnlyActorComponents로 이미 등록돼 있고, 그건 다른 배열이라 Reset해도 안 지워진다.
+	if (USceneCaptureComponent2D* PreviewCapture =
+		FindComponentByClass<USceneCaptureComponent2D>())
+	{
+		PreviewCapture->ShowOnlyActors.Reset();
+		if (NewWeapon)
+		{
+			PreviewCapture->ShowOnlyActors.Add(NewWeapon);
+		}
+	}
 }
 
 float AOBCharacterBase::GetCurrentSpreadAngle() const
 {
 	const UOBEquipmentComponent* Equip = FindComponentByClass<UOBEquipmentComponent>();
 	const AOBWeaponBase* Weapon = Equip ? Equip->GetCurrentWeapon() : nullptr;
-	const UOBWeaponData* Data = Weapon ? Weapon->GetWeaponData() : nullptr;
-	if (!Data) return 0.f;
+	if (!Weapon || !Weapon->GetItemTag().IsValid()) return 0.f;
+	const FOBResolvedWeaponStats& Stats = Weapon->GetResolvedStats();
 	
-	float Spread = Data->BaseSpreadDegrees;
+	float Spread = Stats.BaseSpreadDegrees;
 	if (bIsAiming)
-		Spread *= Data->ADSSpeedMultiplier;
+		Spread *= Stats.ADSSpreadMultiplier;
 	if (GetVelocity().SizeSquared2D() > FMath::Square(10.f))
-		Spread *= Data->MovingSpreadMultiplier;
+		Spread *= Stats.MovingSpreadMultiplier;
 	
 	return Spread;
 }
@@ -594,47 +635,36 @@ void AOBCharacterBase::PossessedBy(AController* NewController)
 	{
 		DefaultAbilitySet->GiveToAbilitySystem(AbilitySystemComponent, nullptr, this);
 	}
-	
-	// 4) 로드아웃: 로비 선택 무기 우선, 없으면 PawnData 기본.
-	TArray<TSubclassOf<AOBWeaponBase>> Loadout;
-	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	if (AOBPlayerStateBase* OBPlayerState = GetPlayerState<AOBPlayerStateBase>())
 	{
-		Loadout = PS->GetSelectedWeapons();
-	}
-	if (Loadout.Num() == 0 && PawnData)
-	{
-		Loadout = PawnData->DefaultWeapons;
+		OBPlayerState->InitializePlayerStatsFromData();
+		if (const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get())
+		{
+			if (const FOBPlayerArchetypeRow* Archetype = GameData->FindPlayerArchetype(OBPlayerState->GetPlayerArchetypeId()))
+			{
+				if (UOBAbilitySet* ArchetypeAbilities = Archetype->DefaultAbilitySet.LoadSynchronous();
+					ArchetypeAbilities && ArchetypeAbilities != DefaultAbilitySet)
+				{
+					ArchetypeAbilities->GiveToAbilitySystem(AbilitySystemComponent, nullptr, this);
+				}
+			}
+		}
 	}
 
 	if (PlayerInventoryComponent)
 	{
 		if (PawnData && PawnData->DefaultBackpackTag.IsValid())
 		{
-			PlayerInventoryComponent->EquipStartingBackpack(
-				PawnData->DefaultBackpackTag);
+			PlayerInventoryComponent->EquipStartingBackpack(PawnData->DefaultBackpackTag);
 		}
-		for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Loadout)
-		{
-			if (WeaponClass)
-			{
-				PlayerInventoryComponent->AddWeapon(WeaponClass);
-			}
-		}
-		if (PawnData)
-		{
-			for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
-			{
-				PlayerInventoryComponent->TryAddItem(Item.Key, Item.Value);
-			}
-		}
-		PlayerInventoryComponent->EquipDefaultSlot();
-		
-		// 초기 지급이 끝난 이 시점이 기준선이다. 이후 늘어난 것만 "주운 것"으로 친다.
-		SpawnBagSnapshot = GetBagContentsAsStacks();
-		
-		// 기준선을 찍은 뒤에 지급한다. 그래야 반입분이 "이번에 얻은 것"으로 잡혀
-		// 탈출 시 창고로 되돌아간다(초기 지급품은 기준선에 포함돼 제외된다).
-		ApplyCarryItems();
+
+		// 로비 로드아웃은 클라가 BeginPlay에서 push한다. 패키징 빌드에서는 폰이 먼저
+		// 스폰되므로 여기서 비어 있을 수 있다. 도착 시점에 PS가 다시 부른다.
+		FinalizeSpawnLoadout();
+
+		// push가 끝내 안 오면(로드아웃이 빈 신규 플레이어 등) 기본 무기로 진행한다.
+		GetWorldTimerManager().SetTimer(
+			LoadoutWaitTimer, this, &AOBCharacterBase::FinalizeSpawnLoadoutFallback, LoadoutWaitSeconds, false);
 	}
 }
 
@@ -764,6 +794,60 @@ TArray<FOBItemStack> AOBCharacterBase::GetBagGainsSinceSpawn()
 	return Gains;
 }
 
+TArray<FOBItemStack> AOBCharacterBase::GetExtractionStackGains()
+{
+	TArray<FOBItemStack> Gains = GetBagGainsSinceSpawn();
+	Gains.RemoveAll(
+		[](const FOBItemStack& Stack)
+		{
+			const FOBItemDefinitionRow* Definition = UOBItemRegistry::FindItem(Stack.ItemTag);
+			return Definition &&
+				(Definition->Category == EOBItemCategory::Weapon ||
+				 Definition->Category == EOBItemCategory::Equipment ||
+				 Definition->Category == EOBItemCategory::Attachment);
+		});
+	return Gains;
+}
+
+TArray<FInventoryData> AOBCharacterBase::GetLootedUniqueItemInstances()
+{
+	TArray<FInventoryData> Out;
+	if (!PlayerInventoryComponent) return Out;
+	TArray<FInventoryData> Items;
+	PlayerInventoryComponent->GetLootableItemInstances(Items);
+	for (const FInventoryData& Item : Items)
+	{
+		const FOBItemDefinitionRow* Definition = Item.GetDefinition();
+		const bool bPersistent = Definition &&
+			(Definition->Category == EOBItemCategory::Weapon ||
+			 Definition->Category == EOBItemCategory::Equipment ||
+			 Definition->Category == EOBItemCategory::Attachment);
+		if (bPersistent && !SpawnInstanceIds.Contains(Item.InstanceId))
+		{
+			Out.Add(Item);
+		}
+	}
+	return Out;
+}
+
+TArray<FInventoryData> AOBCharacterBase::GetReturnedLoadoutItemInstances()
+{
+	TArray<FInventoryData> Out;
+	if (!PlayerInventoryComponent) return Out;
+	TArray<FInventoryData> Items;
+	PlayerInventoryComponent->GetLootableItemInstances(Items);
+	for (const FInventoryData& Item : Items)
+	{
+		const FOBItemDefinitionRow* Definition = Item.GetDefinition();
+		if (SpawnInstanceIds.Contains(Item.InstanceId) && Definition &&
+			Definition->Category == EOBItemCategory::Weapon)
+		{
+			Out.Add(Item);
+		}
+	}
+	return Out;
+}
+
 void AOBCharacterBase::ApplyCarryItems()
 {
 	if (!HasAuthority() || bCarryItemsApplied || !PlayerInventoryComponent) return;
@@ -772,13 +856,25 @@ void AOBCharacterBase::ApplyCarryItems()
 	if (!PS) return;
 
 	const TArray<FOBItemStack>& Carry = PS->GetSelectedCarryItems();
+	const TArray<FInventoryData>& CarryInstances = PS->GetSelectedCarryItemInstances();
 
 	// 아직 클라 push가 안 왔을 수 있다. 플래그를 세우지 않고 다음 호출을 기다린다.
-	if (Carry.IsEmpty()) return;
+	if (Carry.IsEmpty() && CarryInstances.IsEmpty()) return;
 
 	bCarryItemsApplied = true;
 
 	TArray<FOBItemStack> Leftover;
+	TArray<FInventoryData> LeftoverInstances;
+	for (const FInventoryData& Item : CarryInstances)
+	{
+		const int32 Added = PlayerInventoryComponent->TryAddItemInstance(Item);
+		if (Added < Item.ItemStack)
+		{
+			FInventoryData Remaining = Item;
+			Remaining.ItemStack = Item.ItemStack - Added;
+			LeftoverInstances.Add(MoveTemp(Remaining));
+		}
+	}
 	for (const FOBItemStack& Stack : Carry)
 	{
 		const int32 Added = PlayerInventoryComponent->TryAddItem(Stack.ItemTag, Stack.Count);
@@ -796,4 +892,116 @@ void AOBCharacterBase::ApplyCarryItems()
 			PC->Client_ReturnCarryLeftover(Leftover);
 		}
 	}
+	if (!LeftoverInstances.IsEmpty())
+	{
+		if (AOBPlayerController* PC = Cast<AOBPlayerController>(GetController()))
+		{
+			PC->Client_ReturnCarryItemInstances(LeftoverInstances);
+		}
+	}
+}
+
+void AOBCharacterBase::FinalizeSpawnLoadout()
+{
+	TArray<TSubclassOf<AOBWeaponBase>> Loadout;
+	if (const AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	{
+		if (!PS->GetSelectedWeaponInstances().IsEmpty())
+		{
+			FinalizeSpawnLoadoutInstancesInternal(PS->GetSelectedWeaponInstances());
+			return;
+		}
+		Loadout = PS->GetSelectedWeapons();
+	}
+
+	// 아직 push가 안 왔다. 플래그를 세우지 않고 다음 호출을 기다린다.
+	if (Loadout.IsEmpty()) return;
+
+	FinalizeSpawnLoadoutInternal(Loadout);
+}
+
+void AOBCharacterBase::FinalizeSpawnLoadoutFallback()
+{
+	if (bSpawnLoadoutApplied) return;
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("[Loadout] %s: 로드아웃 push가 %.1f초 안에 안 왔다 → PawnData 기본 무기로 진행."),
+		*GetName(), LoadoutWaitSeconds);
+
+	FinalizeSpawnLoadoutInternal(
+		PawnData ? PawnData->DefaultWeapons : TArray<TSubclassOf<AOBWeaponBase>>());
+}
+
+void AOBCharacterBase::FinalizeSpawnLoadoutInternal(
+	const TArray<TSubclassOf<AOBWeaponBase>>& Weapons)
+{
+	if (!HasAuthority() || bSpawnLoadoutApplied || !PlayerInventoryComponent) return;
+
+	bSpawnLoadoutApplied = true;
+	GetWorldTimerManager().ClearTimer(LoadoutWaitTimer);
+
+	for (const TSubclassOf<AOBWeaponBase>& WeaponClass : Weapons)
+	{
+		if (WeaponClass)
+		{
+			PlayerInventoryComponent->AddWeapon(WeaponClass);
+		}
+	}
+	CompleteSpawnInventorySetup();
+}
+
+void AOBCharacterBase::FinalizeSpawnLoadoutInstancesInternal(
+	const TArray<FInventoryData>& Weapons)
+{
+	if (!HasAuthority() || bSpawnLoadoutApplied || !PlayerInventoryComponent) return;
+	bSpawnLoadoutApplied = true;
+	GetWorldTimerManager().ClearTimer(LoadoutWaitTimer);
+	for (const FInventoryData& Weapon : Weapons)
+	{
+		PlayerInventoryComponent->AddWeaponInstance(Weapon);
+	}
+	CompleteSpawnInventorySetup();
+}
+
+void AOBCharacterBase::CompleteSpawnInventorySetup()
+{
+	if (!HasAuthority() || !PlayerInventoryComponent) return;
+
+	if (PawnData)
+	{
+		for (const TPair<FGameplayTag, int32>& Item : PawnData->StartingItems)
+		{
+			PlayerInventoryComponent->TryAddItem(Item.Key, Item.Value);
+		}
+	}
+
+	PlayerInventoryComponent->EquipDefaultSlot();
+
+	// 무기·초기지급이 끝난 이 시점이 정산 기준선이다.
+	// 무기 지급이 늦어졌는데 여기서 안 찍으면 무기가 "이번에 얻은 것"이 되어 창고로 복사된다.
+	CaptureSpawnInventorySnapshot();
+
+	// 반입분은 기준선 뒤에 넣어야 탈출 시 창고로 되돌아간다.
+	ApplyCarryItems();
+}
+
+void AOBCharacterBase::CaptureSpawnInventorySnapshot()
+{
+	SpawnBagSnapshot = GetBagContentsAsStacks();
+	SpawnInstanceIds.Reset();
+	if (!PlayerInventoryComponent) return;
+	TArray<FInventoryData> Items;
+	PlayerInventoryComponent->GetLootableItemInstances(Items);
+	for (const FInventoryData& Item : Items)
+	{
+		if (Item.InstanceId.IsValid()) SpawnInstanceIds.Add(Item.InstanceId);
+	}
+}
+
+void AOBCharacterBase::NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection)
+{
+	if (!HasAuthority()) return;
+
+	LastHitDirection = HitDirection.GetSafeNormal();
+	LastHitBoneName = BoneName;
 }

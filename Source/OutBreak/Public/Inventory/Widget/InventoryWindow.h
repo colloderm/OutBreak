@@ -11,6 +11,8 @@
  * 
  */
 class UPlayerInventoryComponent;
+class UEquipmentSlot;
+class UUniformGridPanel;
 
 UCLASS()
 class OUTBREAK_API UInventoryWindow : public UUserWidget
@@ -19,11 +21,7 @@ class OUTBREAK_API UInventoryWindow : public UUserWidget
 	
 	
 public:
-	void SetInventoryArray(const TArray<FInventoryData>& ArrayRef);
-	void SetInventorySource(
-		UPlayerInventoryComponent* InInventory,
-		EInventoryItemLocation InLocation,
-		const TArray<FInventoryData>& ArrayRef);
+	void SetInventorySource(UPlayerInventoryComponent* InInventory);
 	void Update();
 
 	virtual bool NativeOnDrop(
@@ -33,16 +31,27 @@ public:
 	
 public:
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<class UUniformGridPanel> InventorySlots;
+	TObjectPtr<UUniformGridPanel> InventoryBackPackSlots;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UUniformGridPanel> InventoryQuickSlots;
+
+	// The Widget Blueprint currently uses this spelling. Keep the C++ binding
+	// exact so the user's edited asset does not need to be renamed or resaved.
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UUniformGridPanel> InventoryContainterSlots;
 	
 private:
-	UPROPERTY(Transient)
-	TArray<FInventoryData> InventoryArray;
+	bool SynchronizeGridSlots(
+		UUniformGridPanel* Grid,
+		int32 DesiredSlotCount);
+	void UpdateItemGrid(
+		UUniformGridPanel* Grid,
+		EInventoryItemLocation Location,
+		const TArray<FInventoryData>& Items);
+	void UpdateQuickSlotGrid(int32 QuickSlotCount);
+	void RefreshEquipmentSlots();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPlayerInventoryComponent> InventoryComponent;
-
-	UPROPERTY(Transient)
-	EInventoryItemLocation InventoryLocation =
-		EInventoryItemLocation::Backpack;
 };

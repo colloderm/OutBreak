@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "OBGameModeBase.h"
+#include "Game/Expedition/OBHelicopterTypes.h"
 #include "OBExpeditionGameMode.generated.h"
 
 class AOBPlayerStateBase;
@@ -12,6 +13,21 @@ class UOBExpeditionMapCatalog;
 class AOBExpeditionSpawnZone;
 class UOBExpeditionMapData;
 class AOBExpeditionGameState;
+class AOBInsertionHelicopter;
+class AOBInsertionTargetStreamingProxy;
+class AOBHelicopterRoute;
+class UOBLandingZoneScannerComponent;
+class AOBPlayerController;
+
+struct FOBPendingInsertionTargetRequest
+{
+	TArray<FVector> Candidates;
+	int32 CandidateIndex = INDEX_NONE;
+	TWeakObjectPtr<AOBPlayerController> FeedbackPlayer;
+	bool bAutomatic = false;
+	float RequestStartedServerTime = 0.f;
+	float CandidateStartedServerTime = 0.f;
+};
 
 // 세션 종료 사유. 결과 위젯(Step 8)/로그용.
 UENUM()
@@ -45,6 +61,11 @@ public:
 	
 	// 탈출 성공 처리(ExtractionZone이 호출). 상태=Extracted + 폰 정리 + 종료판정.
 	void NotifyPlayerExtracted(AController* Controller);
+
+	/** Server entry point used by AOBPlayerController's insertion-map RPC. */
+	void RequestInsertionPoint(AOBPlayerController* RequestingPlayer, const FVector2D& WorldXY);
+
+	TSubclassOf<AOBInsertionHelicopter> GetDefaultExtractionHelicopterClass() const;
 	
 	// 팀별 존 배정에 따라 시작지점을 고른다.
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
@@ -69,6 +90,7 @@ public:
 	
 protected:
 	virtual void StartPlay() override;
+	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 	
 	virtual void PreInitializeComponents() override;
 
@@ -85,6 +107,40 @@ protected:
 	void ValidateZoneSeparation() const; // 3~5분 이격 검증
 	
 	void StartExpedition();
+	void BeginInsertionPhase();
+	void RegisterPlayerForInsertion(APlayerController* NewPlayer);
+	bool SpawnAndSeatInsertionPawn(APlayerController* NewPlayer, AOBInsertionHelicopter* Helicopter);
+	AOBInsertionHelicopter* GetOrCreateInsertionHelicopter(uint8 TeamId);
+	AOBHelicopterRoute* GetOrAssignInsertionRoute(uint8 TeamId);
+	void CollectHelicopterRoutes();
+	void AutoSelectInsertionPoint(uint8 TeamId);
+	void BeginInsertionTargetResolution(
+		uint8 TeamId,
+		const TArray<FVector>& Candidates,
+		AOBPlayerController* FeedbackPlayer,
+		bool bAutomatic);
+	void StartNextInsertionTargetCandidate(uint8 TeamId);
+	void PollInsertionTargetStreaming(uint8 TeamId);
+	void ValidateCurrentInsertionTarget(uint8 TeamId);
+	void FinishInsertionTargetFailure(uint8 TeamId, const FString& Message);
+	AOBInsertionTargetStreamingProxy* GetOrCreateInsertionTargetStreamingProxy(uint8 TeamId);
+	void NotifyTeamInsertionPresentation(uint8 TeamId, EOBInsertionPhase Phase, const FString& Message, bool bForceMapOpen);
+	void ReleaseInsertionTargetStreamingProxy(uint8 TeamId);
+	void TickInsertionWatchdog();
+	bool ResolveAndBeginInsertion(uint8 TeamId, const FVector& RequestedLocation, AOBPlayerController* FeedbackPlayer);
+	void TryCompleteInsertion();
+	void CompleteInsertionAfterGracePeriod();
+	void AssignPersonalExtractsForTeam(uint8 TeamId, const FVector& InsertionOrigin);
+	void UpdateReplicatedInsertionState(uint8 TeamId, EOBInsertionPhase Phase);
+
+	UFUNCTION()
+	void HandleInsertionHelicopterPhaseChanged(AOBInsertionHelicopter* Helicopter, EOBInsertionPhase NewPhase);
+
+	UFUNCTION()
+	void HandleInsertionPassengerDeployed(AOBInsertionHelicopter* Helicopter, AController* Passenger);
+
+	UFUNCTION()
+	void HandleAllInsertionPassengersDeployed(AOBInsertionHelicopter* Helicopter);
 
 	void TickSessionTimer();
 
@@ -115,6 +171,15 @@ protected:
 		const FString& Options, const FString& Portal) override;
 	
 	uint8 ResolveTeamForCode(const FString& PartyCode); // 코드→TeamId(같은 코드=같은 팀, 없으면 고유)
+	
+	// [지도] 레벨 배치 공용 탈출구를 모아 GameState에 싣는다(클라가 액터를 못 찾으므로).
+	void CollectPublicExtractsForMap();
+
+	// [지도] 팀에 배정된 개인 탈출구 좌표를 그 팀 전원의 PlayerState에 싣는다.
+	void PushPersonalExtractsToTeam(uint8 TeamId);
+	
+	// [지도] 1초마다 각 플레이어의 PS에 "그 팀의 다른 팀원" 위치를 싣는다.
+	void UpdateTeammateMapLocations();
 
 protected:
 	// 이 맵의 세션 설정(정원/시간). 맵별 GameMode BP에서 해당 맵의 MapData 에셋을 지정.
@@ -130,10 +195,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition", meta = (ClampMin = "0"))
 	int32 FinalMinuteThreshold = 60;
 
-	// 파티(공유팀) 여부. true=전원 같은 TeamId(협동), false=개인전(고유 TeamId).
-	// - 알파: 3인 협동이므로 기본 true. 로비에서 팀 편성 붙이면 이 값 대신 사용.
+	// 파티코드 없는 접속자를 전원 같은 TeamId로 묶을지.
+	// 파티 시스템이 ?party= 코드를 붙여 주므로 기본은 false다.
+	// true면 각자 솔로로 들어온 플레이어끼리 한 팀이 되어 아군 판정·관전·팀전멸이 전부 어긋난다.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
-	bool bUseSharedTeam = true;
+	bool bUseSharedTeam = false;
 	
 	// 단일 GameMode로 여러 맵을 쓰기 위한 카탈로그. 현재 레벨과 매칭해 MapData 결정.
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
@@ -142,6 +208,36 @@ protected:
 	// 존 간 최소 이격(cm). 미달 시 경고 로그. ~1000m(도보 약 3분).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Spawn")
 	float MinZoneSeparation = 100000.f;
+
+	/** Kept for Blueprint serialization compatibility; false is ignored at runtime. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (DeprecatedProperty, DeprecationMessage = "Expedition entry always uses helicopter insertion."))
+	bool bEnableHelicopterInsertion = true;
+
+	/** Assign BP_OBInsertionHelicopter here. Native class remains a logic-only fallback. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion")
+	TSubclassOf<AOBInsertionHelicopter> InsertionHelicopterClass;
+
+	/** Optional extraction-specific visual child. Falls back to InsertionHelicopterClass. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Extraction")
+	TSubclassOf<AOBInsertionHelicopter> ExtractionHelicopterClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (ClampMin = "1"))
+	float InsertionSelectionTimeout = 30.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (ClampMin = "0"))
+	float InsertionCompletionGraceSeconds = 3.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion|Streaming", meta = (ClampMin = "0.05"))
+	float InsertionStreamingPollInterval = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion|Safety", meta = (ClampMin = "5.0"))
+	float MaxInsertionRappelSeconds = 45.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion")
+	bool bAllowLateJoinAtResolvedInsertionPoint = true;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Expedition|Insertion")
+	TObjectPtr<UOBLandingZoneScannerComponent> LandingZoneScanner;
 	
 	// 개인 탈출구로 스폰할 클래스(BP_ExtractionZone_Personal 지정).
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Extraction")
@@ -171,6 +267,8 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Down")
 	float ReviveHealthPercent = 0.35f;
+	
+	FTimerHandle TeammateMapTimer;
 	
 private:
 	void CheckTeamWipe(uint8 TeamId);          // 팀에 Alive 0명이면 다운자 전원 사망
@@ -211,4 +309,29 @@ private:
 	TMap<FString, uint8> PartyTeams;
 
 	TMap<TObjectPtr<AController>, FTimerHandle> BleedOutTimers;
+
+	UPROPERTY(Transient)
+	TMap<uint8, TObjectPtr<AOBInsertionHelicopter>> TeamInsertionHelicopters;
+
+	UPROPERTY(Transient)
+	TMap<uint8, TObjectPtr<AOBInsertionTargetStreamingProxy>> TeamInsertionTargetStreamingProxies;
+
+	UPROPERTY(Transient)
+	TMap<uint8, TObjectPtr<AOBHelicopterRoute>> TeamInsertionRoutes;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AOBHelicopterRoute>> AvailableInsertionRoutes;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AController>> PendingInsertionControllers;
+
+	TMap<uint8, FOBTeamInsertionState> TeamInsertionRuntimeStates;
+	TMap<uint8, FTimerHandle> InsertionSelectionTimers;
+	TMap<uint8, FTimerHandle> InsertionStreamingPollTimers;
+	TMap<uint8, FOBPendingInsertionTargetRequest> PendingInsertionTargetRequests;
+	TMap<uint8, float> LastInsertionWatchdogWarningTimes;
+	FTimerHandle InsertionCompletionTimer;
+	FTimerHandle InsertionWatchdogTimer;
+	bool bInsertionHasStarted = false;
+	bool bInsertionHasCompleted = false;
 };

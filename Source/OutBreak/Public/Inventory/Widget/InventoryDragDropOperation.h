@@ -14,6 +14,9 @@ class OUTBREAK_API UInventoryDragDropOperation : public UDragDropOperation
 	GENERATED_BODY()
 
 public:
+	virtual void DragCancelled_Implementation(
+		const FPointerEvent& PointerEvent) override;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory|DragDrop")
 	TObjectPtr<UPlayerInventoryComponent> Inventory;
 

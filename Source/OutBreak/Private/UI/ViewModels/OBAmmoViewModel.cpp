@@ -51,11 +51,12 @@ void UOBAmmoViewModel::RefreshAmmo()
 	if (AOBWeaponBase* W = Weapon.Get())
 	{
 		Mag = W->GetCurrentAmmo();
-		if (UOBWeaponData* Data = W->GetWeaponData())
+		const FOBResolvedWeaponStats& Stats = W->GetResolvedStats();
+		if (Stats.WeaponType == EOBWeaponType::Ranged)
 		{
 			if (UPlayerInventoryComponent* Inv = Inventory.Get())
 			{
-				Reserve = Inv->GetAmmo(Data->AmmoType);   // 무기 타입의 풀 예비탄
+				Reserve = Inv->GetAmmo(Stats.AmmoType);
 			}
 		}
 		SetCurrentAmmo(Mag);

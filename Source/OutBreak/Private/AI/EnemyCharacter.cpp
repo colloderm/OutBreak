@@ -26,6 +26,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Components/AudioComponent.h"
 #include "Item/Loot/OBLootContainer.h"
+#include "Net/UnrealNetwork.h"
 
 
 DEFINE_LOG_CATEGORY(LogModularAnimationProxy);
@@ -343,6 +344,61 @@ void AEnemyCharacter::StopCharacterMovement()
 	GetMovementComponent()->StopMovementImmediately();
 }
 
+void AEnemyCharacter::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(AEnemyCharacter, bIsDead);
+	DOREPLIFETIME(AEnemyCharacter, LastHitDirection);
+	DOREPLIFETIME(AEnemyCharacter, LastHitBoneName);
+}
+
+void AEnemyCharacter::OnRep_IsDead()
+{
+	// 프로퍼티는 RepNotify 이전에 전부 적용된다. 즉 여기서는
+	// LastHitDirection/BoneName이 이미 서버 값이다.
+	if (bIsDead)
+	{
+		PlayDeathCosmetics();
+	}
+}
+
+void AEnemyCharacter::PlayDeathCosmetics()
+{
+	if (UAudioComponent* CryingAudio = CryingSoundComponent.Get())
+	{
+		CryingSoundComponent.Reset();
+		CryingAudio->Stop();
+	}
+
+	if (UEnemyMovementComponent* EnemyMovementComponent =
+		Cast<UEnemyMovementComponent>(GetMovementComponent()))
+	{
+		// bIsDead가 이미 true라 여기서 Dead()로 되돌아오지 않는다.
+		EnemyMovementComponent->SetLocomotationState(
+			ELocomotionWalkRunState::Dead);
+	}
+
+	StopCharacterMovement();
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->SetSimulatePhysics(true);
+
+		// 맞은 방향으로 쓰러진다. 방향이 없으면(환경 피해 등) 그냥 무너진다.
+		if (!LastHitDirection.IsNearlyZero() && RagdollImpulseStrength > 0.f)
+		{
+			const FName Bone = (LastHitBoneName != NAME_None)
+				? LastHitBoneName
+				: MeshComp->GetBoneName(0);
+
+			MeshComp->AddImpulse(
+				LastHitDirection * RagdollImpulseStrength, Bone, /*bVelChange=*/false);
+		}
+	}
+}
+
 void AEnemyCharacter::Dead()
 {
 	if (bIsDead)
@@ -350,20 +406,16 @@ void AEnemyCharacter::Dead()
 		return;
 	}
 
+	// 사망 선언은 서버만. 클라는 OnRep_IsDead로 따라온다.
+	if (!HasAuthority())
+	{
+		return;
+	}
+
 	bIsDead = true;
-	
-	if (UAudioComponent* CryingAudio = CryingSoundComponent.Get())
-	{
-		CryingSoundComponent.Reset();
-		CryingAudio->Stop();
-	}
-		
-	if (UEnemyMovementComponent* EnemyMovementComponent =
-		Cast<UEnemyMovementComponent>(GetMovementComponent()))
-	{
-		EnemyMovementComponent->SetLocomotationState(
-			ELocomotionWalkRunState::Dead);
-	}
+
+	// 서버 로컬 연출(리슨 서버 화면·데디의 물리 상태).
+	PlayDeathCosmetics();
 
 	AEnemyController* EnemyController =
 		Cast<AEnemyController>(GetController());
@@ -372,14 +424,14 @@ void AEnemyCharacter::Dead()
 		EnemyController->Dead(DeathCleanupDelay);
 	}
 
-	StopCharacterMovement();
-	GetMesh()->SetSimulatePhysics(true);
-	
 	// 처치 보상. Destroy 분기보다 먼저 굴려야 시체가 사라지기 전에 드랍이 남는다.
-	if (HasAuthority() && !DeathLootRow.IsNull() && LootContainerClass)
+	if (!DeathLootRow.IsNull() && LootContainerClass)
 	{
-		const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 0.f;
-		const FVector DropLoc = GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
+		const float HalfHeight = GetCapsuleComponent()
+			? GetCapsuleComponent()->GetScaledCapsuleHalfHeight()
+			: 0.f;
+		const FVector DropLoc =
+			GetActorLocation() - FVector(0.f, 0.f, HalfHeight);
 
 		AOBLootContainer::SpawnFromTable(GetWorld(), LootContainerClass,
 			FTransform(FRotator::ZeroRotator, DropLoc), DeathLootRow);
@@ -574,4 +626,12 @@ void AEnemyCharacter::HandleReducedWorkChanged(
 
 	OnReducedAnimationWorkChanged.Broadcast(
 		bReducedAnimationWork);
+}
+
+void AEnemyCharacter::NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection)
+{
+	if (!HasAuthority()) return;
+
+	LastHitDirection = HitDirection.GetSafeNormal();
+	LastHitBoneName = BoneName;
 }

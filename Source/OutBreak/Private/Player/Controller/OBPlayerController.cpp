@@ -5,10 +5,15 @@
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
+#include "Ability/Tags/OBGameplayTags.h"
 #include "Character/OBCharacterBase.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "Engine/Engine.h"
 #include "InputAction.h"
+#include "InputCoreTypes.h"
+#include "InputKeyEventArgs.h"
+#include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
 #include "LyraInspired/Input/OBInputConfig.h"
 #include "Camera/PlayerCameraManager.h"
@@ -26,12 +31,661 @@
 #include "TimerManager.h"
 #include "Game/GameMode/OBExpeditionGameMode.h"
 #include "Item/Loot/OBLootContainer.h"
+#include "UI/HUD/OBHUD.h"
 #include "UI/Widgets/Expedition/OBExpeditionResultWidget.h"
+#include "UI/Widgets/Expedition/OBWorldMapWidget.h"
+#include "Game/Expedition/OBInsertionHelicopter.h"
+#include "Game/Expedition/OBHelicopterTypes.h"
+#include "GameFramework/GameplayCameraComponentBase.h"
+#include "DrawDebugHelpers.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogOBInsertionInput, Log, All);
 
 AOBPlayerController::AOBPlayerController()
 {
+	// Default quick-slot keys are 4..9. The actual key mappings remain in the
+	// Enhanced Input Mapping Context; this array exposes the six IA properties.
+	QuickSlotActions.SetNum(6);
+}
 
+void AOBPlayerController::ShowInsertionDebugMessage(
+	const FString& Message,
+	const FColor& Color,
+	float Duration,
+	int32 MessageKey) const
+{
+	if (!bShowInsertionDebugMessages || !IsLocalController() || !GEngine)
+	{
+		return;
+	}
+
+	const float EffectiveDuration = Duration > 0.f ? Duration : InsertionDebugMessageDuration;
+	const uint64 ScreenKey = MessageKey < 0
+		? static_cast<uint64>(-1)
+		: static_cast<uint64>(MessageKey);
+	GEngine->AddOnScreenDebugMessage(
+		ScreenKey,
+		EffectiveDuration,
+		Color,
+		FString::Printf(TEXT("[INSERTION] %s"), *Message));
+}
+
+bool AOBPlayerController::InputKey(const FInputKeyEventArgs& Params)
+{
+	bool bRawInsertionHandled = false;
+	const bool bInsertionKeyScope = IsLocalController()
+		&& bEnableRawInsertionKeyFallback
+		&& (bInsertionPresentationActive || bHelicopterTransitLocked)
+		&& Params.Event == IE_Pressed;
+
+	if (bInsertionKeyScope && Params.Key == EKeys::M)
+	{
+		UE_LOG(LogOBInsertionInput, Display,
+			TEXT("[InsertionInput] Raw key received Key=M PC=%s Presentation=%s TransitLocked=%s"),
+			*GetName(), bInsertionPresentationActive ? TEXT("true") : TEXT("false"),
+			bHelicopterTransitLocked ? TEXT("true") : TEXT("false"));
+		HandleInsertionMapToggle(TEXT("RawPlayerController"));
+		bRawInsertionHandled = true;
+	}
+	else if (bInsertionKeyScope && Params.Key == EKeys::E)
+	{
+		UE_LOG(LogOBInsertionInput, Display,
+			TEXT("[InsertionInput] Raw key received Key=E PC=%s Presentation=%s TransitLocked=%s"),
+			*GetName(), bInsertionPresentationActive ? TEXT("true") : TEXT("false"),
+			bHelicopterTransitLocked ? TEXT("true") : TEXT("false"));
+		HandleInsertionTraceRequest(TEXT("RawPlayerController"));
+		bRawInsertionHandled = true;
+	}
+
+	// Keep the normal input stack alive. If Enhanced Input also fires this frame,
+	// the source-aware handlers below suppress the duplicate operation.
+	return Super::InputKey(Params) || bRawInsertionHandled;
+}
+
+void AOBPlayerController::SetHelicopterTransitView(AActor* NewViewTarget, bool bLocked)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	bHelicopterTransitLocked = bLocked;
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+	{
+		ASC->ClearAbilityInput();
+		ASC->SetLooseGameplayTagCount(OBGameplayTags::State_HelicopterTransit, bLocked ? 1 : 0);
+		if (bLocked)
+		{
+			ASC->CancelAbilities();
+		}
+	}
+	AActor* EffectiveTarget = NewViewTarget ? NewViewTarget : GetPawn();
+	if (EffectiveTarget)
+	{
+		SetViewTarget(EffectiveTarget);
+	}
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionInput] Server transit view PC=%s Pawn=%s ViewTarget=%s Locked=%s"),
+		*GetName(), *GetNameSafe(GetPawn()), *GetNameSafe(EffectiveTarget),
+		bLocked ? TEXT("true") : TEXT("false"));
+	Client_SetHelicopterTransitView(EffectiveTarget, bLocked);
+}
+
+void AOBPlayerController::Client_SetHelicopterTransitView_Implementation(AActor* NewViewTarget, bool bLocked)
+{
+	bHelicopterTransitLocked = bLocked;
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+	{
+		ASC->ClearAbilityInput();
+		ASC->SetLooseGameplayTagCount(OBGameplayTags::State_HelicopterTransit, bLocked ? 1 : 0);
+		if (bLocked)
+		{
+			ASC->CancelAbilities();
+		}
+	}
+	if (!bLocked)
+	{
+		APawn* RestoredPawn = Cast<APawn>(NewViewTarget);
+		RestoreGameplayViewAndInput(RestoredPawn, TEXT("TransitUnlocked"));
+		BP_OnInsertionPresentationEnded(RestoredPawn);
+		return;
+	}
+
+	AActor* EffectiveTarget = NewViewTarget ? NewViewTarget : GetPawn();
+	if (EffectiveTarget)
+	{
+		SetViewTargetWithBlend(EffectiveTarget, InsertionViewBlendSeconds);
+	}
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionInput] Client transit view PC=%s Pawn=%s ViewTarget=%s Locked=true"),
+		*GetName(), *GetNameSafe(GetPawn()), *GetNameSafe(EffectiveTarget));
+}
+
+void AOBPlayerController::RequestInsertionPoint(const FVector2D& WorldXY)
+{
+	if (IsLocalController())
+	{
+		UE_LOG(LogOBInsertionInput, Log,
+			TEXT("[InsertionInput] Client request PC=%s WorldXY=%s TransitLocked=%s Presentation=%s CanSelect=%s"),
+			*GetName(), *WorldXY.ToString(), bHelicopterTransitLocked ? TEXT("true") : TEXT("false"),
+			bInsertionPresentationActive ? TEXT("true") : TEXT("false"),
+			bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"));
+		ShowInsertionDebugMessage(
+			FString::Printf(TEXT("Server request sent XY=%s"), *WorldXY.ToString()),
+			FColor::Yellow, 4.f, 77102);
+		Server_RequestInsertionPoint(WorldXY);
+	}
+}
+
+void AOBPlayerController::ToggleInsertionMapFromFocusedWidget()
+{
+	HandleInsertionMapToggle(TEXT("MapWidgetPreview"));
+}
+
+void AOBPlayerController::RequestInsertionPointFromFocusedWidget()
+{
+	HandleInsertionTraceRequest(TEXT("MapWidgetPreview"));
+}
+
+void AOBPlayerController::Server_RequestInsertionPoint_Implementation(FVector2D WorldXY)
+{
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionInput] Server RPC received PC=%s WorldXY=%s Pawn=%s"),
+		*GetName(), *WorldXY.ToString(), *GetNameSafe(GetPawn()));
+	if (AOBExpeditionGameMode* ExpeditionGameMode = GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>())
+	{
+		ExpeditionGameMode->RequestInsertionPoint(this, WorldXY);
+	}
+	else
+	{
+		UE_LOG(LogOBInsertionInput, Error,
+			TEXT("[InsertionInput] Server RPC rejected: ExpeditionGameMode missing PC=%s World=%s"),
+			*GetName(), *GetNameSafe(GetWorld()));
+	}
+}
+
+void AOBPlayerController::Client_InsertionPointResult_Implementation(
+	bool bAccepted,
+	FVector_NetQuantize ResolvedLocation,
+	const FString& Message)
+{
+	if (bAccepted)
+	{
+		UE_LOG(LogOBInsertionInput, Log,
+			TEXT("[InsertionInput] Client result PC=%s Accepted=true Resolved=%s Message=%s"),
+			*GetName(), *FVector(ResolvedLocation).ToCompactString(), *Message);
+	}
+	else
+	{
+		UE_LOG(LogOBInsertionInput, Warning,
+			TEXT("[InsertionInput] Client result PC=%s Accepted=false Resolved=%s Message=%s"),
+			*GetName(), *FVector(ResolvedLocation).ToCompactString(), *Message);
+	}
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("Server result %s | %s | %s"),
+			bAccepted ? TEXT("ACCEPTED") : TEXT("REJECTED"),
+			*FVector(ResolvedLocation).ToCompactString(), *Message),
+		bAccepted ? FColor::Green : FColor::Red,
+		InsertionDebugMessageDuration,
+		77102);
+	if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
+	{
+		if (UOBWorldMapWidget* MapWidget = OBHUD->EnsureWorldMapWidget())
+		{
+			MapWidget->NotifyInsertionPointResult(bAccepted, FVector(ResolvedLocation), Message);
+		}
+		if (bAccepted)
+		{
+			OBHUD->CloseInsertionMap();
+		}
+	}
+	BP_OnInsertionPointResult(bAccepted, FVector(ResolvedLocation), Message);
+}
+
+void AOBPlayerController::Client_BeginInsertionPresentation_Implementation(
+	AOBInsertionHelicopter* Helicopter,
+	float SelectionDeadlineServerTime,
+	bool bCanSelectTarget)
+{
+	bInsertionPresentationActive = true;
+	bHelicopterTransitLocked = true;
+	bCanSelectInsertionTarget = bCanSelectTarget;
+	bInsertionTargetSelectionAvailable = bCanSelectTarget;
+	InsertionSelectionDeadlineServerTime = SelectionDeadlineServerTime;
+	InsertionHelicopter = Helicopter;
+	InsertionMapOpenAttempts = 0;
+
+	if (Helicopter)
+	{
+		SetViewTargetWithBlend(Helicopter, InsertionViewBlendSeconds);
+		SetControlRotation(Helicopter->GetCabinViewRotation());
+	}
+	EnterInsertionInputMode(bCanSelectTarget);
+
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionInput] Begin PC=%s Pawn=%s ViewTarget=%s Helicopter=%s LeaderCanSelect=%s Deadline=%.2f"),
+		*GetName(), *GetNameSafe(GetPawn()), *GetNameSafe(GetViewTarget()), *GetNameSafe(Helicopter),
+		bCanSelectTarget ? TEXT("true") : TEXT("false"), SelectionDeadlineServerTime);
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("INPUT ACTIVE | Mouse Look | M Map | E Trace | Leader=%s"),
+			bCanSelectTarget ? TEXT("true") : TEXT("false")),
+		FColor::Cyan, 10.f, 77100);
+	BP_OnInsertionPresentationStarted(Helicopter, SelectionDeadlineServerTime, bCanSelectTarget);
+	TryOpenInsertionMap();
+}
+
+void AOBPlayerController::Client_UpdateInsertionPresentation_Implementation(
+	EOBInsertionPhase Phase,
+	const FString& StatusMessage,
+	bool bForceMapOpen)
+{
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionInput] Update PC=%s Phase=%d ForceMap=%s CanSelect=%s Message=%s"),
+		*GetName(), static_cast<int32>(Phase), bForceMapOpen ? TEXT("true") : TEXT("false"),
+		bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"), *StatusMessage);
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("State Phase=%d CanSelect=%s | %s"),
+			static_cast<int32>(Phase),
+			bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"),
+			*StatusMessage),
+		FColor::Cyan, InsertionDebugMessageDuration, 77100);
+	if (!bInsertionPresentationActive)
+	{
+		UE_LOG(LogOBInsertionInput, Verbose,
+			TEXT("[InsertionInput] Update deferred because presentation has not begun PC=%s Phase=%d"),
+			*GetName(), static_cast<int32>(Phase));
+		return;
+	}
+	BP_OnInsertionPresentationUpdated(Phase, StatusMessage, bForceMapOpen);
+
+	const bool bSelectionAvailable = Phase == EOBInsertionPhase::WaitingForTarget
+		|| Phase == EOBInsertionPhase::Orbiting;
+	const bool bSelectionBusy = Phase == EOBInsertionPhase::LoadingTarget
+		|| Phase == EOBInsertionPhase::ValidatingTarget;
+	bInsertionTargetSelectionAvailable = bSelectionAvailable && bCanSelectInsertionTarget;
+
+	if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
+	{
+		if (bSelectionAvailable)
+		{
+			OBHUD->OpenInsertionMap(bCanSelectInsertionTarget);
+		}
+		else if (bSelectionBusy)
+		{
+			OBHUD->OpenInsertionMap(false);
+		}
+		else if (Phase == EOBInsertionPhase::Approaching || Phase == EOBInsertionPhase::Scanning
+			|| Phase == EOBInsertionPhase::Hovering || Phase == EOBInsertionPhase::Rappelling)
+		{
+			OBHUD->CloseInsertionMap();
+		}
+	}
+	else if (bForceMapOpen)
+	{
+		InsertionMapOpenAttempts = 0;
+		TryOpenInsertionMap();
+	}
+}
+
+void AOBPlayerController::Client_EndInsertionPresentation_Implementation(APawn* RestoredPawn)
+{
+	RestoreGameplayViewAndInput(RestoredPawn, TEXT("ServerEndPresentation"));
+	BP_OnInsertionPresentationEnded(RestoredPawn);
+}
+
+void AOBPlayerController::EnterInsertionInputMode(bool bCanSelectTarget)
+{
+	bCanSelectInsertionTarget = bCanSelectTarget;
+	if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+	{
+		if (InsertionMappingContext && !bInsertionMappingContextAdded)
+		{
+			Subsystem->AddMappingContext(InsertionMappingContext, InsertionInputMappingPriority);
+			bInsertionMappingContextAdded = true;
+			UE_LOG(LogOBInsertionInput, Log,
+				TEXT("[InsertionInput] MappingContext added PC=%s Context=%s Priority=%d"),
+				*GetName(), *InsertionMappingContext->GetName(), InsertionInputMappingPriority);
+		}
+		else if (!InsertionMappingContext)
+		{
+			UE_LOG(LogOBInsertionInput, Warning,
+				TEXT("[InsertionInput] InsertionMappingContext is not assigned on %s; auto-open map and default MapAction remain available."),
+				*GetClass()->GetName());
+		}
+	}
+}
+
+void AOBPlayerController::ExitInsertionInputMode()
+{
+	GetWorldTimerManager().ClearTimer(InsertionMapOpenRetryTimer);
+	if (bInsertionMappingContextAdded)
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem =
+			ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(GetLocalPlayer()))
+		{
+			Subsystem->RemoveMappingContext(InsertionMappingContext);
+		}
+		UE_LOG(LogOBInsertionInput, Log,
+			TEXT("[InsertionInput] MappingContext removed PC=%s Context=%s"),
+			*GetName(), *GetNameSafe(InsertionMappingContext.Get()));
+		bInsertionMappingContextAdded = false;
+	}
+}
+
+void AOBPlayerController::TryOpenInsertionMap()
+{
+	if (!IsLocalController() || !bInsertionPresentationActive)
+	{
+		return;
+	}
+
+	++InsertionMapOpenAttempts;
+	AOBHUD* OBHUD = GetHUD<AOBHUD>();
+	if (OBHUD && OBHUD->OpenInsertionMap(
+		bCanSelectInsertionTarget && bInsertionTargetSelectionAvailable))
+	{
+		GetWorldTimerManager().ClearTimer(InsertionMapOpenRetryTimer);
+		UE_LOG(LogOBInsertionInput, Log,
+			TEXT("[InsertionUI] Auto-open succeeded PC=%s HUD=%s Attempt=%d CanSelect=%s"),
+			*GetName(), *OBHUD->GetName(), InsertionMapOpenAttempts,
+			bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"));
+		return;
+	}
+
+	if (InsertionMapOpenAttempts >= 25)
+	{
+		UE_LOG(LogOBInsertionInput, Error,
+			TEXT("[InsertionUI] Auto-open failed permanently PC=%s HUD=%s HUDClass=%s Attempts=%d"),
+			*GetName(), *GetNameSafe(OBHUD), *GetNameSafe(GetHUD() ? GetHUD()->GetClass() : nullptr),
+			InsertionMapOpenAttempts);
+		return;
+	}
+
+	UE_LOG(LogOBInsertionInput, Warning,
+		TEXT("[InsertionUI] Auto-open deferred PC=%s HUD=%s Attempt=%d/25"),
+		*GetName(), *GetNameSafe(OBHUD), InsertionMapOpenAttempts);
+	GetWorldTimerManager().SetTimer(
+		InsertionMapOpenRetryTimer, this, &AOBPlayerController::TryOpenInsertionMap, 0.2f, false);
+}
+
+void AOBPlayerController::HandleInsertionMapToggle(const TCHAR* InputSource)
+{
+	const float Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.f;
+	if (bInsertionPresentationActive && Now - LastInsertionMapInputRealTime < 0.08f)
+	{
+		UE_LOG(LogOBInsertionInput, Verbose,
+			TEXT("[InsertionInput] Duplicate M suppressed Source=%s PC=%s Delta=%.4f"),
+			InputSource, *GetName(), Now - LastInsertionMapInputRealTime);
+		return;
+	}
+	LastInsertionMapInputRealTime = Now;
+
+	UE_LOG(LogOBInsertionInput, Display,
+		TEXT("[InsertionInput] M accepted Source=%s PC=%s HUD=%s TransitLocked=%s Presentation=%s"),
+		InputSource, *GetName(), *GetNameSafe(GetHUD()),
+		bHelicopterTransitLocked ? TEXT("true") : TEXT("false"),
+		bInsertionPresentationActive ? TEXT("true") : TEXT("false"));
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("M received [%s]"), InputSource),
+		FColor::Yellow, 3.f, 77101);
+
+	if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
+	{
+		OBHUD->ToggleWorldMap();
+		const UOBWorldMapWidget* MapWidget = OBHUD->GetWorldMapWidget();
+		const bool bMapOpen = MapWidget && MapWidget->IsMapOpen();
+		UE_LOG(LogOBInsertionInput, Display,
+			TEXT("[InsertionUI] M toggle complete Source=%s Widget=%s Open=%s"),
+			InputSource, *GetNameSafe(MapWidget), bMapOpen ? TEXT("true") : TEXT("false"));
+		ShowInsertionDebugMessage(
+			FString::Printf(TEXT("Map %s"), bMapOpen ? TEXT("OPEN") : TEXT("CLOSED")),
+			bMapOpen ? FColor::Cyan : FColor::Silver, 3.f, 77101);
+	}
+	else
+	{
+		UE_LOG(LogOBInsertionInput, Error,
+			TEXT("[InsertionUI] ToggleMap failed: AOBHUD missing PC=%s HUD=%s HUDClass=%s Source=%s"),
+			*GetName(), *GetNameSafe(GetHUD()), *GetNameSafe(GetHUD() ? GetHUD()->GetClass() : nullptr),
+			InputSource);
+		ShowInsertionDebugMessage(TEXT("Map toggle FAILED: AOBHUD missing"), FColor::Red, 8.f, 77101);
+		if (bInsertionPresentationActive)
+		{
+			InsertionMapOpenAttempts = 0;
+			TryOpenInsertionMap();
+		}
+	}
+}
+
+void AOBPlayerController::HandleInsertionTraceRequest(const TCHAR* InputSource)
+{
+	const float Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.f;
+	if (bInsertionPresentationActive && Now - LastInsertionTraceInputRealTime < 0.08f)
+	{
+		UE_LOG(LogOBInsertionInput, Verbose,
+			TEXT("[InsertionInput] Duplicate E suppressed Source=%s PC=%s Delta=%.4f"),
+			InputSource, *GetName(), Now - LastInsertionTraceInputRealTime);
+		return;
+	}
+	LastInsertionTraceInputRealTime = Now;
+
+	UE_LOG(LogOBInsertionInput, Display,
+		TEXT("[InsertionInput] E accepted Source=%s PC=%s ViewTarget=%s TransitLocked=%s Presentation=%s CanSelect=%s Available=%s"),
+		InputSource, *GetName(), *GetNameSafe(GetViewTarget()),
+		bHelicopterTransitLocked ? TEXT("true") : TEXT("false"),
+		bInsertionPresentationActive ? TEXT("true") : TEXT("false"),
+		bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"),
+		bInsertionTargetSelectionAvailable ? TEXT("true") : TEXT("false"));
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("E received [%s] -> trace requested"), InputSource),
+		FColor::Yellow, 4.f, 77102);
+	TryRequestInsertionPointFromView();
+}
+
+void AOBPlayerController::TryRequestInsertionPointFromView()
+{
+	if (!IsLocalController() || !bHelicopterTransitLocked || !bInsertionPresentationActive)
+	{
+		ReportLocalInsertionPointFailure(TEXT("Insertion view targeting is not active."));
+		return;
+	}
+	if (!bCanSelectInsertionTarget)
+	{
+		ReportLocalInsertionPointFailure(TEXT("Only the party leader can select the insertion point."));
+		return;
+	}
+	if (!bInsertionTargetSelectionAvailable)
+	{
+		ReportLocalInsertionPointFailure(TEXT("The current insertion phase does not accept another target."));
+		return;
+	}
+
+	AOBInsertionHelicopter* Helicopter = InsertionHelicopter.Get();
+	if (!Helicopter || GetViewTarget() != Helicopter)
+	{
+		ReportLocalInsertionPointFailure(TEXT("The helicopter camera is not the active view target."));
+		return;
+	}
+
+	FVector TraceStart;
+	FRotator ViewRotation;
+	GetPlayerViewPoint(TraceStart, ViewRotation);
+	const FVector TraceEnd = TraceStart + ViewRotation.Vector() * FMath::Max(1000.f, InsertionTargetTraceDistance);
+	UE_LOG(LogOBInsertionInput, Display,
+		TEXT("[InsertionTrace] Begin PC=%s Start=%s End=%s Rotation=%s ViewTarget=%s Channel=%d Distance=%.0f"),
+		*GetName(), *TraceStart.ToCompactString(), *TraceEnd.ToCompactString(),
+		*ViewRotation.ToCompactString(), *GetNameSafe(GetViewTarget()),
+		static_cast<int32>(InsertionTargetTraceChannel.GetValue()), InsertionTargetTraceDistance);
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("TRACE START Rot=%s Distance=%.0f"),
+			*ViewRotation.ToCompactString(), InsertionTargetTraceDistance),
+		FColor::Yellow, 4.f, 77102);
+
+	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OBInsertionViewTarget), false, GetPawn());
+	QueryParams.AddIgnoredActor(Helicopter);
+	FHitResult Hit;
+	const bool bBlockingHit = GetWorld() && GetWorld()->LineTraceSingleByChannel(
+		Hit, TraceStart, TraceEnd, InsertionTargetTraceChannel, QueryParams);
+
+#if ENABLE_DRAW_DEBUG
+	if (bDrawInsertionTargetTrace && GetWorld())
+	{
+		DrawDebugLine(
+			GetWorld(), TraceStart, bBlockingHit ? Hit.ImpactPoint : TraceEnd,
+			bBlockingHit ? FColor::Green : FColor::Red, false, 8.f, 0, 4.f);
+		if (bBlockingHit)
+		{
+			DrawDebugSphere(GetWorld(), Hit.ImpactPoint, 100.f, 12, FColor::Green, false, 8.f, 0, 5.f);
+		}
+	}
+#endif
+
+	if (!bBlockingHit)
+	{
+		const FString Message = TEXT("The helicopter view trace did not hit the map.");
+		UE_LOG(LogOBInsertionInput, Warning,
+			TEXT("[InsertionTrace] Miss PC=%s Start=%s End=%s Rotation=%s Channel=%d Distance=%.0f"),
+			*GetName(), *TraceStart.ToCompactString(), *TraceEnd.ToCompactString(),
+			*ViewRotation.ToCompactString(), static_cast<int32>(InsertionTargetTraceChannel.GetValue()),
+			InsertionTargetTraceDistance);
+		ShowInsertionDebugMessage(TEXT("TRACE MISS: no Visibility blocking hit"), FColor::Red, 8.f, 77102);
+		BP_OnInsertionViewTrace(false, TraceStart, TraceEnd, FVector::ZeroVector, Message);
+		ReportLocalInsertionPointFailure(Message);
+		return;
+	}
+
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionTrace] Hit PC=%s Start=%s Impact=%s Actor=%s Component=%s Normal=%s Channel=%d"),
+		*GetName(), *TraceStart.ToCompactString(), *Hit.ImpactPoint.ToCompactString(),
+		*GetNameSafe(Hit.GetActor()), *GetNameSafe(Hit.GetComponent()), *Hit.ImpactNormal.ToCompactString(),
+		static_cast<int32>(InsertionTargetTraceChannel.GetValue()));
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("TRACE HIT %s | Actor=%s | sending to server"),
+			*Hit.ImpactPoint.ToCompactString(), *GetNameSafe(Hit.GetActor())),
+		FColor::Green, 8.f, 77102);
+	BP_OnInsertionViewTrace(true, TraceStart, TraceEnd, Hit.ImpactPoint,
+		TEXT("Insertion target trace hit. Waiting for server validation."));
+	RequestInsertionPoint(FVector2D(Hit.ImpactPoint.X, Hit.ImpactPoint.Y));
+}
+
+void AOBPlayerController::ReportLocalInsertionPointFailure(const FString& Message, const FVector& Location)
+{
+	UE_LOG(LogOBInsertionInput, Warning,
+		TEXT("[InsertionTrace] Local rejection PC=%s Location=%s Message=%s"),
+		*GetName(), *Location.ToCompactString(), *Message);
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("LOCAL REJECT | %s"), *Message),
+		FColor::Red, 8.f, 77102);
+	if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
+	{
+		if (UOBWorldMapWidget* MapWidget = OBHUD->EnsureWorldMapWidget())
+		{
+			MapWidget->NotifyInsertionPointResult(false, Location, Message);
+		}
+	}
+	BP_OnInsertionPointResult(false, Location, Message);
+}
+
+void AOBPlayerController::RestoreGameplayViewAndInput(APawn* RestoredPawn, const TCHAR* Reason)
+{
+	APawn* CurrentPawn = GetPawn();
+	APawn* EffectivePawn = IsValid(RestoredPawn) ? RestoredPawn : CurrentPawn;
+	const bool bWasLocked = bHelicopterTransitLocked;
+	const bool bWasPresentationActive = bInsertionPresentationActive;
+
+	bHelicopterTransitLocked = false;
+	bInsertionPresentationActive = false;
+	bCanSelectInsertionTarget = false;
+	bInsertionTargetSelectionAvailable = false;
+	InsertionSelectionDeadlineServerTime = 0.f;
+	InsertionHelicopter.Reset();
+	ExitInsertionInputMode();
+
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+	{
+		ASC->ClearAbilityInput();
+		ASC->SetLooseGameplayTagCount(OBGameplayTags::State_HelicopterTransit, 0);
+	}
+	if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
+	{
+		OBHUD->CloseInsertionMap();
+	}
+	if (IsLocalController())
+	{
+		ResetIgnoreInputFlags();
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+		ApplyInsertionExitCamera(EffectivePawn);
+	}
+	else if (HasAuthority() && EffectivePawn)
+	{
+		// Server SetViewTarget is retained for relevancy/authority bookkeeping.
+		SetViewTarget(EffectivePawn);
+	}
+
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionInput] Restore PC=%s Pawn=%s ViewTarget=%s Reason=%s WasLocked=%s WasPresentation=%s"),
+		*GetName(), *GetNameSafe(EffectivePawn), *GetNameSafe(GetViewTarget()), Reason,
+		bWasLocked ? TEXT("true") : TEXT("false"),
+		bWasPresentationActive ? TEXT("true") : TEXT("false"));
+}
+
+void AOBPlayerController::ApplyInsertionExitCamera(APawn* RestoredPawn)
+{
+	if (!IsLocalController() || !IsValid(RestoredPawn))
+	{
+		return;
+	}
+
+	const FRotator RestoredRotation(
+		InsertionExitCameraPitch,
+		RestoredPawn->GetActorRotation().Yaw,
+		0.f);
+	SetControlRotation(RestoredRotation);
+
+	UGameplayCameraComponentBase* GameplayCamera =
+		RestoredPawn->FindComponentByClass<UGameplayCameraComponentBase>();
+	if (GameplayCamera)
+	{
+		GameplayCamera->ActivateCameraForPlayerController(
+			this,
+			true,
+			EGameplayCameraComponentActivationMode::Push);
+	}
+
+	const bool bViewTargetNeedsCorrection = GetViewTarget() != RestoredPawn;
+	if (bViewTargetNeedsCorrection)
+	{
+		if (bCutCameraOnInsertionExit)
+		{
+			SetViewTarget(RestoredPawn);
+		}
+		else
+		{
+			SetViewTargetWithBlend(RestoredPawn, InsertionViewBlendSeconds);
+		}
+	}
+	if (bCutCameraOnInsertionExit && PlayerCameraManager)
+	{
+		PlayerCameraManager->SetGameCameraCutThisFrame();
+	}
+
+	const FVector CameraLocation = PlayerCameraManager
+		? PlayerCameraManager->GetCameraLocation()
+		: FVector::ZeroVector;
+	const bool bGameplayCameraReady = GameplayCamera
+		&& GameplayCamera->GetEvaluationContext().IsValid();
+	UE_LOG(LogOBInsertionInput, Display,
+		TEXT("[InsertionCamera] Gameplay provider restored PC=%s Pawn=%s AttachedTo=%s PawnLocation=%s ViewTarget=%s ControlRotation=%s CameraManager=%s PreviousCameraLocation=%s GameplayCamera=%s GameplayReady=%s Cut=%s"),
+		*GetName(), *RestoredPawn->GetName(), *GetNameSafe(RestoredPawn->GetAttachParentActor()),
+		*RestoredPawn->GetActorLocation().ToCompactString(), *GetNameSafe(GetViewTarget()),
+		*GetControlRotation().ToCompactString(), *GetNameSafe(PlayerCameraManager), *CameraLocation.ToCompactString(),
+		*GetNameSafe(GameplayCamera), bGameplayCameraReady ? TEXT("true") : TEXT("false"),
+		bCutCameraOnInsertionExit ? TEXT("true") : TEXT("false"));
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("GAMEPLAY CAMERA RESTORED View=%s Rot=%s"),
+			*GetNameSafe(GetViewTarget()), *GetControlRotation().ToCompactString()),
+		FColor::Green, 5.f, 77105);
 }
 
 void AOBPlayerController::BeginPlay()
@@ -66,16 +720,22 @@ void AOBPlayerController::BeginPlay()
 	{
 		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
 		{
-			const TArray<TSubclassOf<AOBWeaponBase>> Classes = Loadout->GetSelectedClasses();
-			if (Classes.Num() > 0)
+			const TArray<FInventoryData> WeaponInstances = Loadout->GetSelectedWeaponInstances();
+			if (!WeaponInstances.IsEmpty())
 			{
-				Server_ApplyLoadout(Classes);
-				
-				const TArray<FOBItemStack>& Carry = Loadout->GetCarryItems();
-				if (Carry.Num() > 0)
-				{
-					Server_ApplyCarryItems(Carry);
-				}
+				Server_ApplyLoadoutInstances(WeaponInstances);
+			}
+			else
+			{
+				const TArray<TSubclassOf<AOBWeaponBase>> Classes = Loadout->GetSelectedClasses();
+				if (!Classes.IsEmpty()) Server_ApplyLoadout(Classes);
+			}
+
+			const TArray<FOBItemStack>& CarryStacks = Loadout->GetCarryStackItems();
+			const TArray<FInventoryData>& CarryInstances = Loadout->GetCarryItemInstances();
+			if (!CarryStacks.IsEmpty() || !CarryInstances.IsEmpty())
+			{
+				Server_ApplyCarryLoadout(CarryStacks, CarryInstances);
 			}
 		}
 
@@ -156,7 +816,14 @@ void AOBPlayerController::Tick(float DeltaSeconds)
 		// 누적 입력을 능력 발동/통지로 처리.
 		if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 		{
-			ASC->ProcessAbilityInput(DeltaSeconds, false);
+			if (bHelicopterTransitLocked)
+			{
+				ASC->ClearAbilityInput();
+			}
+			else
+			{
+				ASC->ProcessAbilityInput(DeltaSeconds, false);
+			}
 		}
 	}
 }
@@ -187,6 +854,15 @@ void AOBPlayerController::SetupInputComponent()
 	if (InventoryAction)
 	{
 		EIC->BindAction(InventoryAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_InventoryKey);
+	}
+	
+	if (MapAction)
+	{
+		EIC->BindAction(MapAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_ToggleMap);
+	}
+	if (InsertionMapAction && InsertionMapAction != MapAction)
+	{
+		EIC->BindAction(InsertionMapAction, ETriggerEvent::Started, this, &AOBPlayerController::Input_ToggleMap);
 	}
 
 	if (InputConfig)
@@ -242,8 +918,18 @@ void AOBPlayerController::SetupInputComponent()
 	}
 }
 
+bool AOBPlayerController::IsInventoryInputBlocked() const
+{
+	AOBCharacterBase* CharacterBase = Cast<AOBCharacterBase>(GetPawn());
+	UPlayerInventoryComponent* Inventory = CharacterBase ? CharacterBase->GetPlayerInventoryComponent() : nullptr;
+	
+	return Inventory && Inventory->IsInventoryOpen();
+}
+
 void AOBPlayerController::Input_Move(const FInputActionValue& Value)
 {
+	if (bHelicopterTransitLocked) return;
+
 	AOBCharacterBase* ControlledCharacter = Cast<AOBCharacterBase>(GetPawn());
 	if (!ControlledCharacter) return;
 
@@ -259,13 +945,37 @@ void AOBPlayerController::Input_Move(const FInputActionValue& Value)
 
 void AOBPlayerController::Input_Look(const FInputActionValue& Value)
 {
+	if (IsInventoryInputBlocked()) return;
+	
+	const FVector2D AxisValue = Value.Get<FVector2D>();
+	if (bHelicopterTransitLocked)
+	{
+		// The helicopter CalcCamera consumes this controller rotation locally,
+		// so each passenger gets an independent free-look direction.
+		AddYawInput(AxisValue.X);
+		AddPitchInput(AxisValue.Y);
+
+		const float Now = GetWorld() ? GetWorld()->GetRealTimeSeconds() : 0.f;
+		if (Now - LastInsertionLookDebugRealTime >= 0.5f)
+		{
+			LastInsertionLookDebugRealTime = Now;
+			UE_LOG(LogOBInsertionInput, Display,
+				TEXT("[InsertionLook] Input received PC=%s Axis=%s ControlRotation=%s ViewTarget=%s"),
+				*GetName(), *AxisValue.ToString(), *GetControlRotation().ToCompactString(),
+				*GetNameSafe(GetViewTarget()));
+			ShowInsertionDebugMessage(
+				FString::Printf(TEXT("LOOK received Axis=%s Rot=%s"),
+					*AxisValue.ToString(), *GetControlRotation().ToCompactString()),
+				FColor::Green, 0.75f, 77103);
+		}
+		return;
+	}
+
 	APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn)
 	{
 		return;
 	}
-
-	const FVector2D AxisValue = Value.Get<FVector2D>();
 
 	ControlledPawn->AddControllerYawInput(AxisValue.X);
 	ControlledPawn->AddControllerPitchInput(AxisValue.Y);
@@ -273,6 +983,10 @@ void AOBPlayerController::Input_Look(const FInputActionValue& Value)
 
 void AOBPlayerController::Input_JumpStarted()
 {
+	if (IsInventoryInputBlocked()) return;
+	
+	if (bHelicopterTransitLocked) return;
+
 	if (ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		ControlledCharacter->Jump();
@@ -281,6 +995,10 @@ void AOBPlayerController::Input_JumpStarted()
 
 void AOBPlayerController::Input_JumpCompleted()
 {
+	if (IsInventoryInputBlocked()) return;
+	
+	if (bHelicopterTransitLocked) return;
+
 	if (ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		ControlledCharacter->StopJumping();
@@ -289,6 +1007,8 @@ void AOBPlayerController::Input_JumpCompleted()
 
 void AOBPlayerController::Input_InventoryKey()
 {
+	if (bHelicopterTransitLocked) return;
+
 	if (!bInventoryToggle)
 	{
 		InventoryStarted();
@@ -313,12 +1033,7 @@ void AOBPlayerController::InventoryStarted()
 		CharacterBase->GetPlayerInventoryComponent();
 	if (!IsValid(Inventory))
 	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("%s::%s: PlayerInventoryComponent is invalid."),
-			*GetClass()->GetName(),
-			TEXT(__FUNCTION__));
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: PlayerInventoryComponent is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
 
@@ -331,10 +1046,15 @@ void AOBPlayerController::InventoryStarted()
 	FInputModeGameAndUI InputMode;
 	InputMode.SetWidgetToFocus(InventoryWindow->TakeWidget());
 	InputMode.SetHideCursorDuringCapture(false);
-	InputMode.SetLockMouseToViewportBehavior(
-		EMouseLockMode::DoNotLock);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(InputMode);
 	SetShowMouseCursor(true);
+	
+	// 발사/ADS를 누른 채로 인벤토리를 열면 뗀 입력이 안 들어와 눌린 상태로 굳는다.
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+	{
+		ASC->ClearAbilityInput();
+	}	
 }
 
 void AOBPlayerController::InventoryCompleted()
@@ -355,6 +1075,10 @@ void AOBPlayerController::InventoryCompleted()
 
 void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 {
+	if (IsInventoryInputBlocked()) return;
+	
+	if (bHelicopterTransitLocked) return;
+
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 	{
 		ASC->AbilityInputTagPressed(InputTag);
@@ -363,6 +1087,10 @@ void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 
 void AOBPlayerController::Input_AbilityInputReleased(FGameplayTag InputTag)
 {
+	if (IsInventoryInputBlocked()) return;
+	
+	if (bHelicopterTransitLocked) return;
+
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
 	{
 		ASC->AbilityInputTagReleased(InputTag);
@@ -376,6 +1104,10 @@ UOBAbilitySystemComponent* AOBPlayerController::GetOBAbilitySystemComponent() co
 
 void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 {
+	if (IsInventoryInputBlocked()) return;
+	
+	if (bHelicopterTransitLocked) return;
+
 	if (APawn* P = GetPawn())
 	{
 		if (UPlayerInventoryComponent* Inv =
@@ -388,12 +1120,16 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 
 void AOBPlayerController::Input_UseQuickSlot(const int32 QuickSlotIndex)
 {
+	if (IsInventoryInputBlocked()) return;
+	
+	if (bHelicopterTransitLocked) return;
+
 	if (APawn* ControlledPawn = GetPawn())
 	{
 		if (UPlayerInventoryComponent* Inventory =
 			ControlledPawn->FindComponentByClass<UPlayerInventoryComponent>())
 		{
-			Inventory->UseQuickSlot(QuickSlotIndex);
+			Inventory->TryUseQuickSlot(QuickSlotIndex);
 		}
 	}
 }
@@ -412,6 +1148,14 @@ void AOBPlayerController::AcknowledgePossession(APawn* P)
 
 void AOBPlayerController::Input_Interact()
 {
+	if (IsInventoryInputBlocked()) return;
+	
+	if (bHelicopterTransitLocked)
+	{
+		HandleInsertionTraceRequest(TEXT("EnhancedInput"));
+		return;
+	}
+
 	if (AOBInteractableActor* Target = CurrentInteractable.Get())
 		Target->Interact(this);
 }
@@ -662,16 +1406,34 @@ void AOBPlayerController::BindToGameStatePhase()
 	GS->OnPhaseChanged.AddDynamic(this, &AOBPlayerController::HandleExpeditionPhaseChanged);
 	bPhaseBound = true;
 	
-	// 늦게 붙어 이미 Ended면 즉시 반영
-	if (GS->GetPhase() == EOBExpeditionPhase::Ended)
-	{
-		HandleExpeditionPhaseChanged(EOBExpeditionPhase::Ended);
-	}
+	// Apply the current phase immediately. This also covers clients that bind
+	// after the insertion phase replication/event has already happened.
+	HandleExpeditionPhaseChanged(GS->GetPhase());
 }
 
 void AOBPlayerController::HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase)
 {
 	if (!IsLocalController()) return;
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionInput] Expedition phase PC=%s Phase=%d TransitLocked=%s Presentation=%s"),
+		*GetName(), static_cast<int32>(NewPhase),
+		bHelicopterTransitLocked ? TEXT("true") : TEXT("false"),
+		bInsertionPresentationActive ? TEXT("true") : TEXT("false"));
+
+	if (NewPhase == EOBExpeditionPhase::Insertion)
+	{
+		// Seating will provide the helicopter and deadline through the explicit
+		// presentation RPC. Do not open a target-less map here.
+		return;
+	}
+	if (NewPhase == EOBExpeditionPhase::InProgress)
+	{
+		if (bHelicopterTransitLocked || bInsertionPresentationActive)
+		{
+			RestoreGameplayViewAndInput(GetPawn(), TEXT("ExpeditionInProgressFailsafe"));
+		}
+		return;
+	}
 	if (NewPhase != EOBExpeditionPhase::Ended) return;
 
 	// 종료 판정은 사망/탈출과 같은 프레임에 온다. 바로 띄우면 사망화면이 1프레임 만에 지워진다.
@@ -732,6 +1494,34 @@ void AOBPlayerController::Client_ApplyExtractionResult_Implementation(const TArr
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] 탈출 정산: %d종 창고 반영"), Haul.Num());
+}
+
+void AOBPlayerController::Client_ApplyExtractionResultV2_Implementation(
+	const TArray<FOBItemStack>& StackHaul,
+	const TArray<FInventoryData>& LootedInstances,
+	const TArray<FInventoryData>& ReturnedLoadoutInstances)
+{
+	LastExtractionHaul = StackHaul;
+	for (const FInventoryData& Item : LootedInstances)
+	{
+		if (Item.ItemTag.IsValid() && Item.ItemStack > 0)
+		{
+			OBItemStacks::Add(LastExtractionHaul, Item.ItemTag, Item.ItemStack);
+		}
+	}
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->ApplyExtractionResult(
+				StackHaul,
+				LootedInstances,
+				ReturnedLoadoutInstances);
+		}
+	}
+	UE_LOG(LogTemp, Log,
+		TEXT("[Expedition] Extraction V2: stacks=%d instances=%d returned=%d"),
+		StackHaul.Num(), LootedInstances.Num(), ReturnedLoadoutInstances.Num());
 }
 
 void AOBPlayerController::ReturnToHome()
@@ -990,6 +1780,37 @@ void AOBPlayerController::Server_TakeLoot_Implementation(AOBLootContainer* Conta
 	}
 }
 
+void AOBPlayerController::Server_ApplyLoadoutInstances_Implementation(
+	const TArray<FInventoryData>& Weapons)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetSelectedWeaponInstancesBulk(Weapons);
+	}
+}
+
+void AOBPlayerController::Server_TakeLootInstance_Implementation(
+	AOBLootContainer* Container,
+	FGuid InstanceId,
+	int32 Count)
+{
+	if (!Container || !InstanceId.IsValid() || Count <= 0) return;
+
+	AOBCharacterBase* MyChar = Cast<AOBCharacterBase>(GetPawn());
+	if (!MyChar || MyChar->IsDead()) return;
+	if (FVector::DistSquared(
+		MyChar->GetActorLocation(),
+		Container->GetActorLocation()) > OBMaxInteractionDistanceSq)
+	{
+		return;
+	}
+
+	if (UPlayerInventoryComponent* Inv = MyChar->GetPlayerInventoryComponent())
+	{
+		Container->TryTakeItemInstance(Inv, InstanceId, Count);
+	}
+}
+
 void AOBPlayerController::Server_TakeAllLoot_Implementation(AOBLootContainer* Container)
 {
 	if (!Container) return;
@@ -1040,15 +1861,122 @@ void AOBPlayerController::Server_ApplyCarryItems_Implementation(const TArray<FOB
 	}
 }
 
+void AOBPlayerController::Server_ApplyCarryLoadout_Implementation(
+	const TArray<FOBItemStack>& StackItems,
+	const TArray<FInventoryData>& ItemInstances)
+{
+	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetCarryLoadoutBulk(StackItems, ItemInstances);
+	}
+}
+
 void AOBPlayerController::Client_ReturnCarryLeftover_Implementation(const TArray<FOBItemStack>& Items)
 {
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
 		{
-			Loadout->AddStashItems(Items);
+			for (const FOBItemStack& Item : Items)
+			{
+				Loadout->RemoveCarryItem(Item.ItemTag, Item.Count);
+			}
 			UE_LOG(LogTemp, Warning,
 				TEXT("[Carry] 가방이 모자라 %d종을 창고로 되돌렸다."), Items.Num());
+		}
+	}
+}
+
+void AOBPlayerController::Input_ToggleMap()
+{
+	HandleInsertionMapToggle(TEXT("EnhancedInput"));
+}
+
+void AOBPlayerController::OBInsertionDump()
+{
+	AOBHUD* OBHUD = GetHUD<AOBHUD>();
+	UOBWorldMapWidget* MapWidget = OBHUD ? OBHUD->GetWorldMapWidget() : nullptr;
+	AOBExpeditionGameState* GS = GetWorld() ? GetWorld()->GetGameState<AOBExpeditionGameState>() : nullptr;
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	FOBTeamInsertionState TeamState;
+	const bool bHasTeamState = GS && PS && GS->GetTeamInsertionState(PS->GetTeamId(), TeamState);
+
+	UE_LOG(LogOBInsertionInput, Display,
+		TEXT("[InsertionDump] PC=%s Local=%s Authority=%s Pawn=%s ViewTarget=%s TransitLocked=%s Presentation=%s CanSelect=%s ")
+		TEXT("SelectionAvailable=%s MappingAdded=%s HUD=%s MapWidget=%s MapOpen=%s ExpeditionPhase=%d Team=%d Leader=%s HasTeamState=%s ")
+		TEXT("InsertionPhase=%d Helicopter=%s Requested=%s Resolved=%s PassengerCount=%d DeployedCount=%d Deadline=%.2f"),
+		*GetName(), IsLocalController() ? TEXT("true") : TEXT("false"), HasAuthority() ? TEXT("true") : TEXT("false"),
+		*GetNameSafe(GetPawn()), *GetNameSafe(GetViewTarget()),
+		bHelicopterTransitLocked ? TEXT("true") : TEXT("false"),
+		bInsertionPresentationActive ? TEXT("true") : TEXT("false"),
+		bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"),
+		bInsertionTargetSelectionAvailable ? TEXT("true") : TEXT("false"),
+		bInsertionMappingContextAdded ? TEXT("true") : TEXT("false"),
+		*GetNameSafe(OBHUD), *GetNameSafe(MapWidget),
+		MapWidget && MapWidget->IsMapOpen() ? TEXT("true") : TEXT("false"),
+		GS ? static_cast<int32>(GS->GetPhase()) : -1,
+		PS ? PS->GetTeamId() : 0,
+		PS && PS->IsPartyLeader() ? TEXT("true") : TEXT("false"),
+		bHasTeamState ? TEXT("true") : TEXT("false"),
+		bHasTeamState ? static_cast<int32>(TeamState.Phase) : -1,
+		bHasTeamState ? *GetNameSafe(TeamState.Helicopter) : TEXT("None"),
+		bHasTeamState && TeamState.bHasRequestedLocation ? TEXT("true") : TEXT("false"),
+		bHasTeamState && TeamState.bHasResolvedLocation ? TEXT("true") : TEXT("false"),
+		bHasTeamState ? TeamState.PassengerCount : 0,
+		bHasTeamState ? TeamState.DeployedCount : 0,
+		InsertionSelectionDeadlineServerTime);
+
+	ShowInsertionDebugMessage(
+		FString::Printf(
+			TEXT("DUMP Local=%s Pawn=%s View=%s Locked=%s Presentation=%s Select=%s Map=%s Phase=%d"),
+			IsLocalController() ? TEXT("true") : TEXT("false"),
+			*GetNameSafe(GetPawn()), *GetNameSafe(GetViewTarget()),
+			bHelicopterTransitLocked ? TEXT("true") : TEXT("false"),
+			bInsertionPresentationActive ? TEXT("true") : TEXT("false"),
+			bInsertionTargetSelectionAvailable ? TEXT("true") : TEXT("false"),
+			MapWidget && MapWidget->IsMapOpen() ? TEXT("open") : TEXT("closed"),
+			bHasTeamState ? static_cast<int32>(TeamState.Phase) : -1),
+		FColor::Cyan, 12.f, 77104);
+}
+
+void AOBPlayerController::OBInsertionOpenMap()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+	if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
+	{
+		const bool bOpened = OBHUD->OpenInsertionMap(
+			bCanSelectInsertionTarget && bInsertionTargetSelectionAvailable);
+		UE_LOG(LogOBInsertionInput, Display,
+			TEXT("[InsertionUI] OBInsertionOpenMap PC=%s Opened=%s CanSelect=%s"),
+			*GetName(), bOpened ? TEXT("true") : TEXT("false"),
+			bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"));
+	}
+	else
+	{
+		UE_LOG(LogOBInsertionInput, Error,
+			TEXT("[InsertionUI] OBInsertionOpenMap failed: HUD missing PC=%s"), *GetName());
+	}
+}
+
+void AOBPlayerController::OBInsertionTrace()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+	HandleInsertionTraceRequest(TEXT("Console"));
+}
+
+void AOBPlayerController::Client_ReturnCarryItemInstances_Implementation(const TArray<FInventoryData>& Items)
+{
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UOBLoadoutSubsystem* Loadout = GI->GetSubsystem<UOBLoadoutSubsystem>())
+		{
+			Loadout->ReturnCarryItemInstances(Items);
 		}
 	}
 }

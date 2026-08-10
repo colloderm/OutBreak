@@ -16,6 +16,7 @@ class AWorldItem;
 class AOBWeaponBase;
 class UOBEquipmentComponent;
 class UOBWeaponData;
+struct FOBWeaponDefinitionRow;
 class UInventoryWindow;
 struct FOBItemDefinitionRow;
 
@@ -67,6 +68,7 @@ public:
 
 	// Weapon inventory owns selection and magazine state. Equipment only spawns/attaches.
 	bool AddWeapon(TSubclassOf<AOBWeaponBase> WeaponClass);
+	bool AddWeaponInstance(const FInventoryData& WeaponInstance);
 	bool EquipStartingBackpack(const FGameplayTag& BackpackItemTag);
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
@@ -104,6 +106,9 @@ public:
 	FInventoryItemHandle MakeBackpackHandle(int32 BackpackIndex) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
+	FInventoryItemHandle MakeContainerHandle(int32 ContainerIndex) const;
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
 	FInventoryItemHandle MakeEquipmentHandle(EOBEquipmentSlot EquipmentSlot) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|DragDrop")
@@ -118,11 +123,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
 	bool GetEquippedItem(EOBEquipmentSlot EquipmentSlot, FInventoryData& OutItem) const;
 
+	// Client-side UI preview of the same category rule enforced again by the
+	// authoritative MoveItem path. This never mutates inventory state.
+	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
+	bool CanEquipItemToSlot(
+		const FInventoryItemHandle& Source,
+		EOBEquipmentSlot TargetSlot) const;
+
 	UFUNCTION(BlueprintPure, Category = "Inventory|Equipment")
 	bool IsItemEquipped(FGuid InstanceId, EOBEquipmentSlot& OutEquipmentSlot) const;
 
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	TArray<FInventoryData> GetBackpackItemsForUI() const { return InventoryBackPackArray; }
+
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	TArray<FInventoryData> GetContainerItemsForUI() const { return InventoryContainerArray; }
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|QuickSlot")
 	TArray<FQuickSlotData> GetQuickSlotsForUI() const { return InventoryQuickSlotsArray; }
@@ -132,6 +147,11 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Inventory|QuickSlot")
 	int32 GetQuickSlotItemCount(int32 QuickSlotIndex) const;
+
+	// Resolves the first concrete inventory stack represented by the quick
+	// slot's metadata-only ItemTag. Backpack storage has deterministic priority.
+	UFUNCTION(BlueprintPure, Category = "Inventory|QuickSlot")
+	bool ResolveQuickSlotItem(int32 QuickSlotIndex, FInventoryData& OutItem) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|QuickSlot")
 	void AssignQuickSlot(int32 QuickSlotIndex, const FInventoryItemHandle& Source);
@@ -148,6 +168,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory|QuickSlot")
 	void UseQuickSlot(int32 QuickSlotIndex);
 
+	// Result-returning entry point for Blueprint and external classes that need
+	// to react when a quick-slot request cannot be resolved or activated.
+	UFUNCTION(BlueprintCallable, Category = "Inventory|QuickSlot")
+	bool TryUseQuickSlot(int32 QuickSlotIndex);
+
 	// Local UI lifetime. Inventory state itself remains server authoritative.
 	UFUNCTION(BlueprintCallable, Category = "Inventory|UI")
 	UInventoryWindow* OpenInventory();
@@ -158,11 +183,28 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Inventory|UI")
 	bool IsInventoryOpen() const;
 
+	bool IsPointInsideInventoryWindow(const FVector2D& ScreenSpacePosition) const;
+
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
 	void UnequipWeapon();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon")
 	void EquipDefaultSlot();
+
+	UFUNCTION(BlueprintPure, Category = "Inventory|Weapon|Customization")
+	bool CanInstallAttachment(FGuid WeaponInstanceId, FGuid AttachmentInstanceId) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon|Customization")
+	void InstallAttachment(FGuid WeaponInstanceId, FGuid AttachmentInstanceId);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory|Weapon|Customization")
+	void RemoveAttachment(FGuid WeaponInstanceId, FGameplayTag SlotTag);
+
+	UFUNCTION(Server, Reliable)
+	void Server_InstallAttachment(FGuid WeaponInstanceId, FGuid AttachmentInstanceId);
+
+	UFUNCTION(Server, Reliable)
+	void Server_RemoveAttachment(FGuid WeaponInstanceId, FGameplayTag SlotTag);
 
 	UFUNCTION(Server, Reliable)
 	void Server_EquipSlot(EOBWeaponSlot Slot);
@@ -198,6 +240,9 @@ protected:
 	void OnRep_BackpackItems();
 
 	UFUNCTION()
+	void OnRep_ContainerItems();
+
+	UFUNCTION()
 	void OnRep_ActiveWeapon();
 
 	UFUNCTION()
@@ -207,6 +252,10 @@ protected:
 	void OnRep_QuickSlots();
 
 private:
+	// 프리뷰 캡처는 인벤토리가 열려 있는 동안만 매 프레임 돈다.
+	// 상시로 켜두면 클라의 모든 폰이 씬 캡처를 돌려 프레임을 먹는다.
+	void SetPreviewCaptureActive(bool bActive);
+	
 	int32 AddItemRowInternal(
 		const FOBItemDefinitionRow* ItemRow,
 		int32 RequestedAmount,
@@ -215,7 +264,7 @@ private:
 	bool ResolveWeaponDefinition(
 		const FOBItemDefinitionRow* ItemRow,
 		TSubclassOf<AOBWeaponBase>& OutWeaponClass,
-		const UOBWeaponData*& OutWeaponData) const;
+		const FOBWeaponDefinitionRow*& OutWeaponDefinition) const;
 	bool ResolveEquipmentSlot(
 		const FInventoryData& Item,
 		EOBEquipmentSlot& OutEquipmentSlot) const;
@@ -267,6 +316,11 @@ private:
 	static EOBEquipmentSlot ToEquipmentSlot(EOBWeaponSlot WeaponSlot);
 	FInventoryData* FindBackpackItem(const FGuid& InstanceId);
 	const FInventoryData* FindBackpackItem(const FGuid& InstanceId) const;
+	FInventoryData* FindOwnedItem(const FGuid& InstanceId);
+	const FInventoryData* FindOwnedItem(const FGuid& InstanceId) const;
+	bool InstallAttachmentInternal(const FGuid& WeaponInstanceId, const FGuid& AttachmentInstanceId);
+	bool RemoveAttachmentInternal(const FGuid& WeaponInstanceId, const FGameplayTag& SlotTag);
+	void RefreshActiveWeaponInstance(const FGuid& ChangedInstanceId);
 	void EquipWeaponAtIndex(int32 BackpackIndex);
 	void EquipWeaponInstance(const FGuid& InstanceId);
 	void EquipActiveWeapon();
@@ -279,6 +333,8 @@ private:
 	TObjectPtr<UInventoryWindow> InventoryWidget;
 	
 	int32 InventoryBackPackSize = 0;
+
+	int32 InventoryContainerSize = 0;
 	
 	
 	/* 고정 값 */
@@ -286,6 +342,10 @@ private:
 	
 	UPROPERTY(ReplicatedUsing = OnRep_BackpackItems, meta = (AllowPrivateAccess = "true"))
 	TArray<FInventoryData> InventoryBackPackArray;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ContainerItems,
+		meta = (AllowPrivateAccess = "true"))
+	TArray<FInventoryData> InventoryContainerArray;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_QuickSlots,
 		meta = (AllowPrivateAccess = "true"))

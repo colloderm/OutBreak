@@ -11,7 +11,10 @@
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "UI/HUD/OBConsumableWidget.h"
+#include "UI/Widgets/Expedition/OBWorldMapWidget.h"
 #include "View/MVVMView.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogOBInsertionUI, Log, All);
 
 void AOBHUD::BeginPlay()
 {
@@ -42,6 +45,9 @@ void AOBHUD::BeginPlay()
 		CrosshairWidget = CreateWidget<UUserWidget>(PC, CrosshairWidgetClass);
 		if (CrosshairWidget) CrosshairWidget->AddToViewport();
 	}
+	
+	// 전체 지도. 상시 생성해 두고 숨긴다(M키가 토글).
+	EnsureWorldMapWidget();
 }
 
 void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)
@@ -123,6 +129,9 @@ void AOBHUD::BindAmmoToCharacter(AOBCharacterBase* Character)
 	if (AmmoViewModel)
 	{
 		AmmoViewModel->SetInventory(Inventory);
+		//Equipment->OnWeaponChanged.AddUObject(this, &AOBHUD::HandleWeaponChanged);
+		// 폰 변경마다 재호출되므로 중복 구독을 막는다.
+		Equipment->OnWeaponChanged.RemoveAll(this);
 		Equipment->OnWeaponChanged.AddUObject(this, &AOBHUD::HandleWeaponChanged);
 		AmmoViewModel->SetWeapon(Equipment->GetCurrentWeapon());
 	}
@@ -152,4 +161,83 @@ void AOBHUD::BindConsumablesToCharacter(AOBCharacterBase* Character)
 	
 	if (ConsumableWidget)
 		ConsumableWidget->SetInventory(Inventory); // 리스폰 시 재 바인딩
+}
+
+void AOBHUD::ToggleWorldMap()
+{
+	if (UOBWorldMapWidget* MapWidget = EnsureWorldMapWidget())
+	{
+		const bool bOpen = !MapWidget->IsMapOpen();
+		UE_LOG(LogOBInsertionUI, Log,
+			TEXT("[InsertionUI] ToggleWorldMap HUD=%s Widget=%s Open=%s"),
+			*GetName(), *MapWidget->GetName(), bOpen ? TEXT("true") : TEXT("false"));
+		MapWidget->SetMapOpen(bOpen);
+	}
+	else
+	{
+		UE_LOG(LogOBInsertionUI, Error,
+			TEXT("[InsertionUI] ToggleWorldMap failed HUD=%s Owner=%s WidgetClass=%s"),
+			*GetName(), *GetNameSafe(GetOwningPlayerController()), *GetNameSafe(WorldMapWidgetClass));
+	}
+}
+
+UOBWorldMapWidget* AOBHUD::EnsureWorldMapWidget()
+{
+	if (IsValid(WorldMapWidget))
+	{
+		return WorldMapWidget;
+	}
+
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC || !WorldMapWidgetClass)
+	{
+		UE_LOG(LogOBInsertionUI, Error,
+			TEXT("[InsertionUI] WorldMap ensure failed HUD=%s Owner=%s WidgetClass=%s"),
+			*GetName(), *GetNameSafe(PC), *GetNameSafe(WorldMapWidgetClass));
+		return nullptr;
+	}
+
+	WorldMapWidget = CreateWidget<UOBWorldMapWidget>(PC, WorldMapWidgetClass);
+	if (!WorldMapWidget)
+	{
+		UE_LOG(LogOBInsertionUI, Error,
+			TEXT("[InsertionUI] WorldMap CreateWidget failed HUD=%s Owner=%s WidgetClass=%s"),
+			*GetName(), *GetNameSafe(PC), *GetNameSafe(WorldMapWidgetClass));
+		return nullptr;
+	}
+
+	WorldMapWidget->AddToViewport(50);
+	UE_LOG(LogOBInsertionUI, Log,
+		TEXT("[InsertionUI] WorldMap ensured HUD=%s Widget=%s WidgetClass=%s"),
+		*GetName(), *WorldMapWidget->GetName(), *GetNameSafe(WorldMapWidgetClass));
+	return WorldMapWidget;
+}
+
+bool AOBHUD::OpenInsertionMap(bool bCanSelectTarget)
+{
+	UOBWorldMapWidget* MapWidget = EnsureWorldMapWidget();
+	if (!MapWidget)
+	{
+		return false;
+	}
+
+	MapWidget->SetInsertionSelectionMode(true, bCanSelectTarget);
+	MapWidget->SetMapOpen(true);
+	UE_LOG(LogOBInsertionUI, Log,
+		TEXT("[InsertionUI] Insertion map opened HUD=%s CanSelect=%s"),
+		*GetName(), bCanSelectTarget ? TEXT("true") : TEXT("false"));
+	return true;
+}
+
+void AOBHUD::CloseInsertionMap()
+{
+	if (UOBWorldMapWidget* MapWidget = EnsureWorldMapWidget())
+	{
+		const bool bWasOpen = MapWidget->IsMapOpen();
+		MapWidget->SetMapOpen(false);
+		MapWidget->SetInsertionSelectionMode(false, false);
+		UE_LOG(LogOBInsertionUI, Log,
+			TEXT("[InsertionUI] Insertion map closed HUD=%s WasOpen=%s"),
+			*GetName(), bWasOpen ? TEXT("true") : TEXT("false"));
+	}
 }

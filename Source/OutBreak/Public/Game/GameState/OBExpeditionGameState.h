@@ -5,8 +5,10 @@
 #include "CoreMinimal.h"
 #include "OBGameStateBase.h"
 #include "Game/Expedition/OBExpeditionTypes.h"
+#include "Game/Expedition/OBHelicopterTypes.h"
 #include "OBExpeditionGameState.generated.h"
 
+class UOBExpeditionMapData;
 class AOBPlayerStateBase;
 // HUD/위젯이 "페이즈가 바뀌었다"를 이벤트로 구독하기 위한 것.
 // - 왜 델리게이트인가: 위젯이 매 프레임 Tick으로 폴링하지 않고, 값이 바뀔 때만 콜백받게 하려고.
@@ -15,6 +17,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOBExpeditionPhaseChanged, EOBExpedi
 // 남은 시간(초)이 복제되어 갱신될 때 HUD 타이머 텍스트를 다시 그리기 위함.
 // - 매초 1회만 변하도록 GameMode가 정수 초 단위로 세팅(불필요한 복제/브로드캐스트 방지).
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOBExpeditionTimeChanged, int32, NewTimeRemaining);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOBTeamInsertionStatesChanged);
 
 UCLASS()
 class OUTBREAK_API AOBExpeditionGameState : public AOBGameStateBase
@@ -42,6 +45,9 @@ public:
 	
 	// 루팅 시드(세션마다 1회 결정). 컨테이너가 이걸로 난수 스트림을 만든다.
 	void SetLootSeed(int32 InSeed);
+
+	void SetTeamInsertionState(const FOBTeamInsertionState& NewState);
+	void RemoveTeamInsertionState(uint8 TeamId);
 	
 	//~ 읽기 접근자 (클라/서버 공용) ------------------------------------------
 	
@@ -72,6 +78,19 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	int32 GetLootSeed() const { return LootSeed; }
+
+	UFUNCTION(BlueprintPure, Category = "Expedition|Insertion")
+	bool GetTeamInsertionState(uint8 TeamId, FOBTeamInsertionState& OutState) const;
+
+	const TArray<FOBTeamInsertionState>& GetTeamInsertionStates() const { return TeamInsertionStates; }
+	
+	// [지도] 공용 탈출구 위치. 전원 공유.
+	const TArray<FVector_NetQuantize>& GetPublicExtractLocations() const { return PublicExtractLocations; }
+	void SetPublicExtractLocations(const TArray<FVector_NetQuantize>& InLocations);
+	
+	// [지도] 클라가 지도 텍스처/월드 범위를 알아야 한다. 서버 GameMode의 ActiveMapData를 그대로 싣는다.
+	const UOBExpeditionMapData* GetMapData() const { return MapData; }
+	void SetMapData(UOBExpeditionMapData* InMapData);
 	
 public:
 	//~ HUD 구독용 델리게이트 인스턴스 ----------------------------------------
@@ -82,6 +101,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Expedition")
 	FOBExpeditionTimeChanged OnTimeRemainingChanged;
+
+	UPROPERTY(BlueprintAssignable, Category = "Expedition|Insertion")
+	FOBTeamInsertionStatesChanged OnTeamInsertionStatesChanged;
 	
 protected:
 	//~ OnRep 콜백 (클라에서만 자동 호출) --------------------------------------
@@ -91,6 +113,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_TimeRemaining();
+
+	UFUNCTION()
+	void OnRep_TeamInsertionStates();
 	
 protected:
 	// [복제] 현재 페이즈. ReplicatedUsing: 클라에서 값 수신 시 OnRep_Phase 호출→델리게이트 브로드캐스트.
@@ -112,4 +137,14 @@ protected:
 	// [복제] 세션 루팅 시드. 시작 시 1회 세팅되므로 OnRep 불필요.
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
 	int32 LootSeed = 0;
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	TArray<FVector_NetQuantize> PublicExtractLocations;
+	
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Expedition")
+	TObjectPtr<UOBExpeditionMapData> MapData;
+
+	UPROPERTY(ReplicatedUsing = OnRep_TeamInsertionStates, BlueprintReadOnly, Category = "Expedition|Insertion")
+	TArray<FOBTeamInsertionState> TeamInsertionStates;
+	
 };

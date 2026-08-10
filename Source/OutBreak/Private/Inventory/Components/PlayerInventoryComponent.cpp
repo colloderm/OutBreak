@@ -6,9 +6,11 @@
 #include "Ability/Tags/OBGameplayTags.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
+#include "Ability/Abilities/OBGameplay/OBGameplayAbility_Consumable.h"
 #include "Animation/AnimMontage.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Equipment/Data/OBEquipmentData.h"
+#include "Data/OBGameDataSubsystem.h"
 #include "Inventory/Data/InventorySystemSetting.h"
 #include "Inventory/Data/WorldItem.h"
 #include "Inventory/Widget/InventoryWindow.h"
@@ -18,8 +20,19 @@
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "Weapon/OBWeaponBase.h"
+
+namespace
+{
+	bool IsWeaponEquipmentSlot(const EOBEquipmentSlot Slot)
+	{
+		return Slot == EOBEquipmentSlot::PrimaryWeapon ||
+			Slot == EOBEquipmentSlot::SecondaryWeapon ||
+			Slot == EOBEquipmentSlot::MeleeWeapon;
+	}
+}
 
 
 UPlayerInventoryComponent::UPlayerInventoryComponent()
@@ -34,12 +47,16 @@ UPlayerInventoryComponent::UPlayerInventoryComponent()
 		InventoryBackPackSize = FMath::Max(
 			0,
 			Settings->FallbackBackpackSlotCount);
+		InventoryContainerSize = FMath::Max(
+			0,
+			Settings->DefaultContainerSlotCount);
 		QuickSlotSize = FMath::Max(
 			0,
 			Settings->DefaultQuickSlotCount);
 	}
 
 	InventoryBackPackArray.SetNum(FMath::Max(InventoryBackPackSize, 0));
+	InventoryContainerArray.SetNum(FMath::Max(InventoryContainerSize, 0));
 	InventoryQuickSlotsArray.SetNum(FMath::Max(QuickSlotSize, 0));
 	InitializeEquipmentSlots();
 }
@@ -52,6 +69,10 @@ void UPlayerInventoryComponent::GetLifetimeReplicatedProps(
 	DOREPLIFETIME_CONDITION(
 		UPlayerInventoryComponent,
 		InventoryBackPackArray,
+		COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(
+		UPlayerInventoryComponent,
+		InventoryContainerArray,
 		COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(
 		UPlayerInventoryComponent,
@@ -217,9 +238,7 @@ void UPlayerInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 UInventoryWindow* UPlayerInventoryComponent::OpenInventory()
 {
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	APlayerController* PlayerController = OwnerPawn
-		? Cast<APlayerController>(OwnerPawn->GetController())
-		: nullptr;
+	APlayerController* PlayerController = OwnerPawn ? Cast<APlayerController>(OwnerPawn->GetController()) : nullptr;
 	if (!PlayerController || !PlayerController->IsLocalController())
 	{
 		return nullptr;
@@ -227,28 +246,19 @@ UInventoryWindow* UPlayerInventoryComponent::OpenInventory()
 
 	if (!IsValid(InventoryWidget))
 	{
-		const UInventorySystemSetting* Settings =
-			GetDefault<UInventorySystemSetting>();
+		const UInventorySystemSetting* Settings = GetDefault<UInventorySystemSetting>();
 		if (!Settings || Settings->InventoryWindowWidgetClass.IsNull())
 		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("%s::%s : InventoryWindowWidgetClass is not configured."),
-				*GetClass()->GetName(),
-				TEXT(__FUNCTION__));
+			UE_LOG(LogTemp, Warning, TEXT("%s::%s : InventoryWindowWidgetClass is not configured."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 			return nullptr;
 		}
 
-		TSubclassOf<UInventoryWindow> WindowClass =
-			Settings->InventoryWindowWidgetClass.LoadSynchronous();
+		TSubclassOf<UInventoryWindow> WindowClass = Settings->InventoryWindowWidgetClass.LoadSynchronous();
 		if (!WindowClass)
 		{
 			return nullptr;
 		}
-		InventoryWidget = CreateWidget<UInventoryWindow>(
-			PlayerController,
-			WindowClass);
+		InventoryWidget = CreateWidget<UInventoryWindow>(PlayerController, WindowClass);
 	}
 	if (!IsValid(InventoryWidget))
 	{
@@ -258,11 +268,12 @@ UInventoryWindow* UPlayerInventoryComponent::OpenInventory()
 	UpdateInventoryWidget();
 	if (!InventoryWidget->IsInViewport())
 	{
-		const UInventorySystemSetting* Settings =
-			GetDefault<UInventorySystemSetting>();
-		InventoryWidget->AddToViewport(
-			Settings ? Settings->InventoryWidgetZOrder : 0);
+		const UInventorySystemSetting* Settings = GetDefault<UInventorySystemSetting>();
+		InventoryWidget->AddToViewport(Settings ? Settings->InventoryWidgetZOrder : 0);
 	}
+	
+	SetPreviewCaptureActive(true);
+	
 	return InventoryWidget;
 }
 
@@ -272,6 +283,22 @@ void UPlayerInventoryComponent::CloseInventory()
 	{
 		InventoryWidget->RemoveFromParent();
 	}
+	
+	SetPreviewCaptureActive(false);
+}
+
+void UPlayerInventoryComponent::SetPreviewCaptureActive(const bool bActive)
+{
+	AActor* OwnerActor = GetOwner();
+	USceneCaptureComponent2D* PreviewCapture = OwnerActor ? OwnerActor->FindComponentByClass<USceneCaptureComponent2D>() : nullptr;
+	if (!PreviewCapture)
+	{
+		return;
+	}
+
+	// bCaptureOnMovement만 켜져 있으면 트랜스폼이 바뀔 때만 찍혀서
+	// 캐릭터가 멈추는 순간의 애니메이션 중간 포즈로 굳는다.
+	PreviewCapture->bCaptureEveryFrame = bActive;
 }
 
 bool UPlayerInventoryComponent::IsInventoryOpen() const
@@ -279,11 +306,23 @@ bool UPlayerInventoryComponent::IsInventoryOpen() const
 	return IsValid(InventoryWidget) && InventoryWidget->IsInViewport();
 }
 
+bool UPlayerInventoryComponent::IsPointInsideInventoryWindow(
+	const FVector2D& ScreenSpacePosition) const
+{
+	return IsInventoryOpen() &&
+		InventoryWidget->GetCachedGeometry().IsUnderLocation(ScreenSpacePosition);
+}
+
 void UPlayerInventoryComponent::UpdateInventory()
 {
 	if (InventoryBackPackArray.Num() != InventoryBackPackSize)
 	{
 		InventoryBackPackArray.SetNum(FMath::Max(InventoryBackPackSize, 0));
+	}
+
+	if (InventoryContainerArray.Num() != InventoryContainerSize)
+	{
+		InventoryContainerArray.SetNum(FMath::Max(InventoryContainerSize, 0));
 	}
 
 	if (InventoryQuickSlotsArray.Num() != QuickSlotSize)
@@ -309,10 +348,7 @@ void UPlayerInventoryComponent::UpdateInventoryWidget()
 		return;
 	}
 
-	InventoryWidget->SetInventorySource(
-		this,
-		EInventoryItemLocation::Backpack,
-		InventoryBackPackArray);
+	InventoryWidget->SetInventorySource(this);
 }
 
 int32 UPlayerInventoryComponent::TryAddItem(
@@ -346,6 +382,24 @@ bool UPlayerInventoryComponent::TryExtractItemInstance(
 	}
 
 	for (FInventoryData& Item : InventoryBackPackArray)
+	{
+		if (Item.InstanceId != InstanceId)
+		{
+			continue;
+		}
+
+		OutItemInstance = Item;
+		Item = FInventoryData();
+		NotifyInventoryChanged();
+		const FOBItemDefinitionRow* ItemRow = OutItemInstance.GetDefinition();
+		if (ItemRow && ItemRow->Category == EOBItemCategory::Ammo)
+		{
+			OnAmmoPoolChanged.Broadcast();
+		}
+		return true;
+	}
+
+	for (FInventoryData& Item : InventoryContainerArray)
 	{
 		if (Item.InstanceId != InstanceId)
 		{
@@ -433,7 +487,8 @@ int32 UPlayerInventoryComponent::AddItemRowInternal(
 
 	const bool bWeapon = ItemRow->Category == EOBItemCategory::Weapon;
 	const bool bEquipment = ItemRow->Category == EOBItemCategory::Equipment;
-	const bool bEquippable = bWeapon || bEquipment;
+	const bool bAttachment = ItemRow->Category == EOBItemCategory::Attachment;
+	const bool bEquippable = bWeapon || bEquipment || bAttachment;
 	const int32 MaxStack = bEquippable ? 1 : ItemRow->MaxStack;
 	int32 RemainingStack = RequestedAmount;
 	bool bUsedSourceInstance = false;
@@ -455,6 +510,13 @@ int32 UPlayerInventoryComponent::AddItemRowInternal(
 
 				if (Slot.ItemTag != ItemRow->ItemTag ||
 					Slot.ItemStack <= 0 || Slot.ItemStack >= MaxStack)
+				{
+					continue;
+				}
+				if (SourceInstance &&
+					(Slot.bFoundInRaid != SourceInstance->bFoundInRaid ||
+					 Slot.QualityTier != SourceInstance->QualityTier ||
+					 !FMath::IsNearlyEqual(Slot.Durability, SourceInstance->Durability)))
 				{
 					continue;
 				}
@@ -483,9 +545,12 @@ int32 UPlayerInventoryComponent::AddItemRowInternal(
 				}
 
 				const int32 AddStack = FMath::Min(MaxStack, RemainingStack);
-				const bool bUseSource =
-					bEquippable && SourceInstance && !bUsedSourceInstance;
+				const bool bUseSource = SourceInstance != nullptr;
 				Slot = bUseSource ? *SourceInstance : FInventoryData();
+				if (bUseSource && bUsedSourceInstance)
+				{
+					Slot.InstanceId.Invalidate();
+				}
 				Slot.ItemTag = ItemRow->ItemTag;
 				Slot.ItemStack = AddStack;
 				if (!Slot.InstanceId.IsValid())
@@ -506,7 +571,9 @@ int32 UPlayerInventoryComponent::AddItemRowInternal(
 		};
 
 	FillExistingStacks(InventoryBackPackArray);
+	FillExistingStacks(InventoryContainerArray);
 	FillEmptySlots(InventoryBackPackArray);
+	FillEmptySlots(InventoryContainerArray);
 
 	const int32 AddedAmount = RequestedAmount - RemainingStack;
 	if (AddedAmount > 0)
@@ -530,6 +597,13 @@ int32 UPlayerInventoryComponent::GetItemCount(const FGameplayTag& ItemTag) const
 
 	int32 Total = 0;
 	for (const FInventoryData& Slot : InventoryBackPackArray)
+	{
+		if (Slot.ItemTag == ItemTag && Slot.ItemStack > 0)
+		{
+			Total += Slot.ItemStack;
+		}
+	}
+	for (const FInventoryData& Slot : InventoryContainerArray)
 	{
 		if (Slot.ItemTag == ItemTag && Slot.ItemStack > 0)
 		{
@@ -570,10 +644,43 @@ int32 UPlayerInventoryComponent::TryRemoveItem(
 			Slot = FInventoryData();
 		}
 	}
+	for (FInventoryData& Slot : InventoryContainerArray)
+	{
+		if (Remaining <= 0)
+		{
+			break;
+		}
+		if (Slot.ItemTag != ItemTag || Slot.ItemStack <= 0)
+		{
+			continue;
+		}
+
+		const int32 Removed = FMath::Min(Remaining, Slot.ItemStack);
+		Slot.ItemStack -= Removed;
+		Remaining -= Removed;
+		if (Slot.ItemStack == 0)
+		{
+			Slot = FInventoryData();
+		}
+	}
 
 	const int32 RemovedAmount = RequestedAmount - Remaining;
 	if (RemovedAmount > 0)
 	{
+		// A completed consumption can remove the final concrete stack. In that
+		// case every quick slot pointing at the now-missing item type is stale
+		// and must be cleared together with the inventory update.
+		if (GetItemCount(ItemTag) <= 0)
+		{
+			for (FQuickSlotData& QuickSlot : InventoryQuickSlotsArray)
+			{
+				if (QuickSlot.ItemTag == ItemTag)
+				{
+					QuickSlot = FQuickSlotData();
+				}
+			}
+		}
+
 		NotifyInventoryChanged();
 		const FOBItemDefinitionRow* ItemRow = UOBItemRegistry::FindItem(ItemTag);
 		if (ItemRow && ItemRow->Category == EOBItemCategory::Ammo)
@@ -609,6 +716,13 @@ void UPlayerInventoryComponent::GetLootableItemInstances(
 			OutItems.Add(Item);
 		}
 	}
+	for (const FInventoryData& Item : InventoryContainerArray)
+	{
+		if (Item.ItemTag.IsValid() && Item.ItemStack > 0)
+		{
+			OutItems.Add(Item);
+		}
+	}
 }
 
 void UPlayerInventoryComponent::ClearLootableItemInstances()
@@ -636,6 +750,11 @@ void UPlayerInventoryComponent::ClearLootableItemInstances()
 		: 0;
 	InventoryBackPackArray.Reset();
 	InventoryBackPackArray.SetNum(InventoryBackPackSize);
+	InventoryContainerSize = Settings
+		? FMath::Max(0, Settings->DefaultContainerSlotCount)
+		: 0;
+	InventoryContainerArray.Reset();
+	InventoryContainerArray.SetNum(InventoryContainerSize);
 	NotifyInventoryChanged();
 	OnAmmoPoolChanged.Broadcast();
 }
@@ -723,8 +842,8 @@ bool UPlayerInventoryComponent::AddWeapon(
 	}
 
 	TSubclassOf<AOBWeaponBase> ResolvedClass;
-	const UOBWeaponData* WeaponData = nullptr;
-	if (!ResolveWeaponDefinition(ItemRow, ResolvedClass, WeaponData) ||
+	const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
+	if (!ResolveWeaponDefinition(ItemRow, ResolvedClass, WeaponDefinition) ||
 		ResolvedClass != WeaponClass)
 	{
 		UE_LOG(
@@ -747,46 +866,78 @@ bool UPlayerInventoryComponent::AddWeapon(
 
 	if (!AssignItemToEquipmentSlot(
 		AddedWeaponId,
-		ToEquipmentSlot(WeaponData->WeaponSlot)))
+		ToEquipmentSlot(WeaponDefinition->WeaponSlot)))
 	{
 		return false;
 	}
 
-	if (WeaponData && WeaponData->AmmoType.IsValid() &&
-		WeaponData->MaxReserveAmmo > 0)
+	if (WeaponDefinition->WeaponType == EOBWeaponType::Ranged &&
+		WeaponDefinition->Ranged.AmmoType.IsValid() &&
+		WeaponDefinition->Ranged.MaxReserveAmmo > 0)
 	{
-		AddAmmo(WeaponData->AmmoType, WeaponData->MaxReserveAmmo);
+		AddAmmo(
+			WeaponDefinition->Ranged.AmmoType,
+			WeaponDefinition->Ranged.MaxReserveAmmo);
 	}
 	return true;
+}
+
+bool UPlayerInventoryComponent::AddWeaponInstance(
+	const FInventoryData& WeaponInstance)
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority() ||
+		!WeaponInstance.ItemTag.IsValid() || WeaponInstance.ItemStack <= 0)
+	{
+		return false;
+	}
+
+	const FOBItemDefinitionRow* ItemRow = UOBItemRegistry::FindItem(WeaponInstance.ItemTag);
+	TSubclassOf<AOBWeaponBase> WeaponClass;
+	const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
+	if (!ResolveWeaponDefinition(ItemRow, WeaponClass, WeaponDefinition) || !WeaponDefinition)
+	{
+		return false;
+	}
+
+	FInventoryData Copy = WeaponInstance;
+	Copy.ItemStack = 1;
+	if (!Copy.InstanceId.IsValid()) Copy.InstanceId = FGuid::NewGuid();
+	FGuid AddedWeaponId;
+	if (AddItemRowInternal(ItemRow, 1, &AddedWeaponId, &Copy) != 1 ||
+		!AddedWeaponId.IsValid())
+	{
+		return false;
+	}
+	return AssignItemToEquipmentSlot(
+		AddedWeaponId,
+		ToEquipmentSlot(WeaponDefinition->WeaponSlot));
 }
 
 bool UPlayerInventoryComponent::ResolveWeaponDefinition(
 	const FOBItemDefinitionRow* ItemRow,
 	TSubclassOf<AOBWeaponBase>& OutWeaponClass,
-	const UOBWeaponData*& OutWeaponData) const
+	const FOBWeaponDefinitionRow*& OutWeaponDefinition) const
 {
 	OutWeaponClass = nullptr;
-	OutWeaponData = nullptr;
-	if (!ItemRow || ItemRow->Category != EOBItemCategory::Weapon ||
-		ItemRow->WeaponClass.IsNull())
+	OutWeaponDefinition = nullptr;
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	if (!ItemRow || ItemRow->Category != EOBItemCategory::Weapon || !GameData)
 	{
 		return false;
 	}
 
-	UClass* LoadedClass = ItemRow->WeaponClass.LoadSynchronous();
+	OutWeaponDefinition = GameData->FindWeapon(ItemRow->ItemTag);
+	UClass* LoadedClass = OutWeaponDefinition
+		? OutWeaponDefinition->ActorClass.LoadSynchronous()
+		: nullptr;
 	if (!LoadedClass || !LoadedClass->IsChildOf(AOBWeaponBase::StaticClass()))
 	{
-		return false;
-	}
-
-	AOBWeaponBase* WeaponCDO = LoadedClass->GetDefaultObject<AOBWeaponBase>();
-	if (!WeaponCDO || !WeaponCDO->GetWeaponData())
-	{
+		OutWeaponDefinition = nullptr;
 		return false;
 	}
 
 	OutWeaponClass = LoadedClass;
-	OutWeaponData = WeaponCDO->GetWeaponData();
 	return true;
 }
 
@@ -818,10 +969,10 @@ bool UPlayerInventoryComponent::ResolveEquipmentSlot(
 	}
 
 	TSubclassOf<AOBWeaponBase> WeaponClass;
-	const UOBWeaponData* WeaponData = nullptr;
-	if (ResolveWeaponDefinition(ItemRow, WeaponClass, WeaponData))
+	const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
+	if (ResolveWeaponDefinition(ItemRow, WeaponClass, WeaponDefinition))
 	{
-		OutEquipmentSlot = ToEquipmentSlot(WeaponData->WeaponSlot);
+		OutEquipmentSlot = ToEquipmentSlot(WeaponDefinition->WeaponSlot);
 		return OutEquipmentSlot != EOBEquipmentSlot::None;
 	}
 
@@ -933,6 +1084,10 @@ FInventoryData* UPlayerInventoryComponent::FindItemInInventory(
 	{
 		Inventory = &InventoryBackPackArray;
 	}
+	else if (Location == EInventoryItemLocation::Container)
+	{
+		Inventory = &InventoryContainerArray;
+	}
 	if (!Inventory || !InstanceId.IsValid())
 	{
 		return nullptr;
@@ -960,6 +1115,10 @@ const FInventoryData* UPlayerInventoryComponent::FindItemInInventory(
 	if (Location == EInventoryItemLocation::Backpack)
 	{
 		Inventory = &InventoryBackPackArray;
+	}
+	else if (Location == EInventoryItemLocation::Container)
+	{
+		Inventory = &InventoryContainerArray;
 	}
 	if (!Inventory || !InstanceId.IsValid())
 	{
@@ -989,6 +1148,64 @@ FInventoryItemHandle UPlayerInventoryComponent::MakeBackpackHandle(
 	{
 		Handle.InstanceId = InventoryBackPackArray[BackpackIndex].InstanceId;
 		Handle.ItemTag = InventoryBackPackArray[BackpackIndex].ItemTag;
+	}
+	return Handle;
+}
+
+FInventoryData* UPlayerInventoryComponent::FindOwnedItem(const FGuid& InstanceId)
+{
+	if (!InstanceId.IsValid()) return nullptr;
+	if (FInventoryData* Item = InventoryBackPackArray.FindByPredicate(
+		[&InstanceId](const FInventoryData& Candidate)
+		{
+			return Candidate.InstanceId == InstanceId;
+		}))
+	{
+		return Item;
+	}
+	if (FInventoryData* Item = InventoryContainerArray.FindByPredicate(
+		[&InstanceId](const FInventoryData& Candidate)
+		{
+			return Candidate.InstanceId == InstanceId;
+		}))
+	{
+		return Item;
+	}
+	return FindEquippedItem(InstanceId);
+}
+
+const FInventoryData* UPlayerInventoryComponent::FindOwnedItem(const FGuid& InstanceId) const
+{
+	if (!InstanceId.IsValid()) return nullptr;
+	if (const FInventoryData* Item = InventoryBackPackArray.FindByPredicate(
+		[&InstanceId](const FInventoryData& Candidate)
+		{
+			return Candidate.InstanceId == InstanceId;
+		}))
+	{
+		return Item;
+	}
+	if (const FInventoryData* Item = InventoryContainerArray.FindByPredicate(
+		[&InstanceId](const FInventoryData& Candidate)
+		{
+			return Candidate.InstanceId == InstanceId;
+		}))
+	{
+		return Item;
+	}
+	return FindEquippedItem(InstanceId);
+}
+
+FInventoryItemHandle UPlayerInventoryComponent::MakeContainerHandle(
+	const int32 ContainerIndex) const
+{
+	FInventoryItemHandle Handle;
+	Handle.Location = EInventoryItemLocation::Container;
+	Handle.SlotIndex = ContainerIndex;
+	if (InventoryContainerArray.IsValidIndex(ContainerIndex))
+	{
+		Handle.InstanceId = InventoryContainerArray[ContainerIndex].InstanceId;
+		Handle.ItemTag = InventoryContainerArray[ContainerIndex].ItemTag;
 	}
 	return Handle;
 }
@@ -1090,6 +1307,49 @@ int32 UPlayerInventoryComponent::GetQuickSlotItemCount(
 	return GetItemCount(InventoryQuickSlotsArray[QuickSlotIndex].ItemTag);
 }
 
+bool UPlayerInventoryComponent::ResolveQuickSlotItem(
+	const int32 QuickSlotIndex,
+	FInventoryData& OutItem) const
+{
+	OutItem = FInventoryData();
+	if (!InventoryQuickSlotsArray.IsValidIndex(QuickSlotIndex))
+	{
+		return false;
+	}
+
+	const FGameplayTag ItemTag =
+		InventoryQuickSlotsArray[QuickSlotIndex].ItemTag;
+	if (!ItemTag.IsValid())
+	{
+		return false;
+	}
+
+	auto FindConcreteItem =
+		[&ItemTag](const TArray<FInventoryData>& Inventory)
+			-> const FInventoryData*
+		{
+			return Inventory.FindByPredicate(
+				[&ItemTag](const FInventoryData& Item)
+				{
+					return Item.ItemTag == ItemTag && Item.ItemStack > 0;
+				});
+		};
+
+	const FInventoryData* ResolvedItem =
+		FindConcreteItem(InventoryBackPackArray);
+	if (!ResolvedItem)
+	{
+		ResolvedItem = FindConcreteItem(InventoryContainerArray);
+	}
+	if (!ResolvedItem)
+	{
+		return false;
+	}
+
+	OutItem = *ResolvedItem;
+	return true;
+}
+
 void UPlayerInventoryComponent::AssignQuickSlot(
 	const int32 QuickSlotIndex,
 	const FInventoryItemHandle& Source)
@@ -1131,9 +1391,11 @@ bool UPlayerInventoryComponent::AssignQuickSlotInternal(
 		return false;
 	}
 
-	// 퀵슬롯은 "사용 가능한 아이템 종류"만 가리킨다. 사용 어빌리티가 없으면 등록 불가.
+	// A quick slot owns metadata only. Assignment must not depend on the
+	// current execution mechanism: an ability or an external caller may use
+	// the represented item later.
 	const FOBItemDefinitionRow* ItemRow = Item.GetDefinition();
-	if (!ItemRow || !ItemRow->ItemTag.IsValid() || !ItemRow->UseAbility)
+	if (!ItemRow || !ItemRow->ItemTag.IsValid())
 	{
 		return false;
 	}
@@ -1181,7 +1443,12 @@ bool UPlayerInventoryComponent::ClearQuickSlotInternal(
 
 void UPlayerInventoryComponent::UseQuickSlot(const int32 QuickSlotIndex)
 {
-	UseQuickSlotInternal(QuickSlotIndex);
+	TryUseQuickSlot(QuickSlotIndex);
+}
+
+bool UPlayerInventoryComponent::TryUseQuickSlot(const int32 QuickSlotIndex)
+{
+	return UseQuickSlotInternal(QuickSlotIndex);
 }
 
 bool UPlayerInventoryComponent::UseQuickSlotInternal(
@@ -1193,18 +1460,46 @@ bool UPlayerInventoryComponent::UseQuickSlotInternal(
 		return false;
 	}
 
-	const FOBItemDefinitionRow* ItemRow = UOBItemRegistry::FindItem(
-		InventoryQuickSlotsArray[QuickSlotIndex].ItemTag);
-	if (!ItemRow || !ItemRow->ItemTag.IsValid() ||
-		!ItemRow->UseAbility ||
-		GetItemCount(ItemRow->ItemTag) <= 0)
+	FInventoryData ResolvedItem;
+	if (!ResolveQuickSlotItem(QuickSlotIndex, ResolvedItem))
+	{
+		return false;
+	}
+
+	const FOBItemDefinitionRow* ItemRow = ResolvedItem.GetDefinition();
+	if (!ItemRow || !ItemRow->ItemTag.IsValid())
 	{
 		return false;
 	}
 
 	UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
-	return ASC && ASC->TryActivateAbilityByClass(ItemRow->UseAbility);
+	if (!ASC)
+	{
+		return false;
+	}
+
+	// DT_Items may explicitly select the behavior for this item type.
+	if (ItemRow->UseAbility)
+	{
+		return ASC->TryActivateAbilityByClass(ItemRow->UseAbility);
+	}
+
+	// Otherwise locate a granted consumable ability by its metadata ItemTag.
+	// GA_Heal and GA_Grenade already declare Item.Bandage/Item.Grenade, so
+	// quick-slot use remains data driven even while DT_Items.UseAbility is None.
+	for (const FGameplayAbilitySpec& AbilitySpec : ASC->GetActivatableAbilities())
+	{
+		const UOBGameplayAbility_Consumable* ConsumableAbility =
+			Cast<UOBGameplayAbility_Consumable>(AbilitySpec.Ability);
+		if (ConsumableAbility &&
+			ConsumableAbility->GetConsumableItemTag() == ResolvedItem.ItemTag)
+		{
+			return ASC->TryActivateAbility(AbilitySpec.Handle);
+		}
+	}
+
+	return false;
 }
 
 bool UPlayerInventoryComponent::GetEquippedItem(
@@ -1212,6 +1507,26 @@ bool UPlayerInventoryComponent::GetEquippedItem(
 	FInventoryData& OutItem) const
 {
 	return GetItemFromHandle(MakeEquipmentHandle(EquipmentSlot), OutItem);
+}
+
+bool UPlayerInventoryComponent::CanEquipItemToSlot(
+	const FInventoryItemHandle& Source,
+	const EOBEquipmentSlot TargetSlot) const
+{
+	if (!Source.HasItem() ||
+		TargetSlot == EOBEquipmentSlot::None ||
+		Source.Location == EInventoryItemLocation::None ||
+		Source.Location == EInventoryItemLocation::QuickSlot ||
+		(bSwitching && IsWeaponEquipmentSlot(TargetSlot)))
+	{
+		return false;
+	}
+
+	FInventoryData SourceItem;
+	EOBEquipmentSlot RequiredSlot = EOBEquipmentSlot::None;
+	return GetItemFromHandle(Source, SourceItem) &&
+		ResolveEquipmentSlot(SourceItem, RequiredSlot) &&
+		RequiredSlot == TargetSlot;
 }
 
 bool UPlayerInventoryComponent::IsItemEquipped(
@@ -1377,6 +1692,10 @@ bool UPlayerInventoryComponent::MoveEquipmentItemToInventory(
 	{
 		TargetArray = &InventoryBackPackArray;
 	}
+	else if (TargetLocation == EInventoryItemLocation::Container)
+	{
+		TargetArray = &InventoryContainerArray;
+	}
 	if (!TargetArray)
 	{
 		return false;
@@ -1506,6 +1825,13 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 
 	if (Target.Location == EInventoryItemLocation::Equipment)
 	{
+		// UI pre-validation is advisory. Repeat it here so forged handles and
+		// requests arriving during a weapon switch cannot mutate server state.
+		if (!CanEquipItemToSlot(Source, Target.EquipmentSlot))
+		{
+			return false;
+		}
+
 		if (Source.Location == EInventoryItemLocation::Equipment)
 		{
 			FEquipmentSlotEntry* SourceEntry =
@@ -1548,7 +1874,8 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 			return true;
 		}
 
-		if (Source.Location != EInventoryItemLocation::Backpack)
+		if (Source.Location != EInventoryItemLocation::Backpack &&
+			Source.Location != EInventoryItemLocation::Container)
 		{
 			return false;
 		}
@@ -1578,20 +1905,21 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 		if (Equipped)
 		{
 			TSubclassOf<AOBWeaponBase> WeaponClass;
-			const UOBWeaponData* WeaponData = nullptr;
+			const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
 			if (ResolveWeaponDefinition(
 				Equipped->Item.GetDefinition(),
 				WeaponClass,
-				WeaponData))
+				WeaponDefinition))
 			{
-				EquipSlot(WeaponData->WeaponSlot);
+				EquipSlot(WeaponDefinition->WeaponSlot);
 			}
 		}
 		return true;
 	}
 
 	if (Source.Location == EInventoryItemLocation::Equipment &&
-		Target.Location == EInventoryItemLocation::Backpack)
+		(Target.Location == EInventoryItemLocation::Backpack ||
+		 Target.Location == EInventoryItemLocation::Container))
 	{
 		const FEquipmentSlotEntry* Entry = FindEquipmentSlot(Source.EquipmentSlot);
 		if (!Entry || Entry->Item.InstanceId != Source.InstanceId ||
@@ -1607,13 +1935,13 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 		if (Entry && !Entry->IsEmpty())
 		{
 			TSubclassOf<AOBWeaponBase> WeaponClass;
-			const UOBWeaponData* WeaponData = nullptr;
+			const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
 			if (ResolveWeaponDefinition(
 				Entry->Item.GetDefinition(),
 				WeaponClass,
-				WeaponData))
+				WeaponDefinition))
 			{
-				EquipSlot(WeaponData->WeaponSlot);
+				EquipSlot(WeaponDefinition->WeaponSlot);
 			}
 		}
 		return true;
@@ -1625,6 +1953,10 @@ bool UPlayerInventoryComponent::MoveItemInternal(
 			if (Location == EInventoryItemLocation::Backpack)
 			{
 				return &InventoryBackPackArray;
+			}
+			if (Location == EInventoryItemLocation::Container)
+			{
+				return &InventoryContainerArray;
 			}
 			return nullptr;
 		};
@@ -1856,11 +2188,11 @@ TSubclassOf<AOBWeaponBase> UPlayerInventoryComponent::GetWeaponInSlot(
 	}
 
 	TSubclassOf<AOBWeaponBase> WeaponClass;
-	const UOBWeaponData* WeaponData = nullptr;
+	const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
 	return ResolveWeaponDefinition(
 		Entry->Item.GetDefinition(),
 		WeaponClass,
-		WeaponData) && WeaponData->WeaponSlot == Slot
+		WeaponDefinition) && WeaponDefinition->WeaponSlot == Slot
 		? WeaponClass
 		: nullptr;
 }
@@ -1934,11 +2266,11 @@ void UPlayerInventoryComponent::EquipWeaponAtIndex(
 	}
 
 	TSubclassOf<AOBWeaponBase> WeaponClass;
-	const UOBWeaponData* WeaponData = nullptr;
+	const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
 	const bool bWeapon = ResolveWeaponDefinition(
 		Item.GetDefinition(),
 		WeaponClass,
-		WeaponData);
+		WeaponDefinition);
 	if (bWeapon && bSwitching)
 	{
 		return;
@@ -1966,8 +2298,8 @@ void UPlayerInventoryComponent::EquipWeaponInstance(
 	}
 
 	TSubclassOf<AOBWeaponBase> WeaponClass;
-	const UOBWeaponData* WeaponData = nullptr;
-	if (!ResolveWeaponDefinition(Item->GetDefinition(), WeaponClass, WeaponData))
+	const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
+	if (!ResolveWeaponDefinition(Item->GetDefinition(), WeaponClass, WeaponDefinition))
 	{
 		return;
 	}
@@ -1996,7 +2328,7 @@ void UPlayerInventoryComponent::EquipWeaponInstance(
 	UnbindActiveWeapon();
 
 	ActiveWeaponInstanceId = Item->InstanceId;
-	ActiveWeaponSlot = WeaponData->WeaponSlot;
+	ActiveWeaponSlot = WeaponDefinition->WeaponSlot;
 	if (bHadWeapon)
 	{
 		SetSwitching(true);
@@ -2014,9 +2346,9 @@ void UPlayerInventoryComponent::EquipWeaponInstance(
 	if (bHadWeapon)
 	{
 		float DrawTime = DefaultDrawTime;
-		if (WeaponData->EquipMontage)
+		if (UAnimMontage* EquipMontage = WeaponDefinition->Visual.EquipMontage.LoadSynchronous())
 		{
-			DrawTime = WeaponData->EquipMontage->GetPlayLength();
+			DrawTime = EquipMontage->GetPlayLength();
 		}
 
 		if (UWorld* World = GetWorld())
@@ -2046,8 +2378,8 @@ void UPlayerInventoryComponent::EquipActiveWeapon()
 	}
 
 	TSubclassOf<AOBWeaponBase> WeaponClass;
-	const UOBWeaponData* WeaponData = nullptr;
-	if (!ResolveWeaponDefinition(Item->GetDefinition(), WeaponClass, WeaponData))
+	const FOBWeaponDefinitionRow* WeaponDefinition = nullptr;
+	if (!ResolveWeaponDefinition(Item->GetDefinition(), WeaponClass, WeaponDefinition))
 	{
 		return;
 	}
@@ -2059,7 +2391,7 @@ void UPlayerInventoryComponent::EquipActiveWeapon()
 		return;
 	}
 
-	Equipment->EquipWeapon(WeaponClass);
+	Equipment->EquipWeaponInstance(*Item);
 	AOBWeaponBase* Weapon = Equipment->GetCurrentWeapon();
 	if (!Weapon)
 	{
@@ -2201,6 +2533,197 @@ void UPlayerInventoryComponent::NotifyInventoryChanged()
 void UPlayerInventoryComponent::OnRep_BackpackItems()
 {
 	InventoryBackPackSize = InventoryBackPackArray.Num();
+	NotifyInventoryChanged();
+	OnAmmoPoolChanged.Broadcast();
+}
+
+bool UPlayerInventoryComponent::CanInstallAttachment(
+	const FGuid WeaponInstanceId,
+	const FGuid AttachmentInstanceId) const
+{
+	const FInventoryData* WeaponItem = FindOwnedItem(WeaponInstanceId);
+	const FInventoryData* AttachmentItem = FindOwnedItem(AttachmentInstanceId);
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	if (!WeaponItem || !AttachmentItem || WeaponItem == AttachmentItem || !GameData)
+	{
+		return false;
+	}
+
+	const FOBWeaponDefinitionRow* WeaponDefinition = GameData->FindWeapon(WeaponItem->ItemTag);
+	const FOBAttachmentDefinitionRow* AttachmentDefinition = GameData->FindAttachment(AttachmentItem->ItemTag);
+	const FOBItemDefinitionRow* AttachmentItemDefinition = AttachmentItem->GetDefinition();
+	if (!WeaponDefinition || !AttachmentDefinition || !AttachmentItemDefinition ||
+		AttachmentItemDefinition->Category != EOBItemCategory::Attachment)
+	{
+		return false;
+	}
+
+	const FOBAttachmentSlotSpec* Slot = WeaponDefinition->AttachmentSlots.FindByPredicate(
+		[AttachmentDefinition](const FOBAttachmentSlotSpec& Candidate)
+		{
+			return Candidate.SlotTag == AttachmentDefinition->SlotTag;
+		});
+	if (!Slot ||
+		(!Slot->AllowedAttachmentTags.IsEmpty() &&
+		 !Slot->AllowedAttachmentTags.HasTag(AttachmentItem->ItemTag)) ||
+		(!AttachmentDefinition->RequiredWeaponTags.IsEmpty() &&
+		 !AttachmentDefinition->RequiredWeaponTags.HasTag(WeaponItem->ItemTag)) ||
+		AttachmentDefinition->BlockedWeaponTags.HasTag(WeaponItem->ItemTag))
+	{
+		return false;
+	}
+
+	return !WeaponItem->Attachments.ContainsByPredicate(
+		[AttachmentDefinition](const FOBInstalledAttachment& Installed)
+		{
+			return Installed.SlotTag == AttachmentDefinition->SlotTag;
+		});
+}
+
+void UPlayerInventoryComponent::InstallAttachment(
+	const FGuid WeaponInstanceId,
+	const FGuid AttachmentInstanceId)
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor) return;
+	if (!OwnerActor->HasAuthority())
+	{
+		Server_InstallAttachment(WeaponInstanceId, AttachmentInstanceId);
+		return;
+	}
+	InstallAttachmentInternal(WeaponInstanceId, AttachmentInstanceId);
+}
+
+void UPlayerInventoryComponent::Server_InstallAttachment_Implementation(
+	FGuid WeaponInstanceId,
+	FGuid AttachmentInstanceId)
+{
+	InstallAttachmentInternal(WeaponInstanceId, AttachmentInstanceId);
+}
+
+bool UPlayerInventoryComponent::InstallAttachmentInternal(
+	const FGuid& WeaponInstanceId,
+	const FGuid& AttachmentInstanceId)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() ||
+		!CanInstallAttachment(WeaponInstanceId, AttachmentInstanceId))
+	{
+		return false;
+	}
+
+	FInventoryData ExtractedAttachment;
+	if (!TryExtractItemInstance(AttachmentInstanceId, ExtractedAttachment))
+	{
+		return false;
+	}
+
+	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
+	const FOBAttachmentDefinitionRow* AttachmentDefinition = GameData
+		? GameData->FindAttachment(ExtractedAttachment.ItemTag)
+		: nullptr;
+	FInventoryData* WeaponItem = FindOwnedItem(WeaponInstanceId);
+	if (!WeaponItem || !AttachmentDefinition)
+	{
+		TryAddItemInstance(ExtractedAttachment);
+		return false;
+	}
+
+	FOBInstalledAttachment& Installed = WeaponItem->Attachments.AddDefaulted_GetRef();
+	Installed.SlotTag = AttachmentDefinition->SlotTag;
+	Installed.ItemTag = ExtractedAttachment.ItemTag;
+	Installed.InstanceId = ExtractedAttachment.InstanceId;
+	Installed.Durability = ExtractedAttachment.Durability;
+	Installed.QualityTier = ExtractedAttachment.QualityTier;
+	Installed.bFoundInRaid = ExtractedAttachment.bFoundInRaid;
+	Installed.RaidAcquisitionId = ExtractedAttachment.RaidAcquisitionId;
+	++WeaponItem->Revision;
+	RefreshActiveWeaponInstance(WeaponInstanceId);
+	NotifyInventoryChanged();
+	return true;
+}
+
+void UPlayerInventoryComponent::RemoveAttachment(
+	const FGuid WeaponInstanceId,
+	const FGameplayTag SlotTag)
+{
+	AActor* OwnerActor = GetOwner();
+	if (!OwnerActor) return;
+	if (!OwnerActor->HasAuthority())
+	{
+		Server_RemoveAttachment(WeaponInstanceId, SlotTag);
+		return;
+	}
+	RemoveAttachmentInternal(WeaponInstanceId, SlotTag);
+}
+
+void UPlayerInventoryComponent::Server_RemoveAttachment_Implementation(
+	FGuid WeaponInstanceId,
+	FGameplayTag SlotTag)
+{
+	RemoveAttachmentInternal(WeaponInstanceId, SlotTag);
+}
+
+bool UPlayerInventoryComponent::RemoveAttachmentInternal(
+	const FGuid& WeaponInstanceId,
+	const FGameplayTag& SlotTag)
+{
+	FInventoryData* WeaponItem = FindOwnedItem(WeaponInstanceId);
+	if (!GetOwner() || !GetOwner()->HasAuthority() || !WeaponItem || !SlotTag.IsValid())
+	{
+		return false;
+	}
+
+	const int32 AttachmentIndex = WeaponItem->Attachments.IndexOfByPredicate(
+		[&SlotTag](const FOBInstalledAttachment& Installed)
+		{
+			return Installed.SlotTag == SlotTag;
+		});
+	if (!WeaponItem->Attachments.IsValidIndex(AttachmentIndex))
+	{
+		return false;
+	}
+
+	const FOBInstalledAttachment Installed = WeaponItem->Attachments[AttachmentIndex];
+	FInventoryData RestoredItem;
+	RestoredItem.ItemTag = Installed.ItemTag;
+	RestoredItem.ItemStack = 1;
+	RestoredItem.InstanceId = Installed.InstanceId;
+	RestoredItem.Durability = Installed.Durability;
+	RestoredItem.QualityTier = Installed.QualityTier;
+	RestoredItem.bFoundInRaid = Installed.bFoundInRaid;
+	RestoredItem.RaidAcquisitionId = Installed.RaidAcquisitionId;
+	if (TryAddItemInstance(RestoredItem) != 1)
+	{
+		return false;
+	}
+
+	WeaponItem = FindOwnedItem(WeaponInstanceId);
+	if (!WeaponItem)
+	{
+		return false;
+	}
+	WeaponItem->Attachments.RemoveAt(AttachmentIndex);
+	++WeaponItem->Revision;
+	RefreshActiveWeaponInstance(WeaponInstanceId);
+	NotifyInventoryChanged();
+	return true;
+}
+
+void UPlayerInventoryComponent::RefreshActiveWeaponInstance(
+	const FGuid& ChangedInstanceId)
+{
+	if (ChangedInstanceId != ActiveWeaponInstanceId)
+	{
+		return;
+	}
+	SyncActiveMagazine();
+	UnbindActiveWeapon();
+	EquipActiveWeapon();
+}
+
+void UPlayerInventoryComponent::OnRep_ContainerItems()
+{
+	InventoryContainerSize = InventoryContainerArray.Num();
 	NotifyInventoryChanged();
 	OnAmmoPoolChanged.Broadcast();
 }

@@ -1,9 +1,9 @@
 {
 	"FileVersion": 3,
-	"Version": 1,
-	"VersionName": "1.0.0",
+	"Version": 2,
+	"VersionName": "2.0.0",
 	"FriendlyName": "Interior PCG",
-	"Description": "Seeded, editor-first interior placement and reusable PCG Preset assets.",
+	"Description": "Rule-driven modular building and constraint-based interior generation for PCG and Blueprint.",
 	"Category": "Procedural",
 	"CreatedBy": "OutBreak",
 	"CanContainContent": true,

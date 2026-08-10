@@ -91,6 +91,9 @@ public:
 	
 	void Dead();
 	bool IsDead() const { return bIsDead; }
+	
+	// 서버: 마지막 피격 방향/부위. Dead()에서 래그돌 임펄스로 쓴다.
+	void NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection);
 
 protected:
 	virtual void BeginPlay() override;
@@ -107,7 +110,13 @@ protected:
 		AController* EventInstigator,
 		AActor* DamageCauser) override;
 	
-	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_IsDead();
+
+	// 서버·클라 공통 사망 연출. 드랍/수명/컨트롤러 정리는 Dead()에만 둔다.
+	void PlayDeathCosmetics();
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
@@ -123,12 +132,21 @@ protected:
 	float DeathCleanupDelay = 5.0f;
 
 	UPROPERTY(
+		ReplicatedUsing = OnRep_IsDead,
 		VisibleInstanceOnly,
 		BlueprintReadOnly,
 		Transient,
 		Category = "Death",
 		meta = (AllowPrivateAccess = "true"))
 	bool bIsDead = false;
+	
+	// 래그돌 임펄스용. 클라도 같은 방향으로 쓰러져야 하므로 복제한다.
+	// bIsDead와 같은 프레임에 갱신되어 같은 번치로 도착한다.
+	UPROPERTY(Replicated)
+	FVector LastHitDirection = FVector::ZeroVector;
+
+	UPROPERTY(Replicated)
+	FName LastHitBoneName = NAME_None;
 	
 	// 처치 시 남길 드랍 테이블. 비우면 아무것도 안 떨어진다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot", Meta = (RowType = "/Script/OutBreak.OBLootTableRow"))
@@ -137,6 +155,10 @@ protected:
 	// 드랍을 담을 컨테이너 클래스(BP_LootDrop).
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")
 	TSubclassOf<AOBLootContainer> LootContainerClass;
+	
+	// 좀비 질량에 맞춰 BP에서 조정한다. 플레이어보다 가볍게 잡으면 더 과장되게 날아간다.
+	UPROPERTY(EditDefaultsOnly, Category = "Death", Meta = (ClampMin = "0.0"))
+	float RagdollImpulseStrength = 12000.f;
 	
 	/* ================================================== Components ============================================= */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Traversal", meta = (AllowPrivateAccess = "true"))

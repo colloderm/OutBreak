@@ -39,6 +39,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	TArray<TSubclassOf<AOBWeaponBase>> GetSelectedClasses() const;
 
+	// Exact stateful weapon instances used when an expedition starts.
+	TArray<FInventoryData> GetSelectedWeaponInstances() const;
+
 	// 사망 페널티: 장착 슬롯만 비움(창고는 유지) + 즉시 저장.
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	void ClearLoadout();
@@ -68,6 +71,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	void AddStashItems(const TArray<FOBItemStack>& Items);
 
+	void AddStashItemInstances(const TArray<FInventoryData>& Items);
+
+	void ApplyExtractionResult(
+		const TArray<FOBItemStack>& StackItems,
+		const TArray<FInventoryData>& LootedInstances,
+		const TArray<FInventoryData>& ReturnedLoadoutInstances);
+
 	// 수량이 부족하면 아무것도 빼지 않고 false. 부분 차감은 하지 않는다.
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	bool RemoveStashItem(const FGameplayTag& ItemTag, int32 Count);
@@ -75,7 +85,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Loadout")
 	int32 GetStashCount(const FGameplayTag& ItemTag) const;
 
-	const TArray<FOBItemStack>& GetStashItems() const { return CurrentLoadout.StashItems; }
+	TArray<FOBItemStack> GetStashItems() const;
+	const TArray<FInventoryData>& GetStashItemInstances() const { return CurrentLoadout.StashItemInstances; }
 
 	// 현재 Loadout 읽기.
 	const FOBLoadout& GetLoadout() const { return CurrentLoadout; }
@@ -89,6 +100,7 @@ public:
 	// 반입 목록 → 창고(선택 취소).
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
 	bool RemoveCarryItem(const FGameplayTag& ItemTag, int32 Count);
+	void ReturnCarryItemInstances(const TArray<FInventoryData>& Items);
 
 	// 탐사 종료 시 항상 비운다. 사망이면 손실, 탈출이면 이미 정산으로 창고에 들어갔다.
 	UFUNCTION(BlueprintCallable, Category = "Loadout")
@@ -97,7 +109,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Loadout")
 	int32 GetCarryCount(const FGameplayTag& ItemTag) const;
 
-	const TArray<FOBItemStack>& GetCarryItems() const { return CurrentLoadout.CarryItems; }
+	TArray<FOBItemStack> GetCarryItems() const;
+	const TArray<FOBItemStack>& GetCarryStackItems() const { return CurrentLoadout.CarryItems; }
+	const TArray<FInventoryData>& GetCarryItemInstances() const { return CurrentLoadout.CarryItemInstances; }
 
 	// --- 스타터킷 ---
 
@@ -153,6 +167,13 @@ private:
 	
 	// 저장 없이 메모리만 갱신. 실제로 늘었으면 true.
 	bool AddStashItemInternal(const FGameplayTag& ItemTag, int32 Count);
+	bool AddStashItemInstanceInternal(const FInventoryData& Item);
+	bool RemoveStashItemsInternal(
+		const FGameplayTag& ItemTag,
+		int32 Count,
+		TArray<FInventoryData>* OutRemovedInstances = nullptr);
+	void NormalizeInstanceStorage();
+	bool ContainsPersistentInstance(const FGuid& InstanceId) const;
 	
 private:
 	// 런타임 권위값(로드/편집 대상).
