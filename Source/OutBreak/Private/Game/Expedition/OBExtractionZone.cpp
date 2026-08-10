@@ -9,9 +9,45 @@
 #include "Game/GameMode/OBExpeditionGameMode.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
+#include "HAL/IConsoleManager.h"
+#include "DrawDebugHelpers.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "TimerManager.h"
+
+namespace
+{
+	TAutoConsoleVariable<int32> CVarOBExtractionDebug(
+		TEXT("ob.Extraction.Debug"),
+		0,
+		TEXT("Extraction zone debug visualization: 0=off, 1=triggers/state, 2=triggers/state/anchors/routes."),
+		ECVF_Cheat);
+
+	TAutoConsoleVariable<float> CVarOBExtractionDebugDistance(
+		TEXT("ob.Extraction.DebugDistance"),
+		30000.f,
+		TEXT("Maximum 2D distance in cm from the local pawn for extraction debug drawing. <=0 draws all zones."),
+		ECVF_Cheat);
+
+	FString ExtractionPhaseName(EOBExtractionCallPhase Phase)
+	{
+		if (const UEnum* Enum = StaticEnum<EOBExtractionCallPhase>())
+		{
+			return Enum->GetNameStringByValue(static_cast<int64>(Phase));
+		}
+		return TEXT("Unknown");
+	}
+
+	FString ExtractionTypeName(EOBExtractionType Type)
+	{
+		if (const UEnum* Enum = StaticEnum<EOBExtractionType>())
+		{
+			return Enum->GetNameStringByValue(static_cast<int64>(Type));
+		}
+		return TEXT("Unknown");
+	}
+}
 
 AOBExtractionZone::AOBExtractionZone()
 {
@@ -66,6 +102,12 @@ void AOBExtractionZone::ConfigureAsPersonal(uint8 InTeamId)
 	bOnlyRelevantToOwner = false;
 }
 
+bool AOBExtractionZone::IsRuntimeAssignedPersonalZone() const
+{
+	return ExtractType == EOBExtractionType::Personal
+		&& OwningTeamId != 0;
+}
+
 void AOBExtractionZone::ConfigureExtractionSite(AOBExtractionSite* Site)
 {
 	if (!Site)
@@ -114,6 +156,34 @@ void AOBExtractionZone::BeginPlay()
 		Trigger->OnComponentBeginOverlap.AddDynamic(this, &AOBExtractionZone::OnCallTriggerBeginOverlap);
 		BoardingTrigger->OnComponentBeginOverlap.AddDynamic(this, &AOBExtractionZone::OnBoardingTriggerBeginOverlap);
 		BoardingTrigger->OnComponentEndOverlap.AddDynamic(this, &AOBExtractionZone::OnBoardingTriggerEndOverlap);
+	}
+
+	const FString ConfigurationIssue = ExtractType == EOBExtractionType::Personal && OwningTeamId == 0
+		? TEXT("UNASSIGNED_PERSONAL_DIRECT_PLACEMENT")
+		: TEXT("None");
+	UE_LOG(LogTemp, Log,
+		TEXT("[ExtractionDebug] BeginPlay Zone=%s Type=%s Team=%d RuntimeAssigned=%s Location=%s Phase=%s ActiveWindow=%d..%d CallTriggerRadius=%.1f CallCollision=%s PawnResponse=%d GenerateOverlap=%s BoardingRadius=%.1f ConfigIssue=%s"),
+		*GetPathName(), *ExtractionTypeName(ExtractType), OwningTeamId,
+		IsRuntimeAssignedPersonalZone() ? TEXT("true") : TEXT("false"),
+		*GetActorLocation().ToCompactString(), *ExtractionPhaseName(CallState.Phase),
+		ActiveStartSec, ActiveEndSec, Trigger ? Trigger->GetScaledSphereRadius() : 0.f,
+		Trigger ? *UEnum::GetValueAsString(Trigger->GetCollisionEnabled()) : TEXT("Missing"),
+		Trigger ? static_cast<int32>(Trigger->GetCollisionResponseToChannel(ECC_Pawn)) : -1,
+		Trigger && Trigger->GetGenerateOverlapEvents() ? TEXT("true") : TEXT("false"),
+		BoardingTrigger ? BoardingTrigger->GetScaledSphereRadius() : 0.f,
+		*ConfigurationIssue);
+
+	if (ConfigurationIssue != TEXT("None"))
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[ExtractionDebug] %s is a Personal extraction zone placed directly in the level, so no team was assigned. Place an OBExtractionSite/PersonalExtract marker instead; the GameMode will spawn and configure BP_ExtractionZone_Personal at runtime."),
+			*GetPathName());
+	}
+	if (Trigger && Trigger->GetScaledSphereRadius() < 100.f)
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[ExtractionDebug] %s CallTrigger radius is only %.1f cm. A standing character's capsule center is normally higher than this, so BeginOverlap may never fire even at the exact marker. Restore the BP CallTrigger sphere radius to at least the native 300 cm default."),
+			*GetPathName(), Trigger->GetScaledSphereRadius());
 	}
 
 	CheckActiveState();
@@ -172,15 +242,43 @@ void AOBExtractionZone::Tick(float DeltaSeconds)
 void AOBExtractionZone::OnCallTriggerBeginOverlap(
 	UPrimitiveComponent*, AActor* OtherActor, UPrimitiveComponent*, int32, bool, const FHitResult&)
 {
-	if (!HasAuthority() || CallState.Phase != EOBExtractionCallPhase::Ready || !IsActiveNow())
+	if (!HasAuthority())
 	{
 		return;
 	}
 	APawn* Pawn = Cast<APawn>(OtherActor);
 	AController* Controller = Pawn ? Pawn->GetController() : nullptr;
-	if (CanPlayerExtract(Controller))
+	FString BlockReason;
+	if (CallState.Phase != EOBExtractionCallPhase::Ready)
 	{
+		BlockReason = FString::Printf(TEXT("Phase=%s"), *ExtractionPhaseName(CallState.Phase));
+	}
+	else if (!IsActiveNow())
+	{
+		BlockReason = FString::Printf(TEXT("InactiveWindow=%d..%d"), ActiveStartSec, ActiveEndSec);
+	}
+	else
+	{
+		BlockReason = GetPlayerExtractionBlockReason(Controller);
+	}
+
+	if (BlockReason.IsEmpty())
+	{
+		UE_LOG(LogTemp, Log,
+			TEXT("[ExtractionDebug] Call trigger accepted. Zone=%s Pawn=%s Controller=%s PlayerTeam=%d ZoneTeam=%d Type=%s"),
+			*GetName(), *GetNameSafe(Pawn), *GetNameSafe(Controller),
+			Controller && Controller->GetPlayerState<AOBPlayerStateBase>()
+				? Controller->GetPlayerState<AOBPlayerStateBase>()->GetTeamId() : 0,
+			OwningTeamId, *ExtractionTypeName(ExtractType));
 		StartExtractionCall(Controller);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[ExtractionDebug] Call trigger rejected. Zone=%s OtherActor=%s Pawn=%s Controller=%s Type=%s ZoneTeam=%d Phase=%s Active=%s Reason=%s"),
+			*GetName(), *GetNameSafe(OtherActor), *GetNameSafe(Pawn), *GetNameSafe(Controller),
+			*ExtractionTypeName(ExtractType), OwningTeamId, *ExtractionPhaseName(CallState.Phase),
+			IsActiveNow() ? TEXT("true") : TEXT("false"), *BlockReason);
 	}
 }
 
@@ -231,6 +329,10 @@ void AOBExtractionZone::StartExtractionCall(AController* CallingController)
 	CallState.Phase = EOBExtractionCallPhase::FlareLaunched;
 	ForceNetUpdate();
 	BP_OnCallPhaseChanged(CallState.Phase);
+	UE_LOG(LogTemp, Log,
+		TEXT("[ExtractionDebug] Call started. Zone=%s CallingTeam=%d FlareClass=%s HelicopterDelay=%.1f ArrivalServerTime=%.2f"),
+		*GetName(), CallState.CallingTeamId, *GetNameSafe(SignalFlareClass),
+		HelicopterCallDelay, CallState.ArrivalServerTime);
 
 	if (SignalFlareClass)
 	{
@@ -239,6 +341,9 @@ void AOBExtractionZone::StartExtractionCall(AController* CallingController)
 		ActiveFlare = GetWorld()->SpawnActor<AOBSignalFlare>(SignalFlareClass,
 			FlareLaunchAnchor->GetComponentTransform(), Params);
 	}
+	UE_LOG(LogTemp, Log, TEXT("[ExtractionDebug] Flare spawn result. Zone=%s Flare=%s Anchor=%s"),
+		*GetName(), *GetNameSafe(ActiveFlare),
+		FlareLaunchAnchor ? *FlareLaunchAnchor->GetComponentLocation().ToCompactString() : TEXT("Missing"));
 	BP_OnFlareLaunched(ActiveFlare);
 	SetActorTickEnabled(true);
 }
@@ -498,21 +603,36 @@ void AOBExtractionZone::OnRep_CallState()
 
 bool AOBExtractionZone::CanPlayerExtract(AController* Controller) const
 {
+	return GetPlayerExtractionBlockReason(Controller).IsEmpty();
+}
+
+FString AOBExtractionZone::GetPlayerExtractionBlockReason(AController* Controller) const
+{
 	const AOBPlayerStateBase* PS = Controller ? Controller->GetPlayerState<AOBPlayerStateBase>() : nullptr;
-	if (!PS || PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive)
+	if (!Controller)
 	{
-		return false;
+		return TEXT("NoController");
+	}
+	if (!PS)
+	{
+		return TEXT("NoOBPlayerState");
+	}
+	if (PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive)
+	{
+		return FString::Printf(TEXT("PlayerStatus=%s"),
+			*UEnum::GetValueAsString(PS->GetExpeditionStatus()));
 	}
 	if (OwningTeamId != 0 && PS->GetTeamId() != OwningTeamId)
 	{
-		return false;
+		return FString::Printf(TEXT("TeamMismatch Player=%d Zone=%d"), PS->GetTeamId(), OwningTeamId);
 	}
 	if (ExtractType == EOBExtractionType::Public && !bPublicAllowsAllTeams
 		&& CallState.CallingTeamId != 0 && PS->GetTeamId() != CallState.CallingTeamId)
 	{
-		return false;
+		return FString::Printf(TEXT("PublicCallOwnedByTeam=%d Player=%d"),
+			CallState.CallingTeamId, PS->GetTeamId());
 	}
-	return true;
+	return FString();
 }
 
 bool AOBExtractionZone::IsActiveNow() const
@@ -540,6 +660,104 @@ void AOBExtractionZone::CheckActiveState()
 	{
 		SetCallPhase(EOBExtractionCallPhase::Expired);
 	}
+	DrawDebugStatus();
+}
+
+void AOBExtractionZone::DrawDebugStatus() const
+{
+#if ENABLE_DRAW_DEBUG
+	const int32 DebugMode = CVarOBExtractionDebug.GetValueOnGameThread();
+	if (!bDrawDebugVisualization && DebugMode <= 0)
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World || !Trigger || !BoardingTrigger)
+	{
+		return;
+	}
+
+	APlayerController* LocalPC = World->GetFirstPlayerController();
+	APawn* LocalPawn = LocalPC ? LocalPC->GetPawn() : nullptr;
+	const float MaxDistance = CVarOBExtractionDebugDistance.GetValueOnGameThread();
+	if (LocalPawn && MaxDistance > 0.f
+		&& FVector::DistSquared2D(LocalPawn->GetActorLocation(), GetActorLocation()) > FMath::Square(MaxDistance))
+	{
+		return;
+	}
+
+	const bool bInvalidPersonalPlacement = ExtractType == EOBExtractionType::Personal && OwningTeamId == 0;
+	const bool bActive = IsActiveNow();
+	const FString PlayerBlock = GetPlayerExtractionBlockReason(LocalPC);
+	FColor StateColor = FColor::Yellow;
+	if (bInvalidPersonalPlacement)
+	{
+		StateColor = FColor::Red;
+	}
+	else if (!bActive || CallState.Phase == EOBExtractionCallPhase::Expired)
+	{
+		StateColor = FColor(255, 128, 0);
+	}
+	else if (CallState.Phase != EOBExtractionCallPhase::Ready)
+	{
+		StateColor = FColor::Magenta;
+	}
+	else if (PlayerBlock.IsEmpty())
+	{
+		StateColor = FColor::Green;
+	}
+
+	const FVector Center = Trigger->GetComponentLocation();
+	DrawDebugSphere(World, Center, Trigger->GetScaledSphereRadius(), 24, StateColor,
+		false, 1.1f, 0, 5.f);
+	DrawDebugSphere(World, BoardingTrigger->GetComponentLocation(), BoardingTrigger->GetScaledSphereRadius(),
+		24, FColor::Cyan, false, 1.1f, 0, 2.f);
+	DrawDebugLine(World, Center, Center + FVector(0.f, 0.f, 250.f), StateColor,
+		false, 1.1f, 0, 4.f);
+
+	const FString Assignment = bInvalidPersonalPlacement
+		? TEXT("INVALID: direct Personal BP / Team 0")
+		: (ExtractType == EOBExtractionType::Personal ? TEXT("runtime team assignment") : TEXT("level public zone"));
+	const FString Eligibility = PlayerBlock.IsEmpty() ? TEXT("ELIGIBLE") : PlayerBlock;
+	const FString Text = FString::Printf(
+		TEXT("%s\nType=%s Team=%d (%s)\nPhase=%s Active=%s Window=%d..%d\nLocal=%s\nCallRadius=%.0f BoardingRadius=%.0f"),
+		*GetName(), *ExtractionTypeName(ExtractType), OwningTeamId, *Assignment,
+		*ExtractionPhaseName(CallState.Phase), bActive ? TEXT("true") : TEXT("false"),
+		ActiveStartSec, ActiveEndSec, *Eligibility,
+		Trigger->GetScaledSphereRadius(), BoardingTrigger->GetScaledSphereRadius());
+	DrawDebugString(World, Center + FVector(0.f, 0.f, 280.f), Text, nullptr,
+		StateColor, 1.1f, true, 1.f);
+
+	if (DebugMode >= 2 || bDrawDebugVisualization)
+	{
+		const FVector LandingLocation = LandingAnchor ? LandingAnchor->GetComponentLocation() : Center;
+		const FVector FlareLocation = FlareLaunchAnchor ? FlareLaunchAnchor->GetComponentLocation() : Center;
+		DrawDebugCoordinateSystem(World, LandingLocation,
+			LandingAnchor ? LandingAnchor->GetComponentRotation() : FRotator::ZeroRotator,
+			200.f, false, 1.1f, 0, 3.f);
+		DrawDebugPoint(World, FlareLocation, 20.f, FColor::Orange, false, 1.1f, 0);
+		DrawDebugLine(World, FlareLocation, FlareLocation + FVector(0.f, 0.f, 500.f),
+			FColor::Orange, false, 1.1f, 0, 3.f);
+
+		auto DrawRoute = [World](const AOBHelicopterRoute* Route, const FColor& Color)
+		{
+			if (!Route || Route->GetRouteLength() <= 1.f)
+			{
+				return;
+			}
+			FVector Previous = Route->GetRouteTransform(0.f).GetLocation();
+			constexpr int32 Segments = 24;
+			for (int32 Index = 1; Index <= Segments; ++Index)
+			{
+				const FVector Current = Route->GetRouteTransform(static_cast<float>(Index) / Segments).GetLocation();
+				DrawDebugLine(World, Previous, Current, Color, false, 1.1f, 0, 3.f);
+				Previous = Current;
+			}
+		};
+		DrawRoute(ApproachRoute, FColor::Blue);
+		DrawRoute(ExitRoute, FColor::Purple);
+	}
+#endif
 }
 
 float AOBExtractionZone::GetServerTime() const

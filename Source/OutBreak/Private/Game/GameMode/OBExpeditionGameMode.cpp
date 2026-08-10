@@ -1904,6 +1904,13 @@ void AOBExpeditionGameMode::CollectPublicExtractsForMap()
 		if (AOBExtractionZone* Zone = *It)
 		{
 			Locations.Add(FVector_NetQuantize(Zone->GetActorLocation()));
+			if (Zone->GetExtractType() == EOBExtractionType::Personal)
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("[ExtractionDebug] A level-placed Personal zone is being included in the existing public map list. Zone=%s Team=%d Location=%s. It is not a runtime-assigned personal extract; use an OBExtractionSite/PersonalExtract marker instead."),
+					*Zone->GetPathName(), Zone->GetOwningTeamId(),
+					*Zone->GetActorLocation().ToCompactString());
+			}
 		}
 	}
 
