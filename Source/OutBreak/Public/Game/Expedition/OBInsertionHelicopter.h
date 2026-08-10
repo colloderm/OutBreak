@@ -8,6 +8,7 @@
 class AController;
 class AOBExtractionZone;
 class AOBHelicopterRoute;
+class APawn;
 class UAudioComponent;
 class UCameraComponent;
 class UNiagaraComponent;
@@ -60,6 +61,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Helicopter|Passengers")
 	void ReleaseAllPassengers(const FVector& GroundCenter);
+
+	/** Removes one tracked passenger without treating a disconnect as a successful insertion. */
+	bool RemovePassenger(AController* Controller, bool bNotifyDeployment = false);
 
 	UFUNCTION(BlueprintPure, Category = "Helicopter|Passengers")
 	int32 GetSeatCapacity() const { return PassengerSeats.Num(); }
@@ -161,11 +165,19 @@ protected:
 	void OpenExtractionBoarding();
 	void FinishInsertionDeparture();
 	void FinishExtractionDeparture();
-	void SetPassengerTransitState(AController* Controller, bool bInTransit, AActor* ViewTarget);
+	void SetPassengerTransitState(
+		AController* Controller,
+		EOBPlayerInsertionTransitPhase Phase,
+		AActor* ViewTarget);
+	bool FinalizePassenger(
+		AController* Controller,
+		APawn* Pawn,
+		const FVector* DeploymentLocation,
+		bool bNotifyDeployment);
+	void NotifyAllPassengersDeployed();
 	void AddReplicatedSeatedPassenger(APawn* Pawn, int32 SeatIndex);
 	void SetReplicatedPassengerRappelling(APawn* Pawn, int32 RopeIndex,
 		const FVector& RopeStart, const FVector& RopeEnd);
-	void RemoveReplicatedPassenger(APawn* Pawn);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Helicopter|Presentation", meta = (DisplayName = "On Mission Changed"))
 	void BP_OnMissionChanged(EOBHelicopterMission NewMission);
@@ -346,6 +358,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Rappel", meta = (ClampMin = "50"))
 	float LandingSlotSpacing = 180.f;
 
+	/** Keep normal rappel endpoints inside the scanner's validated footprint. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Rappel", meta = (ClampMin = "0"))
+	float RappelLandingFormationRadius = 350.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Insertion", meta = (ClampMin = "0.1"))
 	float InsertionDepartureSeconds = 8.f;
 
@@ -439,6 +455,8 @@ private:
 	TArray<FActiveRappel> ActiveRappels;
 	float RappelStartAccumulator = 0.f;
 	int32 RappelSequenceIndex = 0;
+	int32 RappelSequenceTotal = 0;
+	bool bAllPassengersDeployedNotified = false;
 
 	FTimerHandle SequenceTimer;
 };

@@ -36,6 +36,14 @@ public:
 	AOBCharacterBase* GetOBCharacterFromActorInfo() const;
 	
 protected:
+	/** Blocks player-driven abilities during helicopter transit while preserving OnSpawn passives. */
+	virtual bool CanActivateAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayTagContainer* SourceTags = nullptr,
+		const FGameplayTagContainer* TargetTags = nullptr,
+		FGameplayTagContainer* OptionalRelevantTags = nullptr) const override;
+
 	/*
 	왜 호출되는가? - 능력이 ASC에 부여되어 Avatar가 정해질 때. OnSpawn 정책 자동 발동 처리.
 	언제 호출되는가? - GiveAbility 후 Avatar 설정 시점.

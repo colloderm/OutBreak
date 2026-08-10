@@ -8,6 +8,7 @@
 #include "OBExpeditionGameMode.generated.h"
 
 class AOBPlayerStateBase;
+class APlayerController;
 class AOBExtractionZone;
 class UOBExpeditionMapCatalog;
 class AOBExpeditionSpawnZone;
@@ -111,6 +112,11 @@ protected:
 	void BeginInsertionPhase();
 	void RegisterPlayerForInsertion(APlayerController* NewPlayer);
 	bool SpawnAndSeatInsertionPawn(APlayerController* NewPlayer, AOBInsertionHelicopter* Helicopter);
+	bool ResolveInsertionRegistrationFailure(
+		APlayerController* NewPlayer,
+		uint8 TeamId,
+		const FString& FailureReason);
+	bool FindSafeInsertionFallbackGround(uint8 TeamId, FVector& OutGroundLocation) const;
 	AOBInsertionHelicopter* GetOrCreateInsertionHelicopter(uint8 TeamId);
 	AOBHelicopterRoute* GetOrAssignInsertionRoute(uint8 TeamId);
 	void CollectHelicopterRoutes();
@@ -132,7 +138,6 @@ protected:
 	void TryCompleteInsertion();
 	void CompleteInsertionAfterGracePeriod();
 	void AssignPersonalExtractsForTeam(uint8 TeamId, const FVector& InsertionOrigin);
-	void UpdateReplicatedInsertionState(uint8 TeamId, EOBInsertionPhase Phase);
 
 	UFUNCTION()
 	void HandleInsertionHelicopterPhaseChanged(AOBInsertionHelicopter* Helicopter, EOBInsertionPhase NewPhase);

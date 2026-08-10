@@ -4,6 +4,7 @@
 #include "OBHelicopterTypes.generated.h"
 
 class AOBInsertionHelicopter;
+class AActor;
 class APawn;
 
 UENUM(BlueprintType)
@@ -103,6 +104,53 @@ enum class EOBHelicopterPassengerPhase : uint8
 };
 
 /**
+ * Authoritative per-player insertion state. Team insertion state describes the
+ * aircraft mission; this state describes whether one owning player is still
+ * input/camera locked by that mission.
+ */
+UENUM(BlueprintType)
+enum class EOBPlayerInsertionTransitPhase : uint8
+{
+	None       UMETA(DisplayName = "None"),
+	Seated     UMETA(DisplayName = "Seated"),
+	Rappelling UMETA(DisplayName = "Rappelling"),
+	Deployed   UMETA(DisplayName = "Deployed")
+};
+
+inline bool IsPlayerInsertionTransitActive(const EOBPlayerInsertionTransitPhase Phase)
+{
+	return Phase == EOBPlayerInsertionTransitPhase::Seated
+		|| Phase == EOBPlayerInsertionTransitPhase::Rappelling;
+}
+
+/**
+ * Replicated only to the owning PlayerController. Keeping the phase, mission
+ * helicopter, and desired view target in one struct gives the client one
+ * ordered state transition instead of racing multiple camera RPCs.
+ */
+USTRUCT(BlueprintType)
+struct OUTBREAK_API FOBPlayerInsertionTransitState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
+	int32 Revision = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
+	EOBPlayerInsertionTransitPhase Phase = EOBPlayerInsertionTransitPhase::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
+	TObjectPtr<AOBInsertionHelicopter> Helicopter = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
+	TObjectPtr<AActor> ViewTarget = nullptr;
+
+	/** Server-authored selection permission; independent of PlayerState replication order. */
+	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
+	bool bCanSelectTarget = false;
+};
+
+/**
  * Compact passenger presentation state replicated by the helicopter.
  * Controllers do not exist on non-owning clients, so Pawn is the stable
  * cross-network presentation identity.
@@ -193,6 +241,18 @@ struct OUTBREAK_API FOBTeamInsertionState
 
 	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
 	int32 DeployedCount = 0;
+
+	/** Last server-authored presentation message for this team phase. */
+	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
+	FString StatusMessage;
+
+	/** True when clients should reopen the insertion map for this revision. */
+	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
+	bool bForceMapOpen = false;
+
+	/** Monotonic UI revision used to suppress duplicate RPC/replication updates. */
+	UPROPERTY(BlueprintReadOnly, Category = "Insertion")
+	int32 PresentationRevision = 0;
 };
 
 USTRUCT(BlueprintType)
