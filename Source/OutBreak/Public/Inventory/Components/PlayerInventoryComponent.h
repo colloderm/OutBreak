@@ -252,6 +252,10 @@ protected:
 	void OnRep_QuickSlots();
 
 private:
+	// 프리뷰 캡처는 인벤토리가 열려 있는 동안만 매 프레임 돈다.
+	// 상시로 켜두면 클라의 모든 폰이 씬 캡처를 돌려 프레임을 먹는다.
+	void SetPreviewCaptureActive(bool bActive);
+	
 	int32 AddItemRowInternal(
 		const FOBItemDefinitionRow* ItemRow,
 		int32 RequestedAmount,

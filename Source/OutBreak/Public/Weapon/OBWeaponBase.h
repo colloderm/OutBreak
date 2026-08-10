@@ -10,6 +10,7 @@
 
 DECLARE_MULTICAST_DELEGATE(FOBOnAmmoChanged);
 
+class UStaticMesh;
 class USkeletalMeshComponent;
 class UStaticMeshComponent;
 class UOBWeaponData;
@@ -68,6 +69,13 @@ protected:
 	UFUNCTION() void OnRep_Ammo();
 	UFUNCTION() void OnRep_WeaponInstance();
 	void RebuildAttachmentVisuals();
+	
+	// 정의(DT)의 메시·머즐 소켓을 적용하고 부착물을 재구성한다.
+	// 서버/클라 양쪽에서 불러야 한다. InitializeFromItemInstance는 서버 전용이다.
+	void ApplyWeaponVisuals();
+
+	// 스태틱 메시 하나를 소켓에 붙이고 정리 목록에 등록.
+	void SpawnAttachmentMesh(UStaticMesh* Mesh, FName Socket);
 	
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")

@@ -138,7 +138,11 @@ namespace
 	// 왼쪽 카테고리 목록은 실제로 존재하는 항목에서만 만든다(빈 카테고리를 띄우지 않는다).
 	void MaterializeCategories(const TSet<EOBItemCategory>& Present, FShopWindowViewData& View)
 	{
-		for (int32 i = 0; i <= static_cast<int32>(EOBItemCategory::Material); ++i)
+		// 열거형 끝까지 돈다. 상수(Material)로 고정하면 뒤에 값이 추가될 때 조용히 누락된다.
+		const UEnum* CategoryEnum = StaticEnum<EOBItemCategory>();
+		const int32 CategoryCount = CategoryEnum->NumEnums() - 1;   // -1 은 UHT가 붙이는 _MAX
+
+		for (int32 i = 0; i < CategoryCount; ++i)
 		{
 			const EOBItemCategory C = static_cast<EOBItemCategory>(i);
 			if (!Present.Contains(C)) continue;

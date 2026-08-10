@@ -918,6 +918,14 @@ void AOBPlayerController::SetupInputComponent()
 	}
 }
 
+bool AOBPlayerController::IsInventoryInputBlocked() const
+{
+	AOBCharacterBase* CharacterBase = Cast<AOBCharacterBase>(GetPawn());
+	UPlayerInventoryComponent* Inventory = CharacterBase ? CharacterBase->GetPlayerInventoryComponent() : nullptr;
+	
+	return Inventory && Inventory->IsInventoryOpen();
+}
+
 void AOBPlayerController::Input_Move(const FInputActionValue& Value)
 {
 	if (bHelicopterTransitLocked) return;
@@ -937,6 +945,8 @@ void AOBPlayerController::Input_Move(const FInputActionValue& Value)
 
 void AOBPlayerController::Input_Look(const FInputActionValue& Value)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	const FVector2D AxisValue = Value.Get<FVector2D>();
 	if (bHelicopterTransitLocked)
 	{
@@ -973,6 +983,8 @@ void AOBPlayerController::Input_Look(const FInputActionValue& Value)
 
 void AOBPlayerController::Input_JumpStarted()
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (bHelicopterTransitLocked) return;
 
 	if (ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn()))
@@ -983,6 +995,8 @@ void AOBPlayerController::Input_JumpStarted()
 
 void AOBPlayerController::Input_JumpCompleted()
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (bHelicopterTransitLocked) return;
 
 	if (ACharacter* ControlledCharacter = Cast<ACharacter>(GetPawn()))
@@ -1019,12 +1033,7 @@ void AOBPlayerController::InventoryStarted()
 		CharacterBase->GetPlayerInventoryComponent();
 	if (!IsValid(Inventory))
 	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("%s::%s: PlayerInventoryComponent is invalid."),
-			*GetClass()->GetName(),
-			TEXT(__FUNCTION__));
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: PlayerInventoryComponent is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
 
@@ -1037,10 +1046,15 @@ void AOBPlayerController::InventoryStarted()
 	FInputModeGameAndUI InputMode;
 	InputMode.SetWidgetToFocus(InventoryWindow->TakeWidget());
 	InputMode.SetHideCursorDuringCapture(false);
-	InputMode.SetLockMouseToViewportBehavior(
-		EMouseLockMode::DoNotLock);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	SetInputMode(InputMode);
 	SetShowMouseCursor(true);
+	
+	// 발사/ADS를 누른 채로 인벤토리를 열면 뗀 입력이 안 들어와 눌린 상태로 굳는다.
+	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
+	{
+		ASC->ClearAbilityInput();
+	}	
 }
 
 void AOBPlayerController::InventoryCompleted()
@@ -1061,6 +1075,8 @@ void AOBPlayerController::InventoryCompleted()
 
 void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (bHelicopterTransitLocked) return;
 
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
@@ -1071,6 +1087,8 @@ void AOBPlayerController::Input_AbilityInputPressed(FGameplayTag InputTag)
 
 void AOBPlayerController::Input_AbilityInputReleased(FGameplayTag InputTag)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (bHelicopterTransitLocked) return;
 
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
@@ -1086,6 +1104,8 @@ UOBAbilitySystemComponent* AOBPlayerController::GetOBAbilitySystemComponent() co
 
 void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (bHelicopterTransitLocked) return;
 
 	if (APawn* P = GetPawn())
@@ -1100,6 +1120,8 @@ void AOBPlayerController::Input_EquipSlot(EOBWeaponSlot Slot)
 
 void AOBPlayerController::Input_UseQuickSlot(const int32 QuickSlotIndex)
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (bHelicopterTransitLocked) return;
 
 	if (APawn* ControlledPawn = GetPawn())
@@ -1126,6 +1148,8 @@ void AOBPlayerController::AcknowledgePossession(APawn* P)
 
 void AOBPlayerController::Input_Interact()
 {
+	if (IsInventoryInputBlocked()) return;
+	
 	if (bHelicopterTransitLocked)
 	{
 		HandleInsertionTraceRequest(TEXT("EnhancedInput"));

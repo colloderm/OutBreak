@@ -20,6 +20,7 @@
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 #include "TimerManager.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "Weapon/Data/OBWeaponData.h"
 #include "Weapon/OBWeaponBase.h"
 
@@ -237,9 +238,7 @@ void UPlayerInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason
 UInventoryWindow* UPlayerInventoryComponent::OpenInventory()
 {
 	const APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	APlayerController* PlayerController = OwnerPawn
-		? Cast<APlayerController>(OwnerPawn->GetController())
-		: nullptr;
+	APlayerController* PlayerController = OwnerPawn ? Cast<APlayerController>(OwnerPawn->GetController()) : nullptr;
 	if (!PlayerController || !PlayerController->IsLocalController())
 	{
 		return nullptr;
@@ -247,28 +246,19 @@ UInventoryWindow* UPlayerInventoryComponent::OpenInventory()
 
 	if (!IsValid(InventoryWidget))
 	{
-		const UInventorySystemSetting* Settings =
-			GetDefault<UInventorySystemSetting>();
+		const UInventorySystemSetting* Settings = GetDefault<UInventorySystemSetting>();
 		if (!Settings || Settings->InventoryWindowWidgetClass.IsNull())
 		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("%s::%s : InventoryWindowWidgetClass is not configured."),
-				*GetClass()->GetName(),
-				TEXT(__FUNCTION__));
+			UE_LOG(LogTemp, Warning, TEXT("%s::%s : InventoryWindowWidgetClass is not configured."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 			return nullptr;
 		}
 
-		TSubclassOf<UInventoryWindow> WindowClass =
-			Settings->InventoryWindowWidgetClass.LoadSynchronous();
+		TSubclassOf<UInventoryWindow> WindowClass = Settings->InventoryWindowWidgetClass.LoadSynchronous();
 		if (!WindowClass)
 		{
 			return nullptr;
 		}
-		InventoryWidget = CreateWidget<UInventoryWindow>(
-			PlayerController,
-			WindowClass);
+		InventoryWidget = CreateWidget<UInventoryWindow>(PlayerController, WindowClass);
 	}
 	if (!IsValid(InventoryWidget))
 	{
@@ -278,11 +268,12 @@ UInventoryWindow* UPlayerInventoryComponent::OpenInventory()
 	UpdateInventoryWidget();
 	if (!InventoryWidget->IsInViewport())
 	{
-		const UInventorySystemSetting* Settings =
-			GetDefault<UInventorySystemSetting>();
-		InventoryWidget->AddToViewport(
-			Settings ? Settings->InventoryWidgetZOrder : 0);
+		const UInventorySystemSetting* Settings = GetDefault<UInventorySystemSetting>();
+		InventoryWidget->AddToViewport(Settings ? Settings->InventoryWidgetZOrder : 0);
 	}
+	
+	SetPreviewCaptureActive(true);
+	
 	return InventoryWidget;
 }
 
@@ -292,6 +283,22 @@ void UPlayerInventoryComponent::CloseInventory()
 	{
 		InventoryWidget->RemoveFromParent();
 	}
+	
+	SetPreviewCaptureActive(false);
+}
+
+void UPlayerInventoryComponent::SetPreviewCaptureActive(const bool bActive)
+{
+	AActor* OwnerActor = GetOwner();
+	USceneCaptureComponent2D* PreviewCapture = OwnerActor ? OwnerActor->FindComponentByClass<USceneCaptureComponent2D>() : nullptr;
+	if (!PreviewCapture)
+	{
+		return;
+	}
+
+	// bCaptureOnMovement만 켜져 있으면 트랜스폼이 바뀔 때만 찍혀서
+	// 캐릭터가 멈추는 순간의 애니메이션 중간 포즈로 굳는다.
+	PreviewCapture->bCaptureEveryFrame = bActive;
 }
 
 bool UPlayerInventoryComponent::IsInventoryOpen() const

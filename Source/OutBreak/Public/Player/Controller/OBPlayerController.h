@@ -90,6 +90,11 @@ private:
 	bool IsInteractableOccluded(const FVector& ViewLocation, const AOBInteractableActor* Candidate) const;
 	
 	bool bInventoryToggle;
+	
+	// 인벤토리가 떠 있는 동안 게임플레이 입력을 막는다.
+	// bInventoryToggle이 아니라 위젯 실제 상태를 본다(EndPlay 등에서 따로 닫히면 어긋난다).
+	bool IsInventoryInputBlocked() const;
+	
 protected:
 	//~ APlayerController interface
 	virtual void SetupInputComponent() override;

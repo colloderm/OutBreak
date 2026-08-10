@@ -24,7 +24,7 @@
 #include "DrawDebugHelpers.h"
 #include "Character/Animation/OBAnimInstance.h"
 #include "Character/Components/OBCharacterMovementComponent.h"
-#include "Weapon/Data/OBWeaponData.h"
+#include "Components/SceneCaptureComponent2D.h"
 #include "TimerManager.h"
 #include "AI/EnemyController.h"
 #include "Item/Loot/OBLootContainer.h"
@@ -328,6 +328,19 @@ void AOBCharacterBase::HandleWeaponChanged(AOBWeaponBase* NewWeapon)
 {
 	// 속도·FOV·지향 갱신 로직이 전부 여기 모여 있으므로 그대로 재사용.
 	UpdateAimingState();
+
+	// 인벤토리 프리뷰 캡처는 ShowOnly 목록만 그린다. 무기는 캐릭터와 별개 액터라
+	// 넣어주지 않으면 손이 빈 채로 찍힌다. 캐릭터 메시는 BP에서
+	// ShowOnlyActorComponents로 이미 등록돼 있고, 그건 다른 배열이라 Reset해도 안 지워진다.
+	if (USceneCaptureComponent2D* PreviewCapture =
+		FindComponentByClass<USceneCaptureComponent2D>())
+	{
+		PreviewCapture->ShowOnlyActors.Reset();
+		if (NewWeapon)
+		{
+			PreviewCapture->ShowOnlyActors.Add(NewWeapon);
+		}
+	}
 }
 
 float AOBCharacterBase::GetCurrentSpreadAngle() const
