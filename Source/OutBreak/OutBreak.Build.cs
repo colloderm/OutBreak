@@ -40,6 +40,7 @@ public class OutBreak : ModuleRules
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
 			"PropertyBindingUtils",
+			"GameplayCameras",
 			
 		});
 		

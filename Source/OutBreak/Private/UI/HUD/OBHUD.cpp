@@ -14,6 +14,8 @@
 #include "UI/Widgets/Expedition/OBWorldMapWidget.h"
 #include "View/MVVMView.h"
 
+DEFINE_LOG_CATEGORY_STATIC(LogOBInsertionUI, Log, All);
+
 void AOBHUD::BeginPlay()
 {
 	Super::BeginPlay();
@@ -45,11 +47,7 @@ void AOBHUD::BeginPlay()
 	}
 	
 	// 전체 지도. 상시 생성해 두고 숨긴다(M키가 토글).
-	if (WorldMapWidgetClass)
-	{
-		WorldMapWidget = CreateWidget<UOBWorldMapWidget>(PC, WorldMapWidgetClass);
-		if (WorldMapWidget) WorldMapWidget->AddToViewport(50);
-	}
+	EnsureWorldMapWidget();
 }
 
 void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)
@@ -167,8 +165,79 @@ void AOBHUD::BindConsumablesToCharacter(AOBCharacterBase* Character)
 
 void AOBHUD::ToggleWorldMap()
 {
-	if (WorldMapWidget)
+	if (UOBWorldMapWidget* MapWidget = EnsureWorldMapWidget())
 	{
-		WorldMapWidget->SetMapOpen(!WorldMapWidget->IsMapOpen());
+		const bool bOpen = !MapWidget->IsMapOpen();
+		UE_LOG(LogOBInsertionUI, Log,
+			TEXT("[InsertionUI] ToggleWorldMap HUD=%s Widget=%s Open=%s"),
+			*GetName(), *MapWidget->GetName(), bOpen ? TEXT("true") : TEXT("false"));
+		MapWidget->SetMapOpen(bOpen);
+	}
+	else
+	{
+		UE_LOG(LogOBInsertionUI, Error,
+			TEXT("[InsertionUI] ToggleWorldMap failed HUD=%s Owner=%s WidgetClass=%s"),
+			*GetName(), *GetNameSafe(GetOwningPlayerController()), *GetNameSafe(WorldMapWidgetClass));
+	}
+}
+
+UOBWorldMapWidget* AOBHUD::EnsureWorldMapWidget()
+{
+	if (IsValid(WorldMapWidget))
+	{
+		return WorldMapWidget;
+	}
+
+	APlayerController* PC = GetOwningPlayerController();
+	if (!PC || !WorldMapWidgetClass)
+	{
+		UE_LOG(LogOBInsertionUI, Error,
+			TEXT("[InsertionUI] WorldMap ensure failed HUD=%s Owner=%s WidgetClass=%s"),
+			*GetName(), *GetNameSafe(PC), *GetNameSafe(WorldMapWidgetClass));
+		return nullptr;
+	}
+
+	WorldMapWidget = CreateWidget<UOBWorldMapWidget>(PC, WorldMapWidgetClass);
+	if (!WorldMapWidget)
+	{
+		UE_LOG(LogOBInsertionUI, Error,
+			TEXT("[InsertionUI] WorldMap CreateWidget failed HUD=%s Owner=%s WidgetClass=%s"),
+			*GetName(), *GetNameSafe(PC), *GetNameSafe(WorldMapWidgetClass));
+		return nullptr;
+	}
+
+	WorldMapWidget->AddToViewport(50);
+	UE_LOG(LogOBInsertionUI, Log,
+		TEXT("[InsertionUI] WorldMap ensured HUD=%s Widget=%s WidgetClass=%s"),
+		*GetName(), *WorldMapWidget->GetName(), *GetNameSafe(WorldMapWidgetClass));
+	return WorldMapWidget;
+}
+
+bool AOBHUD::OpenInsertionMap(bool bCanSelectTarget)
+{
+	UOBWorldMapWidget* MapWidget = EnsureWorldMapWidget();
+	if (!MapWidget)
+	{
+		return false;
+	}
+
+	MapWidget->SetInsertionSelectionMode(true, bCanSelectTarget);
+	MapWidget->SetMapOpen(true);
+	UE_LOG(LogOBInsertionUI, Log,
+		TEXT("[InsertionUI] Insertion map opened HUD=%s CanSelect=%s"),
+		*GetName(), bCanSelectTarget ? TEXT("true") : TEXT("false"));
+	return true;
+}
+
+void AOBHUD::CloseInsertionMap()
+{
+	if (UOBWorldMapWidget* MapWidget = EnsureWorldMapWidget())
+	{
+		const bool bWasOpen = MapWidget->IsMapOpen();
+		MapWidget->SetMapOpen(false);
+		MapWidget->SetInsertionSelectionMode(false, false);
+		UE_LOG(LogOBInsertionUI, Log,
+			TEXT("[InsertionUI] Insertion map closed HUD=%s WasOpen=%s"),
+			*GetName(), bWasOpen ? TEXT("true") : TEXT("false"));
 	}
 }

@@ -1,25 +1,31 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "Game/Expedition/OBExtractionZone.h"
 
+#include "Components/SceneComponent.h"
 #include "Components/SphereComponent.h"
-#include "GameFramework/Pawn.h"
-#include "GameFramework/Controller.h"
-#include "Game/GameState/OBExpeditionGameState.h"
+#include "Game/Expedition/OBExtractionSite.h"
+#include "Game/Expedition/OBHelicopterRoute.h"
+#include "Game/Expedition/OBInsertionHelicopter.h"
+#include "Game/Expedition/OBSignalFlare.h"
 #include "Game/GameMode/OBExpeditionGameMode.h"
+#include "Game/GameState/OBExpeditionGameState.h"
+#include "GameFramework/Pawn.h"
+#include "Net/UnrealNetwork.h"
 #include "Player/State/OBPlayerStateBase.h"
-#include "Engine/World.h"
+#include "TimerManager.h"
 
-
-// Sets default values
 AOBExtractionZone::AOBExtractionZone()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	PrimaryActorTick.bStartWithTickEnabled = false; // 오버랩 발생 시에만 켬(비용 절감)
+	PrimaryActorTick.bStartWithTickEnabled = false;
+	bReplicates = true;
+	// Calls and countdowns must exist even before this area is streamed around a player.
+	bIsSpatiallyLoaded = false;
+	// Public call state drives map/HUD countdowns even when the site is far away.
+	// Personal zones still apply the team filter in IsNetRelevantFor.
+	bAlwaysRelevant = true;
 
-	Trigger = CreateDefaultSubobject<USphereComponent>(TEXT("Trigger"));
+	Trigger = CreateDefaultSubobject<USphereComponent>(TEXT("CallTrigger"));
 	SetRootComponent(Trigger);
-	
 	Trigger->InitSphereRadius(300.f);
 	Trigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	Trigger->SetCollisionObjectType(ECC_WorldDynamic);
@@ -27,35 +33,70 @@ AOBExtractionZone::AOBExtractionZone()
 	Trigger->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	Trigger->SetGenerateOverlapEvents(true);
 
-	bReplicates = false; // 판정은 서버 전용, 결과는 PlayerState로 복제
+	BoardingTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("BoardingTrigger"));
+	BoardingTrigger->SetupAttachment(Trigger);
+	BoardingTrigger->InitSphereRadius(500.f);
+	BoardingTrigger->SetCollisionObjectType(ECC_WorldDynamic);
+	BoardingTrigger->SetCollisionResponseToAllChannels(ECR_Ignore);
+	BoardingTrigger->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	BoardingTrigger->SetGenerateOverlapEvents(true);
+	BoardingTrigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	LandingAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("LandingAnchor"));
+	LandingAnchor->SetupAttachment(Trigger);
+
+	FlareLaunchAnchor = CreateDefaultSubobject<USceneComponent>(TEXT("FlareLaunchAnchor"));
+	FlareLaunchAnchor->SetupAttachment(Trigger);
+	FlareLaunchAnchor->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
+
+	SignalFlareClass = AOBSignalFlare::StaticClass();
+}
+
+void AOBExtractionZone::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AOBExtractionZone, CallState);
+	DOREPLIFETIME(AOBExtractionZone, OwningTeamId);
 }
 
 void AOBExtractionZone::ConfigureAsPersonal(uint8 InTeamId)
 {
 	OwningTeamId = InTeamId;
-
-	// 팀원 전원에게 보여야 하므로 bOnlyRelevantToOwner는 못 쓴다(소유자는 1명뿐).
-	SetReplicates(true);
+	ExtractType = EOBExtractionType::Personal;
 	bOnlyRelevantToOwner = false;
 }
 
-bool AOBExtractionZone::IsNetRelevantFor(const AActor* RealViewer, const AActor* ViewTarget, const FVector& SrcLocation) const
+void AOBExtractionZone::ConfigureExtractionSite(AOBExtractionSite* Site)
 {
-	// 공용 탈출구는 엔진 기본 규칙(거리 컬링 포함) 그대로.
+	if (!Site)
+	{
+		return;
+	}
+	LandingAnchor->SetWorldTransform(Site->GetLandingTransform());
+	FlareLaunchAnchor->SetWorldTransform(Site->GetFlareTransform());
+	ApproachRoute = Site->GetApproachRoute();
+	ExitRoute = Site->GetExitRoute();
+}
+
+bool AOBExtractionZone::IsNetRelevantFor(
+	const AActor* RealViewer,
+	const AActor* ViewTarget,
+	const FVector& SrcLocation) const
+{
 	if (OwningTeamId == 0)
 	{
 		return Super::IsNetRelevantFor(RealViewer, ViewTarget, SrcLocation);
 	}
 
-	const AController* C = Cast<AController>(RealViewer);
-	if (!C)
+	const AController* Controller = Cast<AController>(RealViewer);
+	if (!Controller)
 	{
-		if (const APawn* P = Cast<APawn>(ViewTarget)) C = P->GetController();
+		if (const APawn* Pawn = Cast<APawn>(ViewTarget))
+		{
+			Controller = Pawn->GetController();
+		}
 	}
-
-	const AOBPlayerStateBase* PS = C ? C->GetPlayerState<AOBPlayerStateBase>() : nullptr;
-
-	// 비콘이라 거리와 무관하게 항상 보여야 한다. 팀만 본다.
+	const AOBPlayerStateBase* PS = Controller ? Controller->GetPlayerState<AOBPlayerStateBase>() : nullptr;
 	return PS && PS->GetTeamId() == OwningTeamId;
 }
 
@@ -65,141 +106,424 @@ void AOBExtractionZone::SetActiveWindow(int32 InStartSec, int32 InEndSec)
 	ActiveEndSec = InEndSec;
 }
 
-// Called when the game starts or when spawned
 void AOBExtractionZone::BeginPlay()
 {
 	Super::BeginPlay();
-	
-	// 서버만 오버랩 구독 → 판정 서버 권위.
 	if (HasAuthority())
 	{
-		Trigger->OnComponentBeginOverlap.AddDynamic(this, &AOBExtractionZone::OnTriggerBeginOverlap);
-		Trigger->OnComponentEndOverlap.AddDynamic(this, &AOBExtractionZone::OnTriggerEndOverlap);
+		Trigger->OnComponentBeginOverlap.AddDynamic(this, &AOBExtractionZone::OnCallTriggerBeginOverlap);
+		BoardingTrigger->OnComponentBeginOverlap.AddDynamic(this, &AOBExtractionZone::OnBoardingTriggerBeginOverlap);
+		BoardingTrigger->OnComponentEndOverlap.AddDynamic(this, &AOBExtractionZone::OnBoardingTriggerEndOverlap);
 	}
-	
-	// 활성 상태 주기 체크(서버/클라 모두). 클라(소유자)에서 비콘이 렌더됨.
+
 	CheckActiveState();
-	GetWorldTimerManager().SetTimer(ActiveCheckTimer, this, &AOBExtractionZone::CheckActiveState, 1.0f, true);
-}
-
-void AOBExtractionZone::OnTriggerBeginOverlap(UPrimitiveComponent*, AActor* OtherActor,
-	UPrimitiveComponent*, int32, bool, const FHitResult&)
-{
-	APawn* Pawn = Cast<APawn>(OtherActor);
-	if (!Pawn) return;
-
-	AController* C = Pawn->GetController();
-	if (!C || !C->IsPlayerController()) return; // 플레이어만
-
-	AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>();
-	if (!PS || PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive) return;
-
-	HoldProgress.Add(C, 0.f);
-	SetActorTickEnabled(true); // 추적 대상이 생겼으니 틱 가동
-}
-
-void AOBExtractionZone::OnTriggerEndOverlap(UPrimitiveComponent*, AActor* OtherActor,
-	UPrimitiveComponent*, int32)
-{
-	APawn* Pawn = Cast<APawn>(OtherActor);
-	if (!Pawn) return;
-
-	AController* C = Pawn->GetController();
-	if (!C) return;
-
-	HoldProgress.Remove(C);
-
-	// 나가면 진행도 리셋(HUD 끔).
-	if (AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>())
-	{
-		PS->SetExtractionProgress(0.f, false);
-	}
-
-	if (HoldProgress.Num() == 0)
-	{
-		SetActorTickEnabled(false);
-	}
+	GetWorldTimerManager().SetTimer(ActiveCheckTimer, this, &AOBExtractionZone::CheckActiveState, 1.f, true);
 }
 
 void AOBExtractionZone::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-
-	if (!HasAuthority() || HoldProgress.Num() == 0) return;
-
-	const bool bActive = IsActiveNow();
-
-	// 홀드 완료자는 순회 후 따로 처리(순회 중 맵 수정 금지).
-	TArray<AController*> Finished;
-
-	for (TPair<TObjectPtr<AController>, float>& Pair : HoldProgress)
+	if (!HasAuthority())
 	{
-		AController* C = Pair.Key;
-		if (!C) continue;
+		return;
+	}
 
-		AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>();
+	const float Now = GetServerTime();
+	switch (CallState.Phase)
+	{
+	case EOBExtractionCallPhase::FlareLaunched:
+		if (Now >= CallState.CallStartedServerTime + 1.f)
+		{
+			SetCallPhase(EOBExtractionCallPhase::Waiting);
+		}
+		break;
+	case EOBExtractionCallPhase::Waiting:
+		if (Now >= CallState.ArrivalServerTime - InboundLeadTime)
+		{
+			SpawnExtractionHelicopter();
+		}
+		break;
+	case EOBExtractionCallPhase::Boarding:
+		ProcessBoarding(DeltaSeconds);
+		if (Now >= CallState.BoardingEndsServerTime)
+		{
+			StartDeparture();
+		}
+		break;
+	case EOBExtractionCallPhase::Completed:
+	case EOBExtractionCallPhase::Aborted:
+		if (bReusable && Now >= CooldownEndsServerTime)
+		{
+			SetCallPhase(EOBExtractionCallPhase::Cooldown);
+			CooldownEndsServerTime = Now + CooldownSeconds;
+		}
+		break;
+	case EOBExtractionCallPhase::Cooldown:
+		if (Now >= CooldownEndsServerTime)
+		{
+			ResetForReuse();
+		}
+		break;
+	default:
+		break;
+	}
+}
 
-		// 무효 조건(사망/비활성/사용불가) → 진행도 리셋 후 다음.
-		if (!PS || PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive
-			|| !bActive || !CanPlayerExtract(C))
+void AOBExtractionZone::OnCallTriggerBeginOverlap(
+	UPrimitiveComponent*, AActor* OtherActor, UPrimitiveComponent*, int32, bool, const FHitResult&)
+{
+	if (!HasAuthority() || CallState.Phase != EOBExtractionCallPhase::Ready || !IsActiveNow())
+	{
+		return;
+	}
+	APawn* Pawn = Cast<APawn>(OtherActor);
+	AController* Controller = Pawn ? Pawn->GetController() : nullptr;
+	if (CanPlayerExtract(Controller))
+	{
+		StartExtractionCall(Controller);
+	}
+}
+
+void AOBExtractionZone::OnBoardingTriggerBeginOverlap(
+	UPrimitiveComponent*, AActor* OtherActor, UPrimitiveComponent*, int32, bool, const FHitResult&)
+{
+	if (!HasAuthority() || CallState.Phase != EOBExtractionCallPhase::Boarding)
+	{
+		return;
+	}
+	APawn* Pawn = Cast<APawn>(OtherActor);
+	AController* Controller = Pawn ? Pawn->GetController() : nullptr;
+	if (CanPlayerExtract(Controller) && !BoardedControllers.Contains(Controller))
+	{
+		BoardingProgress.FindOrAdd(Controller) = 0.f;
+	}
+}
+
+void AOBExtractionZone::OnBoardingTriggerEndOverlap(
+	UPrimitiveComponent*, AActor* OtherActor, UPrimitiveComponent*, int32)
+{
+	APawn* Pawn = Cast<APawn>(OtherActor);
+	AController* Controller = Pawn ? Pawn->GetController() : nullptr;
+	if (!Controller)
+	{
+		return;
+	}
+	BoardingProgress.Remove(Controller);
+	if (AOBPlayerStateBase* PS = Controller->GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetExtractionProgress(0.f, false);
+	}
+}
+
+void AOBExtractionZone::StartExtractionCall(AController* CallingController)
+{
+	AOBPlayerStateBase* PS = CallingController ? CallingController->GetPlayerState<AOBPlayerStateBase>() : nullptr;
+	if (!PS || CallState.Phase != EOBExtractionCallPhase::Ready)
+	{
+		return;
+	}
+
+	const float Now = GetServerTime();
+	CallState = FOBExtractionCallState();
+	CallState.CallingTeamId = PS->GetTeamId();
+	CallState.CallStartedServerTime = Now;
+	CallState.ArrivalServerTime = Now + HelicopterCallDelay;
+	CallState.Phase = EOBExtractionCallPhase::FlareLaunched;
+	ForceNetUpdate();
+	BP_OnCallPhaseChanged(CallState.Phase);
+
+	if (SignalFlareClass)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ActiveFlare = GetWorld()->SpawnActor<AOBSignalFlare>(SignalFlareClass,
+			FlareLaunchAnchor->GetComponentTransform(), Params);
+	}
+	BP_OnFlareLaunched(ActiveFlare);
+	SetActorTickEnabled(true);
+}
+
+void AOBExtractionZone::SpawnExtractionHelicopter()
+{
+	if (CallState.Helicopter)
+	{
+		return;
+	}
+
+	TSubclassOf<AOBInsertionHelicopter> HelicopterClass = ExtractionHelicopterClass;
+	if (!HelicopterClass)
+	{
+		if (const AOBExpeditionGameMode* GM = GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>())
+		{
+			HelicopterClass = GM->GetDefaultExtractionHelicopterClass();
+		}
+	}
+	if (!HelicopterClass)
+	{
+		AbortExtraction(TEXT("No extraction helicopter class is configured."));
+		return;
+	}
+
+	const FTransform LandingTransform = LandingAnchor->GetComponentTransform();
+	FTransform SpawnTransform = LandingTransform;
+	if (ApproachRoute && ApproachRoute->GetRouteLength() > 1.f)
+	{
+		SpawnTransform = ApproachRoute->GetRouteTransform(0.f);
+	}
+	else
+	{
+		SpawnTransform.AddToTranslation(SpawnTransform.TransformVectorNoScale(HelicopterSpawnOffset));
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AOBInsertionHelicopter* Helicopter = GetWorld()->SpawnActor<AOBInsertionHelicopter>(
+		HelicopterClass, SpawnTransform, Params);
+	if (!Helicopter)
+	{
+		AbortExtraction(TEXT("Failed to spawn extraction helicopter."));
+		return;
+	}
+
+	Helicopter->OnExtractionPhaseChanged.AddDynamic(this, &AOBExtractionZone::HandleHelicopterPhaseChanged);
+	Helicopter->OnExtractionBoardingReady.AddDynamic(this, &AOBExtractionZone::HandleHelicopterBoardingReady);
+	Helicopter->OnExtractionDepartureCompleted.AddDynamic(this, &AOBExtractionZone::HandleHelicopterDepartureCompleted);
+	Helicopter->InitializeExtraction(this);
+	CallState.Helicopter = Helicopter;
+	SetCallPhase(EOBExtractionCallPhase::Inbound);
+	BP_OnHelicopterSpawned(Helicopter);
+
+	const float RemainingApproachTime = FMath::Max(0.1f, CallState.ArrivalServerTime - GetServerTime());
+	Helicopter->BeginExtractionApproach(ApproachRoute, LandingTransform, RemainingApproachTime);
+}
+
+void AOBExtractionZone::HandleHelicopterPhaseChanged(
+	AOBInsertionHelicopter*, EOBExtractionCallPhase NewPhase)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	if (NewPhase == EOBExtractionCallPhase::Inbound
+		|| NewPhase == EOBExtractionCallPhase::Landing
+		|| NewPhase == EOBExtractionCallPhase::Boarding
+		|| NewPhase == EOBExtractionCallPhase::Departing)
+	{
+		SetCallPhase(NewPhase);
+	}
+}
+
+void AOBExtractionZone::HandleHelicopterBoardingReady(AOBInsertionHelicopter*)
+{
+	OpenBoardingWindow();
+}
+
+void AOBExtractionZone::OpenBoardingWindow()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	CallState.BoardingEndsServerTime = GetServerTime() + BoardingWindowSeconds;
+	SetCallPhase(EOBExtractionCallPhase::Boarding);
+	BoardingTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
+	TArray<AActor*> OverlappingActors;
+	BoardingTrigger->GetOverlappingActors(OverlappingActors, APawn::StaticClass());
+	for (AActor* Actor : OverlappingActors)
+	{
+		APawn* Pawn = Cast<APawn>(Actor);
+		AController* Controller = Pawn ? Pawn->GetController() : nullptr;
+		if (CanPlayerExtract(Controller) && !BoardedControllers.Contains(Controller))
+		{
+			BoardingProgress.FindOrAdd(Controller) = 0.f;
+		}
+	}
+}
+
+void AOBExtractionZone::ProcessBoarding(float DeltaSeconds)
+{
+	TArray<AController*> Finished;
+	for (TPair<TObjectPtr<AController>, float>& Pair : BoardingProgress)
+	{
+		AController* Controller = Pair.Key;
+		APawn* Pawn = Controller ? Controller->GetPawn() : nullptr;
+		AOBPlayerStateBase* PS = Controller ? Controller->GetPlayerState<AOBPlayerStateBase>() : nullptr;
+		if (!Pawn || !PS || !BoardingTrigger->IsOverlappingActor(Pawn) || !CanPlayerExtract(Controller))
 		{
 			Pair.Value = 0.f;
-			if (PS) PS->SetExtractionProgress(0.f, false);
+			if (PS)
+			{
+				PS->SetExtractionProgress(0.f, false);
+			}
 			continue;
 		}
 
 		Pair.Value += DeltaSeconds;
 		PS->SetExtractionProgress(FMath::Clamp(Pair.Value / HoldTime, 0.f, 1.f), true);
-
 		if (Pair.Value >= HoldTime)
 		{
-			Finished.Add(C);
+			Finished.Add(Controller);
 		}
 	}
 
-	for (AController* C : Finished)
+	for (AController* Controller : Finished)
 	{
-		HoldProgress.Remove(C);
-		if (AOBExpeditionGameMode* GM = GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>())
+		BoardPassenger(Controller);
+	}
+}
+
+void AOBExtractionZone::BoardPassenger(AController* Controller)
+{
+	if (!Controller || !CallState.Helicopter || BoardedControllers.Contains(Controller))
+	{
+		return;
+	}
+	if (!CallState.Helicopter->SeatPassenger(Controller))
+	{
+		return;
+	}
+
+	BoardedControllers.Add(Controller);
+	BoardingProgress.Remove(Controller);
+	CallState.BoardedCount = BoardedControllers.Num();
+	ForceNetUpdate();
+	if (AOBPlayerStateBase* PS = Controller->GetPlayerState<AOBPlayerStateBase>())
+	{
+		PS->SetExtractionProgress(0.f, false);
+	}
+	BP_OnPassengerBoarded(Controller);
+}
+
+void AOBExtractionZone::StartDeparture()
+{
+	if (!HasAuthority() || CallState.Phase == EOBExtractionCallPhase::Departing)
+	{
+		return;
+	}
+
+	BoardingTrigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	for (const TPair<TObjectPtr<AController>, float>& Pair : BoardingProgress)
+	{
+		if (AOBPlayerStateBase* PS = Pair.Key ? Pair.Key->GetPlayerState<AOBPlayerStateBase>() : nullptr)
 		{
-			GM->NotifyPlayerExtracted(C);
+			PS->SetExtractionProgress(0.f, false);
+		}
+	}
+	BoardingProgress.Reset();
+	SetCallPhase(EOBExtractionCallPhase::Departing);
+
+	if (CallState.Helicopter)
+	{
+		CallState.Helicopter->BeginExtractionDeparture(ExitRoute, DepartureSeconds);
+	}
+	else
+	{
+		AbortExtraction(TEXT("Extraction helicopter disappeared before departure."));
+	}
+}
+
+void AOBExtractionZone::HandleHelicopterDepartureCompleted(AOBInsertionHelicopter*)
+{
+	FinishExtractionFlight();
+}
+
+void AOBExtractionZone::FinishExtractionFlight()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	TArray<TObjectPtr<AController>> SettledControllers = BoardedControllers;
+	BoardedControllers.Reset();
+	if (AOBExpeditionGameMode* GM = GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>())
+	{
+		for (AController* Controller : SettledControllers)
+		{
+			GM->NotifyPlayerExtracted(Controller);
 		}
 	}
 
-	if (HoldProgress.Num() == 0)
+	SetCallPhase(EOBExtractionCallPhase::Completed);
+	CooldownEndsServerTime = GetServerTime() + 2.f;
+	if (!bReusable)
 	{
 		SetActorTickEnabled(false);
 	}
 }
 
+void AOBExtractionZone::AbortExtraction(const FString& Reason)
+{
+	UE_LOG(LogTemp, Warning, TEXT("[Extraction] %s aborted: %s"), *GetName(), *Reason);
+	if (CallState.Helicopter)
+	{
+		CallState.Helicopter->ReleaseAllPassengers(LandingAnchor->GetComponentLocation());
+		CallState.Helicopter->Destroy();
+	}
+	BoardedControllers.Reset();
+	BoardingProgress.Reset();
+	BoardingTrigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	SetCallPhase(EOBExtractionCallPhase::Aborted);
+	CooldownEndsServerTime = GetServerTime() + 2.f;
+}
+
+void AOBExtractionZone::ResetForReuse()
+{
+	CallState = FOBExtractionCallState();
+	ActiveFlare = nullptr;
+	BoardedControllers.Reset();
+	BoardingProgress.Reset();
+	BoardingTrigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	ForceNetUpdate();
+	BP_OnCallPhaseChanged(CallState.Phase);
+	SetActorTickEnabled(false);
+}
+
+void AOBExtractionZone::SetCallPhase(EOBExtractionCallPhase NewPhase)
+{
+	if (CallState.Phase == NewPhase)
+	{
+		return;
+	}
+	CallState.Phase = NewPhase;
+	ForceNetUpdate();
+	BP_OnCallPhaseChanged(NewPhase);
+}
+
+void AOBExtractionZone::OnRep_CallState()
+{
+	BP_OnCallPhaseChanged(CallState.Phase);
+}
+
+bool AOBExtractionZone::CanPlayerExtract(AController* Controller) const
+{
+	const AOBPlayerStateBase* PS = Controller ? Controller->GetPlayerState<AOBPlayerStateBase>() : nullptr;
+	if (!PS || PS->GetExpeditionStatus() != EOBPlayerExpeditionStatus::Alive)
+	{
+		return false;
+	}
+	if (OwningTeamId != 0 && PS->GetTeamId() != OwningTeamId)
+	{
+		return false;
+	}
+	if (ExtractType == EOBExtractionType::Public && !bPublicAllowsAllTeams
+		&& CallState.CallingTeamId != 0 && PS->GetTeamId() != CallState.CallingTeamId)
+	{
+		return false;
+	}
+	return true;
+}
+
 bool AOBExtractionZone::IsActiveNow() const
 {
 	const AOBExpeditionGameState* GS = GetExpeditionGameState();
-	if (!GS) return true; // GameState 없으면 안전하게 활성 취급
-
-	const int32 Elapsed = GS->GetElapsedSeconds();
-	if (Elapsed < ActiveStartSec) return false;
-	if (ActiveEndSec > 0 && Elapsed > ActiveEndSec) return false;
-	return true;
-}
-
-bool AOBExtractionZone::CanPlayerExtract(AController* C) const
-{
-	// 판정은 서버 오버랩이라 "안 보인다"만으로는 못 막는다. 팀을 여기서 걸러야 한다.
-	if (OwningTeamId != 0)
+	if (!GS)
 	{
-		const AOBPlayerStateBase* PS = C ? C->GetPlayerState<AOBPlayerStateBase>() : nullptr;
-		if (!PS || PS->GetTeamId() != OwningTeamId) return false;
+		return true;
 	}
-
-	// 인벤토리 붙으면: ExtractType==Personal && RequiredItemTag 유효 시
-	// 플레이어 인벤토리에 아이템이 있는지 검사 + 탈출 성사 시 소비.
-	return true;
-}
-
-AOBExpeditionGameState* AOBExtractionZone::GetExpeditionGameState() const
-{
-	return GetWorld() ? GetWorld()->GetGameState<AOBExpeditionGameState>() : nullptr;
+	const int32 Elapsed = GS->GetElapsedSeconds();
+	return Elapsed >= ActiveStartSec && (ActiveEndSec <= 0 || Elapsed <= ActiveEndSec);
 }
 
 void AOBExtractionZone::CheckActiveState()
@@ -208,7 +532,36 @@ void AOBExtractionZone::CheckActiveState()
 	if (bNow != bLastActiveState)
 	{
 		bLastActiveState = bNow;
-		OnExtractionActiveChanged(bNow); // BP: 비콘 on/off
+		OnExtractionActiveChanged(bNow);
+	}
+	const AOBExpeditionGameState* GS = GetExpeditionGameState();
+	const bool bWindowHasEnded = GS && ActiveEndSec > 0 && GS->GetElapsedSeconds() > ActiveEndSec;
+	if (HasAuthority() && bWindowHasEnded && CallState.Phase == EOBExtractionCallPhase::Ready)
+	{
+		SetCallPhase(EOBExtractionCallPhase::Expired);
 	}
 }
 
+float AOBExtractionZone::GetServerTime() const
+{
+	if (const AOBExpeditionGameState* GS = GetExpeditionGameState())
+	{
+		return GS->GetServerWorldTimeSeconds();
+	}
+	return GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+}
+
+float AOBExtractionZone::GetArrivalSecondsRemaining() const
+{
+	return FMath::Max(0.f, CallState.ArrivalServerTime - GetServerTime());
+}
+
+float AOBExtractionZone::GetBoardingSecondsRemaining() const
+{
+	return FMath::Max(0.f, CallState.BoardingEndsServerTime - GetServerTime());
+}
+
+AOBExpeditionGameState* AOBExtractionZone::GetExpeditionGameState() const
+{
+	return GetWorld() ? GetWorld()->GetGameState<AOBExpeditionGameState>() : nullptr;
+}

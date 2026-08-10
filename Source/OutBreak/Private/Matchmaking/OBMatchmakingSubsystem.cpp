@@ -16,8 +16,9 @@ void UOBMatchmakingSubsystem::StartMatchmaking(UOBExpeditionMapData* InMap, bool
 	ElapsedSeconds = 0;
 	
 	// (스텁) 실제로는 개인/파티 큐로 세션 검색을 시작해야함.
-	UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 시작 map=%s queue=%s"),
-		*InMap->DisplayName.ToString(), bPartyQueue ? TEXT("Party") : TEXT("Solo"));
+	UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 시작 map=%s level=%s queue=%s"),
+		*InMap->DisplayName.ToString(), *InMap->Level.ToString(),
+		bPartyQueue ? TEXT("Party") : TEXT("Solo"));
 	
 	SetState(EOBMatchmakingState::Searching);
 	
@@ -75,8 +76,9 @@ void UOBMatchmakingSubsystem::StartSession()
 		return;
 	}
 	
-	// TestServerAddress 있음 → 데디 접속 / 비어있음 → 로컬 단독 플레이(솔로 반복 테스트)
-	if (!SelectedMap->TestServerAddress.IsEmpty())
+	// 데디 접속은 Data Asset에서 명시적으로 켠 경우에만 Level보다 우선한다.
+	// 주소 문자열이 예전 테스트 값으로 남아 있어도 Level 이동을 가로채지 않는다.
+	if (SelectedMap->bUseTestServerAddress && !SelectedMap->TestServerAddress.IsEmpty())
 	{
 		FString Address = SelectedMap->TestServerAddress;
 		if (!PartyCode.IsEmpty())
@@ -92,6 +94,11 @@ void UOBMatchmakingSubsystem::StartSession()
 	}
 	else
 	{
+		if (SelectedMap->bUseTestServerAddress)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[Matchmaking] 테스트 서버 사용이 켜졌지만 주소가 비어 있어 Level로 이동합니다."));
+		}
 		UE_LOG(LogTemp, Log, TEXT("[Matchmaking] 로컬 이동 → %s"), *SelectedMap->Level.ToString());
 		UGameplayStatics::OpenLevelBySoftObjectPtr(World, SelectedMap->Level);
 	}

@@ -21,6 +21,7 @@ namespace OBGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Weapon_Switching,		"State.Weapon.Switching");
 	UE_DEFINE_GAMEPLAY_TAG(State_UsingConsumable,		"State.UsingConsumable");
 	UE_DEFINE_GAMEPLAY_TAG(State_Melee_Attacking,		"State.Melee.Attacking");
+	UE_DEFINE_GAMEPLAY_TAG(State_HelicopterTransit,		"State.HelicopterTransit");
 	
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_Fire,		"GameplayCue.Weapon.Fire");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_Impact,	"GameplayCue.Weapon.Impact");
