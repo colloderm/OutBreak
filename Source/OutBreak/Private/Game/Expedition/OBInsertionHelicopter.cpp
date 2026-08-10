@@ -6,15 +6,19 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
+#include "DrawDebugHelpers.h"
 #include "Game/Expedition/OBExtractionZone.h"
 #include "Game/Expedition/OBHelicopterRoute.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogOBHelicopterInsertion, Log, All);
 
 namespace OBHelicopterTasks
 {
@@ -89,6 +93,55 @@ void AOBInsertionHelicopter::BeginPlay()
 	StreamingSourceComponent->EnableStreamingSource();
 }
 
+void AOBInsertionHelicopter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	const bool bWorldTeardown = EndPlayReason == EEndPlayReason::Quit
+		|| EndPlayReason == EEndPlayReason::EndPlayInEditor;
+	if (HasAuthority() && !PassengerControllers.IsEmpty() && !bWorldTeardown)
+	{
+		UE_LOG(LogOBHelicopterInsertion, Error,
+			TEXT("[InsertionSafety] Helicopter EndPlay with seated passengers Helicopter=%s Team=%d Phase=%d Passengers=%d Reason=%d ValidatedGround=%s"),
+			*GetName(), TeamId, static_cast<int32>(InsertionPhase), PassengerControllers.Num(),
+			static_cast<int32>(EndPlayReason), ActiveLandingZone.bValid ? TEXT("true") : TEXT("false"));
+		if (ActiveLandingZone.bValid)
+		{
+			ReleaseAllPassengers(ActiveLandingZone.GroundLocation);
+		}
+		else
+		{
+			// There is no validated ground coordinate. Never teleport to the world
+			// origin; detach in place and at least return camera/input ownership.
+			for (AController* Controller : PassengerControllers)
+			{
+				APawn* Pawn = Controller ? Controller->GetPawn() : nullptr;
+				if (!Pawn)
+				{
+					continue;
+				}
+				Pawn->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+				Pawn->SetActorEnableCollision(true);
+				if (ACharacter* Character = Cast<ACharacter>(Pawn))
+				{
+					Character->GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+				}
+				SetPassengerTransitState(Controller, false, Pawn);
+			}
+			PassengerControllers.Reset();
+			PassengerSeatIndices.Reset();
+			RappelQueue.Reset();
+			ActiveRappels.Reset();
+		}
+	}
+	else if (!PassengerControllers.IsEmpty() && bWorldTeardown)
+	{
+		UE_LOG(LogOBHelicopterInsertion, Log,
+			TEXT("[InsertionSafety] World teardown with seated passengers Helicopter=%s Team=%d Phase=%d Passengers=%d Reason=%d"),
+			*GetName(), TeamId, static_cast<int32>(InsertionPhase), PassengerControllers.Num(),
+			static_cast<int32>(EndPlayReason));
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
 void AOBInsertionHelicopter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -98,6 +151,10 @@ void AOBInsertionHelicopter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(AOBInsertionHelicopter, TeamId);
 	DOREPLIFETIME(AOBInsertionHelicopter, ResolvedGroundLocation);
 	DOREPLIFETIME(AOBInsertionHelicopter, bDoorsOpen);
+	DOREPLIFETIME(AOBInsertionHelicopter, bSteeringMotion);
+	DOREPLIFETIME(AOBInsertionHelicopter, ReplicatedSteeringVelocity);
+	DOREPLIFETIME(AOBInsertionHelicopter, ReplicatedSteeringTurnInput);
+	DOREPLIFETIME(AOBInsertionHelicopter, ReplicatedSteeringPitchInput);
 }
 
 void AOBInsertionHelicopter::Tick(float DeltaSeconds)
@@ -120,6 +177,56 @@ void AOBInsertionHelicopter::Tick(float DeltaSeconds)
 	{
 		TickRappels(DeltaSeconds);
 	}
+}
+
+void AOBInsertionHelicopter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult)
+{
+	if (!CabinCamera)
+	{
+		Super::CalcCamera(DeltaTime, OutResult);
+		return;
+	}
+
+	CabinCamera->GetCameraView(DeltaTime, OutResult);
+	if (!bEnablePassengerFreeLook || !GetWorld())
+	{
+		return;
+	}
+
+	APlayerController* ViewingController = nullptr;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* Candidate = It->Get();
+		if (Candidate && Candidate->IsLocalController() && Candidate->GetViewTarget() == this)
+		{
+			ViewingController = Candidate;
+			break;
+		}
+	}
+	if (!ViewingController)
+	{
+		return;
+	}
+
+	const FRotator BaseRotation = CabinCamera->GetComponentRotation();
+	const FRotator RelativeRotation = (ViewingController->GetControlRotation() - BaseRotation).GetNormalized();
+	const float Pitch = FMath::Clamp(
+		RelativeRotation.Pitch,
+		FMath::Min(PassengerFreeLookMinPitch, PassengerFreeLookMaxPitch),
+		FMath::Max(PassengerFreeLookMinPitch, PassengerFreeLookMaxPitch));
+	const float Yaw = FMath::Clamp(
+		RelativeRotation.Yaw,
+		-FMath::Abs(PassengerFreeLookYawLimit),
+		FMath::Abs(PassengerFreeLookYawLimit));
+	OutResult.Rotation = FRotator(
+		BaseRotation.Pitch + Pitch,
+		BaseRotation.Yaw + Yaw,
+		BaseRotation.Roll).GetNormalized();
+}
+
+FRotator AOBInsertionHelicopter::GetCabinViewRotation() const
+{
+	return CabinCamera ? CabinCamera->GetComponentRotation() : GetActorRotation();
 }
 
 void AOBInsertionHelicopter::InitializeInsertion(
@@ -200,7 +307,14 @@ void AOBInsertionHelicopter::BeginInsertionApproach(const FOBLandingZoneResult& 
 	{
 		ScanTransform.SetRotation(Direction.Rotation().Quaternion());
 	}
-	BeginTransformMotion(ScanTransform, InsertionApproachSeconds, OBHelicopterTasks::InsertionApproach);
+	if (bUseSteeringInsertionApproach)
+	{
+		BeginSteeringMotion(ScanTransform, InsertionApproachSeconds, OBHelicopterTasks::InsertionApproach);
+	}
+	else
+	{
+		BeginTransformMotion(ScanTransform, InsertionApproachSeconds, OBHelicopterTasks::InsertionApproach);
+	}
 }
 
 void AOBInsertionHelicopter::BeginExtractionApproach(
@@ -299,6 +413,9 @@ bool AOBInsertionHelicopter::SeatPassenger(AController* Controller)
 	PassengerControllers.Add(Controller);
 	PassengerSeatIndices.Add(FreeSeat);
 	SetPassengerTransitState(Controller, true, this);
+	UE_LOG(LogOBHelicopterInsertion, Log,
+		TEXT("[Insertion] Passenger seated Helicopter=%s Team=%d Controller=%s Pawn=%s Seat=%d Count=%d"),
+		*GetName(), TeamId, *Controller->GetName(), *GetNameSafe(Pawn), FreeSeat, PassengerControllers.Num());
 	BP_OnPassengerSeated(Controller, FreeSeat);
 	return true;
 }
@@ -310,6 +427,10 @@ void AOBInsertionHelicopter::ReleaseAllPassengers(const FVector& GroundCenter)
 		return;
 	}
 
+	UE_LOG(LogOBHelicopterInsertion, Warning,
+		TEXT("[InsertionSafety] ReleaseAllPassengers Helicopter=%s Team=%d Phase=%d Count=%d Ground=%s"),
+		*GetName(), TeamId, static_cast<int32>(InsertionPhase), PassengerControllers.Num(),
+		*GroundCenter.ToCompactString());
 	for (int32 Index = 0; Index < PassengerControllers.Num(); ++Index)
 	{
 		AController* Controller = PassengerControllers[Index];
@@ -351,7 +472,12 @@ void AOBInsertionHelicopter::SetInsertionPhase(EOBInsertionPhase NewPhase)
 	{
 		return;
 	}
+	const EOBInsertionPhase PreviousPhase = InsertionPhase;
 	InsertionPhase = NewPhase;
+	UE_LOG(LogOBHelicopterInsertion, Log,
+		TEXT("[Insertion] Helicopter phase changed Helicopter=%s Team=%d Previous=%d New=%d Location=%s Passengers=%d"),
+		*GetName(), TeamId, static_cast<int32>(PreviousPhase), static_cast<int32>(NewPhase),
+		*GetActorLocation().ToCompactString(), PassengerControllers.Num());
 	ForceNetUpdate();
 	BP_OnInsertionPhaseChanged(NewPhase);
 	OnInsertionPhaseChanged.Broadcast(this, NewPhase);
@@ -390,6 +516,11 @@ void AOBInsertionHelicopter::BeginTransformMotion(const FTransform& Target, floa
 	bMotionActive = true;
 	bRouteMotion = false;
 	bLoopRoute = false;
+	bSteeringMotion = false;
+	SteeringVelocity = FVector::ZeroVector;
+	ReplicatedSteeringVelocity = FVector::ZeroVector;
+	ReplicatedSteeringTurnInput = 0.f;
+	ReplicatedSteeringPitchInput = 0.f;
 }
 
 void AOBInsertionHelicopter::BeginRouteMotion(
@@ -406,10 +537,81 @@ void AOBInsertionHelicopter::BeginRouteMotion(
 	bMotionActive = Route != nullptr;
 	bRouteMotion = true;
 	bLoopRoute = bLoop;
+	bSteeringMotion = false;
+	SteeringVelocity = FVector::ZeroVector;
+	ReplicatedSteeringVelocity = FVector::ZeroVector;
+	ReplicatedSteeringTurnInput = 0.f;
+	ReplicatedSteeringPitchInput = 0.f;
+}
+
+void AOBInsertionHelicopter::BeginSteeringMotion(
+	const FTransform& Target,
+	float DesiredDuration,
+	uint8 CompletionTask)
+{
+	MotionStartTransform = GetActorTransform();
+	MotionTargetTransform = Target;
+	MotionElapsed = 0.f;
+	MotionDuration = FMath::Max(0.1f, DesiredDuration);
+	MotionCompletionTask = CompletionTask;
+	bMotionActive = true;
+	bRouteMotion = false;
+	bLoopRoute = false;
+	bSteeringMotion = true;
+	bSteeringFinalLeg = false;
+	SteeringLastLogTime = -1000.f;
+
+	const FVector CurrentLocation = GetActorLocation();
+	const FVector TargetLocation = Target.GetLocation();
+	FVector FinalForward = Target.GetRotation().GetForwardVector().GetSafeNormal2D();
+	if (FinalForward.IsNearlyZero())
+	{
+		FinalForward = (TargetLocation - CurrentLocation).GetSafeNormal2D();
+	}
+	SteeringApproachGate = TargetLocation - FinalForward * FMath::Max(0.f, SteeringFinalLegDistance);
+
+	const float CurrentTargetDistance2D = FVector::Dist2D(CurrentLocation, TargetLocation);
+	bSteeringFinalLeg = SteeringFinalLegDistance <= KINDA_SMALL_NUMBER
+		|| CurrentTargetDistance2D <= SteeringFinalLegDistance * 1.25f;
+
+	const float EstimatedPathLength = bSteeringFinalLeg
+		? FVector::Distance(CurrentLocation, TargetLocation)
+		: FVector::Distance(CurrentLocation, SteeringApproachGate)
+			+ FVector::Distance(SteeringApproachGate, TargetLocation);
+	const float MinSpeed = FMath::Max(100.f, FMath::Min(SteeringMinApproachSpeed, SteeringMaxApproachSpeed));
+	const float MaxSpeed = FMath::Max(MinSpeed, SteeringMaxApproachSpeed);
+	SteeringCruiseSpeed = FMath::Clamp(EstimatedPathLength / MotionDuration, MinSpeed, MaxSpeed);
+
+	const float InitialSpeed = FMath::Clamp(FMath::Max(OrbitSpeed, MinSpeed), MinSpeed, SteeringCruiseSpeed);
+	FVector InitialForward = GetActorForwardVector().GetSafeNormal2D();
+	if (InitialForward.IsNearlyZero())
+	{
+		InitialForward = (TargetLocation - CurrentLocation).GetSafeNormal2D();
+	}
+	SteeringVelocity = InitialForward * InitialSpeed;
+	ReplicatedSteeringVelocity = SteeringVelocity;
+	ReplicatedSteeringTurnInput = 0.f;
+	ReplicatedSteeringPitchInput = 0.f;
+	SteeringPreviousDistance = FVector::Distance(CurrentLocation, TargetLocation);
+	SteeringPreviousGateDistance = FVector::Dist2D(CurrentLocation, SteeringApproachGate);
+	ForceNetUpdate();
+
+	UE_LOG(LogOBHelicopterInsertion, Display,
+		TEXT("[HelicopterSteering] Begin Helicopter=%s Start=%s Target=%s Gate=%s FinalLeg=%s InitialSpeed=%.0f CruiseSpeed=%.0f TurnRate=%.1f LookAhead=%.2f DurationTarget=%.1f"),
+		*GetName(), *CurrentLocation.ToCompactString(), *TargetLocation.ToCompactString(),
+		*SteeringApproachGate.ToCompactString(), bSteeringFinalLeg ? TEXT("true") : TEXT("false"),
+		InitialSpeed, SteeringCruiseSpeed, SteeringMaxTurnRateDegrees,
+		SteeringLookAheadSeconds, MotionDuration);
 }
 
 void AOBInsertionHelicopter::TickMotion(float DeltaSeconds)
 {
+	if (bSteeringMotion)
+	{
+		TickSteeringMotion(DeltaSeconds);
+		return;
+	}
+
 	MotionElapsed += DeltaSeconds;
 	float Alpha = FMath::Clamp(MotionElapsed / MotionDuration, 0.f, 1.f);
 
@@ -431,6 +633,217 @@ void AOBInsertionHelicopter::TickMotion(float DeltaSeconds)
 		const uint8 CompletedTask = MotionCompletionTask;
 		bMotionActive = false;
 		MotionCompletionTask = OBHelicopterTasks::None;
+		HandleMotionCompleted(CompletedTask);
+	}
+}
+
+void AOBInsertionHelicopter::TickSteeringMotion(float DeltaSeconds)
+{
+	if (DeltaSeconds <= UE_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	MotionElapsed += DeltaSeconds;
+	const FVector CurrentLocation = GetActorLocation();
+	const FVector TargetLocation = MotionTargetTransform.GetLocation();
+
+	if (!bSteeringFinalLeg)
+	{
+		const float GateDistance2D = FVector::Dist2D(CurrentLocation, SteeringApproachGate);
+		const float GateRadius = FMath::Max(100.f, SteeringGateAcceptanceRadius);
+		// A helicopter moving at cruise speed must start curving toward the final
+		// hover point before physically crossing the gate. Waiting for the small
+		// gate radius can put the target behind the airframe and create an orbit.
+		const float PredictiveTransitionRadius = FMath::Max(
+			GateRadius,
+			FMath::Min(
+				FMath::Max(GateRadius, SteeringFinalLegDistance),
+				SteeringVelocity.Size2D() * FMath::Max(0.5f, SteeringLookAheadSeconds)));
+		const bool bPassedClosestGatePoint = GateDistance2D > SteeringPreviousGateDistance
+			&& SteeringPreviousGateDistance <= GateRadius * 1.5f;
+		if (GateDistance2D <= PredictiveTransitionRadius || bPassedClosestGatePoint)
+		{
+			bSteeringFinalLeg = true;
+			UE_LOG(LogOBHelicopterInsertion, Display,
+				TEXT("[HelicopterSteering] Final leg entered Helicopter=%s Location=%s GateDistance=%.0f TransitionRadius=%.0f Elapsed=%.2f"),
+				*GetName(), *CurrentLocation.ToCompactString(), GateDistance2D,
+				PredictiveTransitionRadius, MotionElapsed);
+		}
+		SteeringPreviousGateDistance = GateDistance2D;
+	}
+
+	const FVector SteeringTarget = bSteeringFinalLeg ? TargetLocation : SteeringApproachGate;
+	const float DistanceToSteeringTarget2D = FVector::Dist2D(CurrentLocation, SteeringTarget);
+	const float DistanceToFinalTarget = FVector::Distance(CurrentLocation, TargetLocation);
+	const float CurrentHorizontalSpeed = SteeringVelocity.Size2D();
+	const float PredictionTime = FMath::Min(
+		FMath::Max(0.f, SteeringLookAheadSeconds),
+		DistanceToSteeringTarget2D / FMath::Max(100.f, CurrentHorizontalSpeed) * 0.65f);
+	const FVector PredictedLocation = CurrentLocation + FVector(
+		SteeringVelocity.X,
+		SteeringVelocity.Y,
+		0.f) * PredictionTime;
+	FVector DesiredDirection = (SteeringTarget - PredictedLocation).GetSafeNormal2D();
+	if (DesiredDirection.IsNearlyZero())
+	{
+		DesiredDirection = (SteeringTarget - CurrentLocation).GetSafeNormal2D();
+	}
+
+	const float CurrentYaw = CurrentHorizontalSpeed > 10.f
+		? SteeringVelocity.Rotation().Yaw
+		: GetActorRotation().Yaw;
+	const float DesiredYaw = DesiredDirection.IsNearlyZero() ? CurrentYaw : DesiredDirection.Rotation().Yaw;
+	const float UnclampedYawDelta = FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw);
+	const float MaxYawStep = FMath::Max(1.f, SteeringMaxTurnRateDegrees) * DeltaSeconds;
+	const float AppliedYawDelta = FMath::Clamp(UnclampedYawDelta, -MaxYawStep, MaxYawStep);
+	const float NewYaw = FRotator::NormalizeAxis(CurrentYaw + AppliedYawDelta);
+	const float TurnInput = MaxYawStep > UE_SMALL_NUMBER
+		? FMath::Clamp(AppliedYawDelta / MaxYawStep, -1.f, 1.f)
+		: 0.f;
+
+	float DesiredHorizontalSpeed = SteeringCruiseSpeed;
+	if (bSteeringFinalLeg)
+	{
+		const float BrakingDistance = FMath::Max(0.f, DistanceToFinalTarget - SteeringArrivalRadius * 0.25f);
+		DesiredHorizontalSpeed = FMath::Min(
+			SteeringCruiseSpeed,
+			FMath::Sqrt(2.f * FMath::Max(10.f, SteeringDeceleration) * BrakingDistance));
+	}
+	// Rotorcraft can keep yawing while translating very slowly. A low final-leg
+	// factor lets the simulated turn radius shrink below the arrival radius
+	// instead of orbiting the hover point forever.
+	const float MinimumTurnSpeedFactor = bSteeringFinalLeg ? 0.06f : 0.55f;
+	const float TurnSlowdown = FMath::Lerp(
+		1.f,
+		MinimumTurnSpeedFactor,
+		FMath::Clamp(FMath::Abs(UnclampedYawDelta) / 120.f, 0.f, 1.f));
+	DesiredHorizontalSpeed *= TurnSlowdown;
+	if (!bSteeringFinalLeg && DistanceToFinalTarget > SteeringArrivalRadius * 2.f)
+	{
+		DesiredHorizontalSpeed = FMath::Max(
+			FMath::Min(SteeringMinApproachSpeed, SteeringCruiseSpeed),
+			DesiredHorizontalSpeed);
+	}
+
+	const float SpeedChangeRate = DesiredHorizontalSpeed >= CurrentHorizontalSpeed
+		? FMath::Max(10.f, SteeringAcceleration)
+		: FMath::Max(10.f, SteeringDeceleration);
+	const float NewHorizontalSpeed = FMath::FInterpConstantTo(
+		CurrentHorizontalSpeed, DesiredHorizontalSpeed, DeltaSeconds, SpeedChangeRate);
+
+	const float EstimatedArrivalSeconds = FMath::Max(
+		0.5f,
+		DistanceToSteeringTarget2D / FMath::Max(300.f, NewHorizontalSpeed));
+	const float DesiredVerticalSpeed = FMath::Clamp(
+		(SteeringTarget.Z - CurrentLocation.Z) / EstimatedArrivalSeconds,
+		-FMath::Max(10.f, SteeringMaxVerticalSpeed),
+		FMath::Max(10.f, SteeringMaxVerticalSpeed));
+	const float NewVerticalSpeed = FMath::FInterpConstantTo(
+		SteeringVelocity.Z,
+		DesiredVerticalSpeed,
+		DeltaSeconds,
+		FMath::Max(10.f, SteeringAcceleration));
+
+	const FVector HorizontalDirection = FRotator(0.f, NewYaw, 0.f).Vector();
+	SteeringVelocity = HorizontalDirection * NewHorizontalSpeed + FVector::UpVector * NewVerticalSpeed;
+	const FVector NewLocation = CurrentLocation + SteeringVelocity * DeltaSeconds;
+
+	const float SpeedDelta = NewHorizontalSpeed - CurrentHorizontalSpeed;
+	const float LongitudinalRate = SpeedDelta >= 0.f
+		? FMath::Max(10.f, SteeringAcceleration)
+		: FMath::Max(10.f, SteeringDeceleration);
+	const float LongitudinalInput = FMath::Clamp(
+		SpeedDelta / FMath::Max(UE_SMALL_NUMBER, LongitudinalRate * DeltaSeconds),
+		-1.f,
+		1.f);
+	const float VerticalInput = FMath::Clamp(
+		NewVerticalSpeed / FMath::Max(10.f, SteeringMaxVerticalSpeed),
+		-1.f,
+		1.f);
+	const float PitchInput = FMath::Clamp(
+		VerticalInput * SteeringVerticalPitchWeight
+			- LongitudinalInput * SteeringAccelerationPitchWeight,
+		-1.f,
+		1.f);
+	const float DesiredPitch = PitchInput * FMath::Max(0.f, SteeringMaxPitchAngle);
+	// UE/vendor airframe roll convention in this project banks into a positive-Yaw turn.
+	const float DesiredBank = TurnInput * FMath::Max(0.f, SteeringMaxBankAngle);
+	const FRotator CurrentRotation = GetActorRotation();
+	const float NewPitch = FMath::FInterpTo(
+		CurrentRotation.Pitch, DesiredPitch, DeltaSeconds, FMath::Max(0.1f, SteeringAttitudeInterpSpeed));
+	const float NewBank = FMath::FInterpTo(
+		CurrentRotation.Roll, DesiredBank, DeltaSeconds, FMath::Max(0.1f, SteeringAttitudeInterpSpeed));
+	SetActorLocationAndRotation(
+		NewLocation,
+		FRotator(NewPitch, NewYaw, NewBank),
+		false,
+		nullptr,
+		ETeleportType::None);
+
+	ReplicatedSteeringVelocity = SteeringVelocity;
+	ReplicatedSteeringTurnInput = TurnInput;
+	ReplicatedSteeringPitchInput = PitchInput;
+
+#if ENABLE_DRAW_DEBUG
+	if (bDrawSteeringDebug && GetWorld())
+	{
+		DrawDebugLine(GetWorld(), CurrentLocation, PredictedLocation, FColor::Cyan, false, 0.f, 0, 8.f);
+		DrawDebugDirectionalArrow(GetWorld(), PredictedLocation, SteeringTarget, 500.f,
+			bSteeringFinalLeg ? FColor::Green : FColor::Yellow, false, 0.f, 0, 8.f);
+		DrawDebugSphere(GetWorld(), SteeringApproachGate, SteeringGateAcceptanceRadius, 16,
+			FColor::Yellow, false, 0.f, 0, 5.f);
+		DrawDebugSphere(GetWorld(), TargetLocation, SteeringArrivalRadius, 16,
+			FColor::Green, false, 0.f, 0, 5.f);
+	}
+#endif
+
+	if (MotionElapsed - SteeringLastLogTime >= 1.f)
+	{
+		SteeringLastLogTime = MotionElapsed;
+		UE_LOG(LogOBHelicopterInsertion, Display,
+			TEXT("[HelicopterSteering] Tick Helicopter=%s FinalLeg=%s Location=%s Target=%s Speed=%.0f DesiredSpeed=%.0f Vertical=%.0f YawError=%.1f Turn=%.2f Pitch=%.2f Distance=%.0f Elapsed=%.1f"),
+			*GetName(), bSteeringFinalLeg ? TEXT("true") : TEXT("false"),
+			*CurrentLocation.ToCompactString(), *SteeringTarget.ToCompactString(),
+			NewHorizontalSpeed, DesiredHorizontalSpeed, NewVerticalSpeed,
+			UnclampedYawDelta, TurnInput, PitchInput, DistanceToFinalTarget, MotionElapsed);
+	}
+
+	const float NewDistanceToTarget = FVector::Distance(NewLocation, TargetLocation);
+	const bool bCrossedTarget = bSteeringFinalLeg
+		&& NewDistanceToTarget > SteeringPreviousDistance
+		&& SteeringPreviousDistance <= SteeringArrivalRadius * 1.5f;
+	const bool bArrived = bSteeringFinalLeg
+		&& (NewDistanceToTarget <= FMath::Max(50.f, SteeringArrivalRadius) || bCrossedTarget);
+	const float HardTimeout = FMath::Max(10.f, MotionDuration * FMath::Max(1.f, SteeringTimeoutMultiplier));
+	const bool bTimedOut = MotionElapsed >= HardTimeout;
+	SteeringPreviousDistance = NewDistanceToTarget;
+
+	if (bArrived || bTimedOut)
+	{
+		if (bTimedOut && !bArrived)
+		{
+			UE_LOG(LogOBHelicopterInsertion, Error,
+				TEXT("[HelicopterSteering] Hard timeout; snapping to target Helicopter=%s Distance=%.0f Elapsed=%.1f Timeout=%.1f"),
+				*GetName(), NewDistanceToTarget, MotionElapsed, HardTimeout);
+		}
+		else
+		{
+			UE_LOG(LogOBHelicopterInsertion, Display,
+				TEXT("[HelicopterSteering] Arrived Helicopter=%s Distance=%.0f Elapsed=%.2f FinalSpeed=%.0f"),
+				*GetName(), NewDistanceToTarget, MotionElapsed, SteeringVelocity.Size());
+		}
+
+		SetActorTransform(MotionTargetTransform, false, nullptr, ETeleportType::None);
+		const uint8 CompletedTask = MotionCompletionTask;
+		bMotionActive = false;
+		bSteeringMotion = false;
+		SteeringVelocity = FVector::ZeroVector;
+		ReplicatedSteeringVelocity = FVector::ZeroVector;
+		ReplicatedSteeringTurnInput = 0.f;
+		ReplicatedSteeringPitchInput = 0.f;
+		MotionCompletionTask = OBHelicopterTasks::None;
+		ForceNetUpdate();
 		HandleMotionCompleted(CompletedTask);
 	}
 }
@@ -612,6 +1025,10 @@ void AOBInsertionHelicopter::StartNextRappel()
 	Rappel.End = End;
 	Rappel.Duration = FMath::Max(0.1f, FVector::Distance(Start, End) / FMath::Max(50.f, RappelSpeed));
 	Rappel.RopeIndex = RopeIndex;
+	UE_LOG(LogOBHelicopterInsertion, Log,
+		TEXT("[Insertion] Rappel started Helicopter=%s Team=%d Controller=%s Pawn=%s Rope=%d Start=%s End=%s Duration=%.2f Queue=%d Active=%d"),
+		*GetName(), TeamId, *GetNameSafe(Controller), *GetNameSafe(Pawn), RopeIndex,
+		*Start.ToCompactString(), *End.ToCompactString(), Rappel.Duration, RappelQueue.Num(), ActiveRappels.Num());
 
 	BP_OnRappelLineChanged(RopeIndex, true, Start, End);
 	BP_OnPassengerRappelStarted(Controller, RopeIndex);
@@ -640,6 +1057,11 @@ void AOBInsertionHelicopter::FinishRappel(int32 ActiveIndex)
 			}
 		}
 		SetPassengerTransitState(Controller, false, Pawn);
+		UE_LOG(LogOBHelicopterInsertion, Log,
+			TEXT("[InsertionInput] Rappel restore Controller=%s Pawn=%s Ground=%s MovementMode=%d Collision=%s"),
+			*GetNameSafe(Controller), *Pawn->GetName(), *Rappel.End.ToCompactString(),
+			Cast<ACharacter>(Pawn) ? static_cast<int32>(Cast<ACharacter>(Pawn)->GetCharacterMovement()->MovementMode) : -1,
+			Pawn->GetActorEnableCollision() ? TEXT("true") : TEXT("false"));
 	}
 
 	BP_OnRappelLineChanged(Rappel.RopeIndex, false, Rappel.Start, Rappel.End);

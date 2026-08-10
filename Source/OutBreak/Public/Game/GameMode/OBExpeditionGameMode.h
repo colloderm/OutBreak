@@ -14,9 +14,20 @@ class AOBExpeditionSpawnZone;
 class UOBExpeditionMapData;
 class AOBExpeditionGameState;
 class AOBInsertionHelicopter;
+class AOBInsertionTargetStreamingProxy;
 class AOBHelicopterRoute;
 class UOBLandingZoneScannerComponent;
 class AOBPlayerController;
+
+struct FOBPendingInsertionTargetRequest
+{
+	TArray<FVector> Candidates;
+	int32 CandidateIndex = INDEX_NONE;
+	TWeakObjectPtr<AOBPlayerController> FeedbackPlayer;
+	bool bAutomatic = false;
+	float RequestStartedServerTime = 0.f;
+	float CandidateStartedServerTime = 0.f;
+};
 
 // 세션 종료 사유. 결과 위젯(Step 8)/로그용.
 UENUM()
@@ -103,6 +114,19 @@ protected:
 	AOBHelicopterRoute* GetOrAssignInsertionRoute(uint8 TeamId);
 	void CollectHelicopterRoutes();
 	void AutoSelectInsertionPoint(uint8 TeamId);
+	void BeginInsertionTargetResolution(
+		uint8 TeamId,
+		const TArray<FVector>& Candidates,
+		AOBPlayerController* FeedbackPlayer,
+		bool bAutomatic);
+	void StartNextInsertionTargetCandidate(uint8 TeamId);
+	void PollInsertionTargetStreaming(uint8 TeamId);
+	void ValidateCurrentInsertionTarget(uint8 TeamId);
+	void FinishInsertionTargetFailure(uint8 TeamId, const FString& Message);
+	AOBInsertionTargetStreamingProxy* GetOrCreateInsertionTargetStreamingProxy(uint8 TeamId);
+	void NotifyTeamInsertionPresentation(uint8 TeamId, EOBInsertionPhase Phase, const FString& Message, bool bForceMapOpen);
+	void ReleaseInsertionTargetStreamingProxy(uint8 TeamId);
+	void TickInsertionWatchdog();
 	bool ResolveAndBeginInsertion(uint8 TeamId, const FVector& RequestedLocation, AOBPlayerController* FeedbackPlayer);
 	void TryCompleteInsertion();
 	void CompleteInsertionAfterGracePeriod();
@@ -203,6 +227,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (ClampMin = "0"))
 	float InsertionCompletionGraceSeconds = 3.f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion|Streaming", meta = (ClampMin = "0.05"))
+	float InsertionStreamingPollInterval = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion|Safety", meta = (ClampMin = "5.0"))
+	float MaxInsertionRappelSeconds = 45.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion")
 	bool bAllowLateJoinAtResolvedInsertionPoint = true;
 
@@ -284,6 +314,9 @@ private:
 	TMap<uint8, TObjectPtr<AOBInsertionHelicopter>> TeamInsertionHelicopters;
 
 	UPROPERTY(Transient)
+	TMap<uint8, TObjectPtr<AOBInsertionTargetStreamingProxy>> TeamInsertionTargetStreamingProxies;
+
+	UPROPERTY(Transient)
 	TMap<uint8, TObjectPtr<AOBHelicopterRoute>> TeamInsertionRoutes;
 
 	UPROPERTY(Transient)
@@ -294,7 +327,11 @@ private:
 
 	TMap<uint8, FOBTeamInsertionState> TeamInsertionRuntimeStates;
 	TMap<uint8, FTimerHandle> InsertionSelectionTimers;
+	TMap<uint8, FTimerHandle> InsertionStreamingPollTimers;
+	TMap<uint8, FOBPendingInsertionTargetRequest> PendingInsertionTargetRequests;
+	TMap<uint8, float> LastInsertionWatchdogWarningTimes;
 	FTimerHandle InsertionCompletionTimer;
+	FTimerHandle InsertionWatchdogTimer;
 	bool bInsertionHasStarted = false;
 	bool bInsertionHasCompleted = false;
 };

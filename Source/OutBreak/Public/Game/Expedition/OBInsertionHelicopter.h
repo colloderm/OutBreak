@@ -39,8 +39,12 @@ public:
 	AOBInsertionHelicopter();
 
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	FRotator GetCabinViewRotation() const;
 
 	void InitializeInsertion(uint8 InTeamId, AOBHelicopterRoute* OrbitRoute, const FVector& OrbitCenter);
 	void BeginInsertionApproach(const FOBLandingZoneResult& LandingZone);
@@ -79,6 +83,21 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Helicopter")
 	FVector GetResolvedGroundLocation() const { return ResolvedGroundLocation; }
 
+	/** Replicated flight state for Blueprint rotor/airframe presentation. */
+	UFUNCTION(BlueprintPure, Category = "Helicopter|Flight")
+	bool IsSteeringFlightActive() const { return bSteeringMotion; }
+
+	UFUNCTION(BlueprintPure, Category = "Helicopter|Flight")
+	FVector GetSteeringFlightVelocity() const { return FVector(ReplicatedSteeringVelocity); }
+
+	/** -1 left, +1 right. */
+	UFUNCTION(BlueprintPure, Category = "Helicopter|Flight")
+	float GetSteeringTurnInput() const { return ReplicatedSteeringTurnInput; }
+
+	/** -1 nose down, +1 nose up. Includes acceleration/braking and climb/descent. */
+	UFUNCTION(BlueprintPure, Category = "Helicopter|Flight")
+	float GetSteeringPitchInput() const { return ReplicatedSteeringPitchInput; }
+
 	UPROPERTY(BlueprintAssignable, Category = "Helicopter|Events")
 	FOBInsertionHelicopterPhaseChanged OnInsertionPhaseChanged;
 
@@ -115,7 +134,9 @@ protected:
 	void SetDoorsOpen(bool bOpen);
 	void BeginTransformMotion(const FTransform& Target, float Duration, uint8 CompletionTask);
 	void BeginRouteMotion(AOBHelicopterRoute* Route, float Duration, bool bLoop, uint8 CompletionTask);
+	void BeginSteeringMotion(const FTransform& Target, float DesiredDuration, uint8 CompletionTask);
 	void TickMotion(float DeltaSeconds);
+	void TickSteeringMotion(float DeltaSeconds);
 	void TickOrbit(float DeltaSeconds);
 	void HandleMotionCompleted(uint8 CompletionTask);
 	void CompleteInsertionScan();
@@ -163,6 +184,19 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCameraComponent> CabinCamera;
 
+	/** Uses the local controller rotation while this helicopter is its ViewTarget. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Camera")
+	bool bEnablePassengerFreeLook = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Camera", meta = (ClampMin = "0.0", ClampMax = "180.0"))
+	float PassengerFreeLookYawLimit = 150.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Camera", meta = (ClampMin = "-89.0", ClampMax = "89.0"))
+	float PassengerFreeLookMinPitch = -75.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Camera", meta = (ClampMin = "-89.0", ClampMax = "89.0"))
+	float PassengerFreeLookMaxPitch = 55.f;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> LeftRappelAnchor;
 
@@ -199,6 +233,65 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Insertion", meta = (ClampMin = "0.1"))
 	float InsertionApproachSeconds = 12.f;
+
+	/** Uses acceleration, braking, turn-rate and an approach gate instead of a straight transform lerp. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering")
+	bool bUseSteeringInsertionApproach = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "100"))
+	float SteeringMinApproachSpeed = 1800.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "100"))
+	float SteeringMaxApproachSpeed = 12000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "10"))
+	float SteeringAcceleration = 2800.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "10"))
+	float SteeringDeceleration = 3500.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "1.0", ClampMax = "180.0"))
+	float SteeringMaxTurnRateDegrees = 28.f;
+
+	/** Predicts current momentum this many seconds ahead when choosing the turn direction. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0.0", ClampMax = "5.0"))
+	float SteeringLookAheadSeconds = 1.35f;
+
+	/** Distance behind the scan hold transform used to establish a stable final approach. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0"))
+	float SteeringFinalLegDistance = 9000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "100"))
+	float SteeringGateAcceptanceRadius = 1800.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "50"))
+	float SteeringArrivalRadius = 450.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "10"))
+	float SteeringMaxVerticalSpeed = 2800.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0.0", ClampMax = "45.0"))
+	float SteeringMaxBankAngle = 18.f;
+
+	/** Maximum nose-up/down attitude produced by longitudinal and vertical steering. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0.0", ClampMax = "45.0"))
+	float SteeringMaxPitchAngle = 14.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float SteeringAccelerationPitchWeight = 0.8f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	float SteeringVerticalPitchWeight = 0.65f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0.1"))
+	float SteeringAttitudeInterpSpeed = 3.5f;
+
+	/** Safety fallback only; normal completion is based on arrival distance. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "1.0"))
+	float SteeringTimeoutMultiplier = 3.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering|Debug")
+	bool bDrawSteeringDebug = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Insertion")
 	FVector ScanningHoldOffset = FVector(-3500.f, 0.f, 600.f);
@@ -265,6 +358,18 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_DoorsOpen)
 	bool bDoorsOpen = false;
 
+	UPROPERTY(Replicated)
+	bool bSteeringMotion = false;
+
+	UPROPERTY(Replicated)
+	FVector_NetQuantize10 ReplicatedSteeringVelocity = FVector::ZeroVector;
+
+	UPROPERTY(Replicated)
+	float ReplicatedSteeringTurnInput = 0.f;
+
+	UPROPERTY(Replicated)
+	float ReplicatedSteeringPitchInput = 0.f;
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AController>> PassengerControllers;
 
@@ -286,6 +391,13 @@ private:
 	bool bMotionActive = false;
 	bool bRouteMotion = false;
 	bool bLoopRoute = false;
+	bool bSteeringFinalLeg = false;
+	FVector SteeringVelocity = FVector::ZeroVector;
+	FVector SteeringApproachGate = FVector::ZeroVector;
+	float SteeringCruiseSpeed = 0.f;
+	float SteeringPreviousDistance = TNumericLimits<float>::Max();
+	float SteeringPreviousGateDistance = TNumericLimits<float>::Max();
+	float SteeringLastLogTime = -1000.f;
 
 	FOBLandingZoneResult ActiveLandingZone;
 	TArray<TWeakObjectPtr<AController>> RappelQueue;

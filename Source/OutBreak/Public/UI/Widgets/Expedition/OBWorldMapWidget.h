@@ -30,9 +30,19 @@ public:
 	void SetMapOpen(bool bOpen);
 	bool IsMapOpen() const;
 
+	void SetInsertionSelectionMode(bool bEnabled, bool bCanSelectTarget);
+	void NotifyInsertionPointResult(bool bAccepted, const FVector& ResolvedLocation, const FString& Message);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Map|Insertion", meta = (DisplayName = "On Insertion Selection Mode Changed"))
+	void BP_OnInsertionSelectionModeChanged(bool bEnabled, bool bCanSelectTarget);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Map|Insertion", meta = (DisplayName = "On Insertion Point Result"))
+	void BP_OnInsertionPointResult(bool bAccepted, FVector ResolvedLocation, const FString& Message);
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
+	virtual FReply NativeOnPreviewKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	void Refresh();
 
@@ -130,6 +140,8 @@ private:
 
 	bool bDragging = false;
 	bool bDragThresholdExceeded = false;
+	bool bInsertionSelectionMode = false;
+	bool bCanSelectInsertionTarget = false;
 	FVector2D MouseDownScreenPos = FVector2D::ZeroVector;
 	FVector2D LastDragScreenPos = FVector2D::ZeroVector;
 	

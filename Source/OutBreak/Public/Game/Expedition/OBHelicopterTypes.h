@@ -33,8 +33,50 @@ enum class EOBInsertionPhase : uint8
 	Rappelling       UMETA(DisplayName = "Rappelling"),
 	Departing        UMETA(DisplayName = "Departing"),
 	Completed        UMETA(DisplayName = "Completed"),
-	Aborted          UMETA(DisplayName = "Aborted")
+	Aborted          UMETA(DisplayName = "Aborted"),
+	// Appended to preserve the serialized values of the original phases.
+	LoadingTarget    UMETA(DisplayName = "Loading Target"),
+	ValidatingTarget UMETA(DisplayName = "Validating Target")
 };
+
+UENUM(BlueprintType)
+enum class EOBLandingZoneFailure : uint8
+{
+	None                       UMETA(DisplayName = "None"),
+	WorldNotReady              UMETA(DisplayName = "World Not Ready"),
+	NoGroundHit                UMETA(DisplayName = "No Ground Hit"),
+	SlopeTooSteep              UMETA(DisplayName = "Slope Too Steep"),
+	FootprintInvalid           UMETA(DisplayName = "Footprint Invalid"),
+	HeightVariance             UMETA(DisplayName = "Height Variance"),
+	NavigationUnavailable      UMETA(DisplayName = "Navigation Unavailable"),
+	NavigationProjectionFailed UMETA(DisplayName = "Navigation Projection Failed"),
+	HelicopterClearanceBlocked UMETA(DisplayName = "Helicopter Clearance Blocked"),
+	RappelPathBlocked          UMETA(DisplayName = "Rappel Path Blocked"),
+	ExclusionVolume            UMETA(DisplayName = "Exclusion Volume"),
+	MissingInsertionAreaVolume UMETA(DisplayName = "Missing Insertion Area Volume"),
+	OutsideInsertionArea       UMETA(DisplayName = "Outside Insertion Area")
+};
+
+inline const TCHAR* LexToString(EOBLandingZoneFailure Failure)
+{
+	switch (Failure)
+	{
+	case EOBLandingZoneFailure::None: return TEXT("None");
+	case EOBLandingZoneFailure::WorldNotReady: return TEXT("WorldNotReady");
+	case EOBLandingZoneFailure::NoGroundHit: return TEXT("NoGroundHit");
+	case EOBLandingZoneFailure::SlopeTooSteep: return TEXT("SlopeTooSteep");
+	case EOBLandingZoneFailure::FootprintInvalid: return TEXT("FootprintInvalid");
+	case EOBLandingZoneFailure::HeightVariance: return TEXT("HeightVariance");
+	case EOBLandingZoneFailure::NavigationUnavailable: return TEXT("NavigationUnavailable");
+	case EOBLandingZoneFailure::NavigationProjectionFailed: return TEXT("NavigationProjectionFailed");
+	case EOBLandingZoneFailure::HelicopterClearanceBlocked: return TEXT("HelicopterClearanceBlocked");
+	case EOBLandingZoneFailure::RappelPathBlocked: return TEXT("RappelPathBlocked");
+	case EOBLandingZoneFailure::ExclusionVolume: return TEXT("ExclusionVolume");
+	case EOBLandingZoneFailure::MissingInsertionAreaVolume: return TEXT("MissingInsertionAreaVolume");
+	case EOBLandingZoneFailure::OutsideInsertionArea: return TEXT("OutsideInsertionArea");
+	default: return TEXT("Unknown");
+	}
+}
 
 UENUM(BlueprintType)
 enum class EOBExtractionCallPhase : uint8
@@ -68,6 +110,13 @@ struct OUTBREAK_API FOBLandingZoneResult
 
 	UPROPERTY(BlueprintReadOnly, Category = "Helicopter")
 	float Score = TNumericLimits<float>::Max();
+
+	/** Most frequent rejection reason when no valid candidate was found. */
+	UPROPERTY(BlueprintReadOnly, Category = "Helicopter")
+	EOBLandingZoneFailure Failure = EOBLandingZoneFailure::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Helicopter")
+	int32 CandidatesEvaluated = 0;
 };
 
 USTRUCT(BlueprintType)

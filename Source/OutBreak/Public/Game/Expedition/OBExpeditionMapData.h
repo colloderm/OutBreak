@@ -75,6 +75,18 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map|WorldMap", meta = (ClampMin = "1.0"))
 	FVector2D WorldMapSize = FVector2D(100000.0, 100000.0);
 
+	/** Optional deterministic server-side fallback candidates used after the leader selection timeout. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map|Insertion")
+	TArray<FVector2D> DefaultInsertionCandidates;
+
+	/** Radius of the temporary World Partition streaming source placed at a requested insertion point. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map|Insertion", meta = (ClampMin = "1000.0"))
+	float InsertionStreamingRadius = 10000.f;
+
+	/** Maximum time the server waits for a target region to finish streaming before trying another point. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Map|Insertion", meta = (ClampMin = "1.0"))
+	float InsertionStreamingTimeout = 15.f;
+
 	// 월드 좌표 → 지도 UV(좌상단 0,0 / 우하단 1,1).
 	// SceneCapture2D를 Pitch=-90 / Yaw=0 / Orthographic으로 찍은 이미지 기준이다:
 	//   이미지 오른쪽 = 월드 +Y, 이미지 위쪽 = 월드 +X.

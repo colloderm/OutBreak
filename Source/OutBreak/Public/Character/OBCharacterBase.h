@@ -44,9 +44,6 @@ public:
 	// 복제 등록
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
-	// 조준 트레이스용 카메라(서버에도 컨트롤 회전 복제로 위치 유효).
-	UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-	
 	UFUNCTION(BlueprintPure, Category = "OB|Death")
 	bool IsDead() const { return bIsDead; }
 	
@@ -91,7 +88,7 @@ public:
 	// 스프린트 카메라 랙 토글. BP 스프린트 시작(true)/종료(false)에서 호출.
 	UFUNCTION(BlueprintCallable, Category = "OB|Camera")
 	void SetSprintCameraLag(bool bSprinting);
-	
+
 	// 스프린트 입력 상태. BP의 스프린트 시작(true)/종료(false)에서 이걸 호출한다.
 	// 카메라 랙까지 함께 처리하므로 SetSprintCameraLag을 따로 부를 필요 없다.
 	UFUNCTION(BlueprintCallable, Category = "OB|Movement")

@@ -20,9 +20,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Helicopter|Landing Zone")
 	bool FindGroundAtXY(const FVector2D& WorldXY, FVector& OutGroundLocation) const;
 
+	/** True only when the point is inside an enabled insertion allow-list volume. */
+	UFUNCTION(BlueprintCallable, Category = "Helicopter|Landing Zone")
+	bool IsInsideInsertionArea(const FVector& WorldLocation) const;
+
+	UFUNCTION(BlueprintPure, Category = "Helicopter|Landing Zone")
+	bool RequiresInsertionAreaVolume() const { return bRequireInsertionAreaVolume; }
+
 protected:
-	bool EvaluateCandidate(const FVector& RequestedLocation, const FVector2D& CandidateXY, FOBLandingZoneResult& OutResult) const;
+	bool EvaluateCandidate(
+		const FVector& RequestedLocation,
+		const FVector2D& CandidateXY,
+		FOBLandingZoneResult& OutResult,
+		EOBLandingZoneFailure& OutFailure) const;
 	bool IsInsideExclusionVolume(const FVector& Location) const;
+	bool HasInsertionAreaVolume() const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Landing Zone|Search", meta = (ClampMin = "0"))
 	float SearchRadius = 6000.f;
@@ -47,6 +59,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Landing Zone|Navigation")
 	bool bRequireNavigation = true;
+
+	/** When true, insertion is impossible outside AOBHelicopterInsertionAreaVolume. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Landing Zone|Area")
+	bool bRequireInsertionAreaVolume = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Landing Zone|Navigation")
 	FVector NavigationProjectionExtent = FVector(500.f, 500.f, 500.f);

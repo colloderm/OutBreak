@@ -3,7 +3,10 @@
 #include "DrawDebugHelpers.h"
 #include "EngineUtils.h"
 #include "Game/Expedition/OBHelicopterExclusionVolume.h"
+#include "Game/Expedition/OBHelicopterInsertionAreaVolume.h"
 #include "NavigationSystem.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogOBLandingZone, Log, All);
 
 UOBLandingZoneScannerComponent::UOBLandingZoneScannerComponent()
 {
@@ -37,6 +40,9 @@ bool UOBLandingZoneScannerComponent::FindSafeLandingZone(
 {
 	OutResult = FOBLandingZoneResult();
 	FOBLandingZoneResult Best;
+	TArray<int32> FailureCounts;
+	FailureCounts.SetNumZeroed(static_cast<int32>(EOBLandingZoneFailure::OutsideInsertionArea) + 1);
+	int32 CandidatesEvaluated = 0;
 
 	const int32 RingCount = FMath::Max(1, FMath::CeilToInt(SearchRadius / FMath::Max(100.f, RingStep)));
 	for (int32 Ring = 0; Ring <= RingCount; ++Ring)
@@ -45,31 +51,74 @@ bool UOBLandingZoneScannerComponent::FindSafeLandingZone(
 		const float Radius = Ring * RingStep;
 		for (int32 Sample = 0; Sample < Count; ++Sample)
 		{
+			++CandidatesEvaluated;
 			const float Angle = Count == 1 ? 0.f : (2.f * UE_PI * static_cast<float>(Sample) / static_cast<float>(Count));
 			const FVector2D CandidateXY(
 				RequestedLocation.X + FMath::Cos(Angle) * Radius,
 				RequestedLocation.Y + FMath::Sin(Angle) * Radius);
 
 			FOBLandingZoneResult Candidate;
-			if (EvaluateCandidate(RequestedLocation, CandidateXY, Candidate) && Candidate.Score < Best.Score)
+			EOBLandingZoneFailure Failure = EOBLandingZoneFailure::None;
+			if (EvaluateCandidate(RequestedLocation, CandidateXY, Candidate, Failure) && Candidate.Score < Best.Score)
 			{
 				Best = Candidate;
+			}
+			else if (Failure != EOBLandingZoneFailure::None)
+			{
+				const int32 FailureIndex = static_cast<int32>(Failure);
+				if (FailureCounts.IsValidIndex(FailureIndex))
+				{
+					++FailureCounts[FailureIndex];
+				}
 			}
 		}
 	}
 
 	OutResult = Best;
+	OutResult.CandidatesEvaluated = CandidatesEvaluated;
+	if (!OutResult.bValid)
+	{
+		int32 MostFrequentCount = 0;
+		for (int32 Index = 1; Index < FailureCounts.Num(); ++Index)
+		{
+			if (FailureCounts[Index] > MostFrequentCount)
+			{
+				MostFrequentCount = FailureCounts[Index];
+				OutResult.Failure = static_cast<EOBLandingZoneFailure>(Index);
+			}
+		}
+	}
+
+	if (OutResult.bValid)
+	{
+		UE_LOG(LogOBLandingZone, Log,
+			TEXT("[InsertionTarget] Validation accepted Requested=%s Candidates=%d Reason=%s Ground=%s Hover=%s Score=%.1f"),
+			*RequestedLocation.ToCompactString(), OutResult.CandidatesEvaluated,
+			LexToString(OutResult.Failure), *FVector(OutResult.GroundLocation).ToCompactString(),
+			*OutResult.HoverTransform.GetLocation().ToCompactString(), OutResult.Score);
+	}
+	else
+	{
+		UE_LOG(LogOBLandingZone, Warning,
+			TEXT("[InsertionTarget] Validation failed Requested=%s Candidates=%d Reason=%s Ground=%s Hover=%s Score=%.1f"),
+			*RequestedLocation.ToCompactString(), OutResult.CandidatesEvaluated,
+			LexToString(OutResult.Failure), *FVector(OutResult.GroundLocation).ToCompactString(),
+			*OutResult.HoverTransform.GetLocation().ToCompactString(), OutResult.Score);
+	}
 	return OutResult.bValid;
 }
 
 bool UOBLandingZoneScannerComponent::EvaluateCandidate(
 	const FVector& RequestedLocation,
 	const FVector2D& CandidateXY,
-	FOBLandingZoneResult& OutResult) const
+	FOBLandingZoneResult& OutResult,
+	EOBLandingZoneFailure& OutFailure) const
 {
+	OutFailure = EOBLandingZoneFailure::None;
 	UWorld* World = GetWorld();
 	if (!World)
 	{
+		OutFailure = EOBLandingZoneFailure::WorldNotReady;
 		return false;
 	}
 
@@ -79,18 +128,34 @@ bool UOBLandingZoneScannerComponent::EvaluateCandidate(
 	FHitResult CenterHit;
 	if (!World->LineTraceSingleByChannel(CenterHit, Start, End, GroundTraceChannel, Params) || !CenterHit.bBlockingHit)
 	{
+		OutFailure = EOBLandingZoneFailure::NoGroundHit;
 		return false;
 	}
 
 	const float MinUpDot = FMath::Cos(FMath::DegreesToRadians(MaxSlopeDegrees));
 	if (FVector::DotProduct(CenterHit.ImpactNormal.GetSafeNormal(), FVector::UpVector) < MinUpDot)
 	{
+		OutFailure = EOBLandingZoneFailure::SlopeTooSteep;
 		return false;
 	}
 
 	const FVector Ground = CenterHit.ImpactPoint;
+	if (bRequireInsertionAreaVolume)
+	{
+		if (!HasInsertionAreaVolume())
+		{
+			OutFailure = EOBLandingZoneFailure::MissingInsertionAreaVolume;
+			return false;
+		}
+		if (!IsInsideInsertionArea(Ground))
+		{
+			OutFailure = EOBLandingZoneFailure::OutsideInsertionArea;
+			return false;
+		}
+	}
 	if (IsInsideExclusionVolume(Ground))
 	{
+		OutFailure = EOBLandingZoneFailure::ExclusionVolume;
 		return false;
 	}
 
@@ -105,6 +170,7 @@ bool UOBLandingZoneScannerComponent::EvaluateCandidate(
 		FVector SampleGround;
 		if (!FindGroundAtXY(SampleXY, SampleGround))
 		{
+			OutFailure = EOBLandingZoneFailure::FootprintInvalid;
 			return false;
 		}
 		MinZ = FMath::Min(MinZ, SampleGround.Z);
@@ -114,6 +180,7 @@ bool UOBLandingZoneScannerComponent::EvaluateCandidate(
 	const float HeightVariance = MaxZ - MinZ;
 	if (HeightVariance > MaxHeightVariance)
 	{
+		OutFailure = EOBLandingZoneFailure::HeightVariance;
 		return false;
 	}
 
@@ -122,8 +189,14 @@ bool UOBLandingZoneScannerComponent::EvaluateCandidate(
 	{
 		const UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
 		FNavLocation Projected;
-		if (!Navigation || !Navigation->ProjectPointToNavigation(Ground, Projected, NavigationProjectionExtent))
+		if (!Navigation)
 		{
+			OutFailure = EOBLandingZoneFailure::NavigationUnavailable;
+			return false;
+		}
+		if (!Navigation->ProjectPointToNavigation(Ground, Projected, NavigationProjectionExtent))
+		{
+			OutFailure = EOBLandingZoneFailure::NavigationProjectionFailed;
 			return false;
 		}
 		NavigableGround = Projected.Location;
@@ -140,6 +213,7 @@ bool UOBLandingZoneScannerComponent::EvaluateCandidate(
 		HelicopterShape,
 		Params))
 	{
+		OutFailure = EOBLandingZoneFailure::HelicopterClearanceBlocked;
 		return false;
 	}
 
@@ -147,6 +221,7 @@ bool UOBLandingZoneScannerComponent::EvaluateCandidate(
 	const FVector RopeEnd = HoverLocation - FVector(0.f, 0.f, HelicopterClearanceHalfHeight + 50.f);
 	if (World->LineTraceTestByChannel(RopeStart, RopeEnd, ECC_WorldStatic, Params))
 	{
+		OutFailure = EOBLandingZoneFailure::RappelPathBlocked;
 		return false;
 	}
 
@@ -158,6 +233,7 @@ bool UOBLandingZoneScannerComponent::EvaluateCandidate(
 	OutResult.GroundLocation = Ground;
 	OutResult.HoverTransform = FTransform(FRotator::ZeroRotator, HoverLocation);
 	OutResult.Score = DistanceScore + SlopeScore + HeightVariance * 10.f + NavOffsetScore;
+	OutResult.Failure = EOBLandingZoneFailure::None;
 
 #if ENABLE_DRAW_DEBUG
 	if (bDrawDebug)
@@ -183,6 +259,41 @@ bool UOBLandingZoneScannerComponent::IsInsideExclusionVolume(const FVector& Loca
 	{
 		const AOBHelicopterExclusionVolume* Volume = *It;
 		if (Volume && Volume->bBlockInsertion && Volume->EncompassesPoint(Location))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UOBLandingZoneScannerComponent::HasInsertionAreaVolume() const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+	for (TActorIterator<AOBHelicopterInsertionAreaVolume> It(World); It; ++It)
+	{
+		if (It->bAllowInsertion)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UOBLandingZoneScannerComponent::IsInsideInsertionArea(const FVector& WorldLocation) const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+	for (TActorIterator<AOBHelicopterInsertionAreaVolume> It(World); It; ++It)
+	{
+		const AOBHelicopterInsertionAreaVolume* Volume = *It;
+		if (Volume && Volume->bAllowInsertion && Volume->EncompassesPoint(WorldLocation))
 		{
 			return true;
 		}

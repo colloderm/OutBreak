@@ -6,6 +6,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
+#include "GameFramework/GameplayCameraComponentBase.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/State/OBPlayerStateBase.h"
@@ -32,6 +33,8 @@
 #include "Player/Controller/OBPlayerController.h"
 #include "Data/OBGameDataSubsystem.h"
 #include "Player/Data/OBPlayerStatData.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogOBCameraProvider, Log, All);
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
 {
@@ -83,6 +86,17 @@ AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
 void AOBCharacterBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Gameplay Cameras owns the evaluated view for player Blueprints that carry
+	// this component. Disable the inherited native camera once, at provider setup,
+	// so AActor::CalcCamera never selects two competing camera providers.
+	if (FollowCamera && FindComponentByClass<UGameplayCameraComponentBase>())
+	{
+		FollowCamera->Deactivate();
+		UE_LOG(LogOBCameraProvider, Log,
+			TEXT("[CameraProvider] Gameplay Camera selected Character=%s NativeFollowCameraActive=false"),
+			*GetName());
+	}
 	
 	if (EquipmentComponent)
 	{

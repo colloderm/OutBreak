@@ -89,5 +89,16 @@ protected:
 public:
 	// PC의 M키가 호출.
 	void ToggleWorldMap();
+
+	/** Creates the configured map widget on demand and returns it. */
+	UOBWorldMapWidget* EnsureWorldMapWidget();
+
+	/** Opens the map in insertion selection/read-only mode. */
+	bool OpenInsertionMap(bool bCanSelectTarget);
+
+	/** Closes the map and clears insertion-specific selection state. */
+	void CloseInsertionMap();
+
+	UOBWorldMapWidget* GetWorldMapWidget() const { return WorldMapWidget; }
 	
 };
