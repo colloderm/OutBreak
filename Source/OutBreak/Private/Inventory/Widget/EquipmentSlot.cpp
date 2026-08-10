@@ -85,7 +85,7 @@ void UEquipmentSlot::NativeOnDragEnter(
 		InOperation);
 	OnEquipmentDragStateChanged(
 		true,
-		CanAcceptOperation(InOperation));
+		CanAcceptOperation(InOperation) || CanInstallFromOperation(InOperation));
 }
 
 void UEquipmentSlot::NativeOnDragLeave(
@@ -103,10 +103,18 @@ bool UEquipmentSlot::NativeOnDrop(
 {
 	const UInventoryDragDropOperation* Operation =
 		Cast<UInventoryDragDropOperation>(InOperation);
-	const bool bCanDrop = CanAcceptOperation(InOperation);
 	OnEquipmentDragStateChanged(false, false);
 
-	if (!bCanDrop)
+	// 부착물 설치는 이동/장착이 아니다. Super로 넘기면 무기 슬롯을 부착물로 덮어쓴다.
+	if (CanInstallFromOperation(InOperation))
+	{
+		EquipmentInventory->InstallAttachment(
+			GetEquippedWeaponInstanceId(),
+			Operation->SourceHandle.InstanceId);
+		return true;
+	}
+
+	if (!CanAcceptOperation(InOperation))
 	{
 		if (Operation)
 		{
@@ -132,4 +140,34 @@ bool UEquipmentSlot::CanAcceptOperation(
 		EquipmentInventory->CanEquipItemToSlot(
 			Operation->SourceHandle,
 			SlotCategory);
+}
+
+// 파일 끝에 추가
+FGuid UEquipmentSlot::GetEquippedWeaponInstanceId() const
+{
+	FInventoryData Equipped;
+	if (!EquipmentInventory ||
+		!EquipmentInventory->GetEquippedItem(SlotCategory, Equipped))
+	{
+		return FGuid();
+	}
+	return Equipped.InstanceId;
+}
+
+bool UEquipmentSlot::CanInstallFromOperation(
+	UDragDropOperation* InOperation) const
+{
+	const UInventoryDragDropOperation* Operation =
+		Cast<UInventoryDragDropOperation>(InOperation);
+	if (!Operation ||
+		!EquipmentInventory ||
+		Operation->Inventory != EquipmentInventory)
+	{
+		return false;
+	}
+
+	// 카테고리·슬롯·RequiredWeaponTags 검증은 전부 컴포넌트가 한다.
+	return EquipmentInventory->CanInstallAttachment(
+		GetEquippedWeaponInstanceId(),
+		Operation->SourceHandle.InstanceId);
 }

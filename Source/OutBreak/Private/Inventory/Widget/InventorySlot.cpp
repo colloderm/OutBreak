@@ -87,10 +87,39 @@ void UInventorySlot::SetQuickSlotContext(
 	SetSlotData(DisplayData);
 }
 
+void UInventorySlot::SetAttachmentContext(
+	UPlayerInventoryComponent* InInventory,
+	const FGuid& InWeaponInstanceId,
+	const FGameplayTag& InAttachmentSlotTag,
+	const FInventoryData& Data)
+{
+	InventoryComponent = InInventory;
+	AttachmentWeaponInstanceId = InWeaponInstanceId;
+	AttachmentSlotTag = InAttachmentSlotTag;
+
+	// SlotHandle은 비워 둔다. Location이 None이라 드롭이 와도 MoveItem으로
+	// 새지 않고 Super로 흘러간다.
+	SlotHandle = FInventoryItemHandle();
+	SetSlotData(Data);
+}
+
 FReply UInventorySlot::NativeOnMouseButtonDown(
 	const FGeometry& InGeometry,
 	const FPointerEvent& InMouseEvent)
 {
+	// 부착물 칸 우클릭 = 해제. 서버가 가방으로 되돌려준다.
+	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton &&
+		InventoryComponent &&
+		AttachmentSlotTag.IsValid() &&
+		AttachmentWeaponInstanceId.IsValid() &&
+		InventoryData.ItemTag.IsValid())
+	{
+		InventoryComponent->RemoveAttachment(
+			AttachmentWeaponInstanceId,
+			AttachmentSlotTag);
+		return FReply::Handled();
+	}
+
 	if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton &&
 		InventoryComponent && SlotHandle.HasItem())
 	{

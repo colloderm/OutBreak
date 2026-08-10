@@ -10,6 +10,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
+#include "Net/UnrealNetwork.h"
 
 // Sets default values for this component's properties
 UEnemyPhysicalComponent::UEnemyPhysicalComponent()
@@ -17,6 +18,9 @@ UEnemyPhysicalComponent::UEnemyPhysicalComponent()
 	// Set this component to be initialized when the game starts, and to be ticked every frame.  You can turn these features
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = true;
+	
+	// 부위 파괴 상태를 클라에 전달한다.
+	SetIsReplicatedByDefault(true);
 	
 	Limbes.Add(FName(TEXT("Head")), FLimbData(20, 20));
 	Limbes.Add(FName(TEXT("upperarm_r")), FLimbData(40, 40));
@@ -154,23 +158,23 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 	
 	if (PhyMtrl == PhysicalReact->PM_Head)
 	{
-		ActionLimb(nullptr, FName(TEXT("Head")), DamageAmount);
+		ActionLimb(FName(TEXT("Head")), DamageAmount);
 	}
 	else if (PhyMtrl == PhysicalReact->PM_Arm_R)
 	{
-		ActionLimb(LimbMeshes->SM_Arm_R, FName(TEXT("upperarm_r")), DamageAmount);
+		ActionLimb(FName(TEXT("upperarm_r")), DamageAmount);
 	}
 	else if (PhyMtrl == PhysicalReact->PM_Arm_L)
 	{
-		ActionLimb(LimbMeshes->SM_Arm_L, FName(TEXT("upperarm_l")), DamageAmount);
+		ActionLimb(FName(TEXT("upperarm_l")), DamageAmount);
 	}
 	else if (PhyMtrl == PhysicalReact->PM_Leg_R)
 	{
-		ActionLimb(LimbMeshes->SM_Leg_R, FName(TEXT("thigh_r")), DamageAmount);
+		ActionLimb(FName(TEXT("thigh_r")), DamageAmount);
 	}
 	else if (PhyMtrl == PhysicalReact->PM_Leg_L)
 	{
-		ActionLimb(LimbMeshes->SM_Leg_L, FName(TEXT("thigh_l")), DamageAmount);
+		ActionLimb(FName(TEXT("thigh_l")), DamageAmount);
 	}
 
 	// Head destruction or a lethal limb combination can enter the dead state
@@ -331,96 +335,138 @@ void UEnemyPhysicalComponent::BloodVFX(const FHitResult& HitResult)
 	);
 }
 
-void UEnemyPhysicalComponent::ActionLimb(UStaticMesh* MeshAsset, FName BoneName, float DamageAmount)
+void UEnemyPhysicalComponent::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UEnemyPhysicalComponent, DestroyedLimbs);
+}
+
+UStaticMesh* UEnemyPhysicalComponent::GetLimbMesh(const FName BoneName) const
+{
+	if (!IsValid(EnemyAsset))
+	{
+		return nullptr;
+	}
+
+	const FEnemyLimbMesh* LimbMeshes = EnemyAsset->GetLimbMeshes();
+	if (LimbMeshes == nullptr)
+	{
+		return nullptr;
+	}
+
+	if (BoneName == FName(TEXT("upperarm_r"))) return LimbMeshes->SM_Arm_R;
+	if (BoneName == FName(TEXT("upperarm_l"))) return LimbMeshes->SM_Arm_L;
+	if (BoneName == FName(TEXT("thigh_r")))    return LimbMeshes->SM_Leg_R;
+	if (BoneName == FName(TEXT("thigh_l")))    return LimbMeshes->SM_Leg_L;
+
+	// 머리는 떨어지는 조각이 없다.
+	return nullptr;
+}
+
+void UEnemyPhysicalComponent::ApplyLimbDestruction(const FName BoneName)
+{
+	if (UStaticMesh* MeshAsset = GetLimbMesh(BoneName))
+	{
+		UWorld* World = GetWorld();
+		if (IsValid(World) && IsValid(ProxyMesh))
+		{
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.Owner = GetOwner();
+			SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+			const FTransform SpawnTransform = ProxyMesh->GetSocketTransform(BoneName);
+			AStaticMeshActor* MeshPart = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), SpawnTransform, SpawnParams);
+			if (IsValid(MeshPart))
+			{
+				MeshPart->SetLifeSpan(10.f);
+				UStaticMeshComponent* MeshComp =
+					Cast<UStaticMeshComponent>(MeshPart->GetRootComponent());
+				if (IsValid(MeshComp))
+				{
+					MeshComp->SetMobility(EComponentMobility::Movable);
+					MeshComp->SetStaticMesh(MeshAsset);
+					MeshComp->SetCollisionProfileName(TEXT("PhysicsActor"));
+					MeshComp->SetGenerateOverlapEvents(false);
+					MeshComp->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
+					MeshComp->SetCanEverAffectNavigation(false);
+					MeshComp->SetMassOverrideInKg(NAME_None, 300.f);
+					MeshComp->SetSimulatePhysics(true);
+					MeshComp->WakeAllRigidBodies();
+				}
+			}
+		}
+	}
+
+	if (IsValid(TargetMesh))
+	{
+		UAnimInstance* AnimInstance = TargetMesh->GetAnimInstance();
+		if (IsValid(AnimInstance) && AnimInstance->IsAnyMontagePlaying())
+		{
+			AnimInstance->StopAllMontages(0.f);
+		}
+	}
+
+	if (IsValid(ProxyMesh))
+	{
+		ProxyMesh->HideBoneByName(BoneName, PBO_Term);
+	}
+
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (!IsValid(OwnerCharacter)) return;
+
+	if (UEnemyMovementComponent* MovementComponent = Cast<UEnemyMovementComponent>(OwnerCharacter->GetMovementComponent()))
+	{
+		MovementComponent->SetLocomotationState(EvaluateLocomotionState());
+	}
+}
+
+void UEnemyPhysicalComponent::OnRep_DestroyedLimbs()
+{
+	// 배열 전체를 훑는다. 늦게 접속한 클라는 여기서 한 번에 따라잡는다.
+	for (const FName& BoneName : DestroyedLimbs)
+	{
+		FLimbData* Data = Limbes.Find(BoneName);
+		if (Data == nullptr || !Data->bIsHas) continue;   // 이미 반영됨
+
+		Data->bIsHas = false;
+		Data->Durability = 0.f;
+		ApplyLimbDestruction(BoneName);
+	}
+}
+
+void UEnemyPhysicalComponent::ActionLimb(const FName BoneName, const float DamageAmount)
 {
 	if (BoneName == NAME_None)
 	{
 		UE_LOG(LogTemp, Error, TEXT("%s::%s: BoneName is Name_None."), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
-	
+
 	FLimbData* Data = Limbes.Find(BoneName);
 	if (Data == nullptr)
 	{
-		UE_LOG(
-			LogTemp,
-			Error,
-			TEXT("%s::%s: Limb data was not found for bone %s."),
-			*GetClass()->GetName(),
-			TEXT(__FUNCTION__),
-			*BoneName.ToString());
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Limb data was not found for bone %s."), *GetClass()->GetName(), TEXT(__FUNCTION__), *BoneName.ToString());
 		return;
 	}
 
-	if ((Data->bIsHas))
+	if (Data->bIsHas)
 	{
 		Data->Durability -= DamageAmount;
 		Data->Durability = FMath::Clamp(Data->Durability, 0.f, Data->MaxDurability);
-	
+
 		if (Data->Durability <= 0.f)
 		{
 			Data->bIsHas = false;
-			if (IsValid(MeshAsset))
-			{
-				UWorld* World = GetWorld();
 
-				if (!IsValid(World))
-				{
-					UE_LOG(LogTemp, Error, TEXT("%s::%s: World is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-					return;
-				}
-			
-				FActorSpawnParameters SpawnParams;
-				SpawnParams.Owner = GetOwner();
-				SpawnParams.SpawnCollisionHandlingOverride =
-					ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			// 복제 트리거. 클라는 OnRep_DestroyedLimbs에서 같은 연출을 재생한다.
+			DestroyedLimbs.AddUnique(BoneName);
 
-				FTransform SpawnTransform = ProxyMesh->GetSocketTransform(BoneName);
-				AStaticMeshActor* MeshPart = World->SpawnActor<AStaticMeshActor>(AStaticMeshActor::StaticClass(), SpawnTransform, SpawnParams);
-				MeshPart->SetLifeSpan(10.f);
-				UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(MeshPart->GetRootComponent());
-				MeshComp->SetMobility(EComponentMobility::Movable);
-				MeshComp->SetStaticMesh(MeshAsset);
-
-				MeshComp->SetCollisionProfileName(TEXT("PhysicsActor"));
-				MeshComp->SetGenerateOverlapEvents(false);
-				MeshComp->SetCollisionEnabled(ECollisionEnabled::PhysicsOnly);
-
-				MeshComp->SetCanEverAffectNavigation(false);
-				MeshComp->SetMassOverrideInKg(NAME_None, 300.f);
-				MeshComp->SetSimulatePhysics(true);
-				MeshComp->WakeAllRigidBodies();
-			}
-			
-			UAnimInstance* AnimInstance = TargetMesh->GetAnimInstance();
-			if (IsValid(AnimInstance))
-			{
-				if (AnimInstance->IsAnyMontagePlaying())
-				{
-					AnimInstance->StopAllMontages(0.f);
-				}
-			}
-			
-			ProxyMesh->HideBoneByName(BoneName, PBO_Term);
-			
-			AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
-			if (!IsValid(OwnerCharacter))
-			{
-				UE_LOG(LogTemp, Error, TEXT("%s::%s: Owner Character is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-				return;
-			}
-			UEnemyMovementComponent* MovementComponent =  Cast<UEnemyMovementComponent>(OwnerCharacter->GetMovementComponent());
-			if (!IsValid(MovementComponent))
-			{
-				UE_LOG(LogTemp, Error, TEXT("%s::%s: Movement Component is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-				return;
-			}
-			
-			
-			MovementComponent->SetLocomotationState(EvaluateLocomotionState());
+			ApplyLimbDestruction(BoneName);
 		}
 	}
-	
+
 	const FLimbData* HeadData = Limbes.Find(FName(TEXT("Head")));
 	if (HeadData != nullptr && !HeadData->bIsHas)
 	{

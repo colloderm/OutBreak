@@ -63,6 +63,12 @@ protected:
 
 private:
 	bool CanAcceptOperation(UDragDropOperation* InOperation) const;
+	
+	// 이 슬롯에 장착된 무기의 InstanceId. 무기가 없거나 무기 슬롯이 아니면 무효.
+	FGuid GetEquippedWeaponInstanceId() const;
+
+	// 드롭된 것이 이 슬롯의 무기에 설치 가능한 부착물이면 true.
+	bool CanInstallFromOperation(UDragDropOperation* InOperation) const;
 
 	// Configure this per WBP_InventoryWindow widget instance.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory|Equipment",

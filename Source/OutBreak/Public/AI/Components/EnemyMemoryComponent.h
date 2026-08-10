@@ -70,6 +70,9 @@ public:
 	
 	
 private:
+	// 이미 쫓는 표적이 있을 때 새 자극으로 갈아탈지 판정한다.
+	bool ShouldSwitchTargetTo(const AActor* Candidate) const;
+	
 	void UpdateSightMemory(
 		AActor* UpdatedActor,
 		const FAIStimulus& Stimulus);
@@ -119,6 +122,10 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "AI|Memory", meta = (ClampMin = "0.0"))
 	float TargetMemoryDuration = 5.0f;
+	
+	// 새 표적이 이만큼 더 가까워야 갈아탄다. 0이면 매 자극마다 표적이 요동친다.
+	UPROPERTY(EditAnywhere, Category = "AI|Memory", meta = (ClampMin = "0.0", Units = "cm"))
+	float TargetSwitchDistanceMargin = 300.0f;
 
 	UPROPERTY(EditAnywhere, Category = "AI|Memory", meta = (ClampMin = "0.0"))
 	float StimulusMemoryDuration = 8.0f;

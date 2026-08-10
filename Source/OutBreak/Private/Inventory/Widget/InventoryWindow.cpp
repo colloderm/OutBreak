@@ -10,6 +10,7 @@
 #include "Inventory/Widget/InventoryDragDropOperation.h"
 #include "Inventory/Widget/InventorySlot.h"
 #include "Inventory/Data/InventorySystemSetting.h"
+#include "Inventory/Widget/WeaponAttachmentBar.h"
 
 void UInventoryWindow::SetInventorySource(
 	UPlayerInventoryComponent* InInventory)
@@ -268,10 +269,7 @@ void UInventoryWindow::UpdateQuickSlotGrid(const int32 QuickSlotCount)
 
 void UInventoryWindow::RefreshEquipmentSlots()
 {
-	if (!WidgetTree)
-	{
-		return;
-	}
+	if (!WidgetTree) return;
 
 	// Equipment slot instances may be arranged anywhere in the InventoryWindow
 	// designer. Discovering them by class keeps the C++ binding independent of
@@ -279,10 +277,13 @@ void UInventoryWindow::RefreshEquipmentSlots()
 	WidgetTree->ForEachWidget(
 		[this](UWidget* Widget)
 		{
-			if (UEquipmentSlot* EquipmentSlot =
-				Cast<UEquipmentSlot>(Widget))
+			if (UEquipmentSlot* EquipmentSlot = Cast<UEquipmentSlot>(Widget))
 			{
 				EquipmentSlot->SetInventorySource(InventoryComponent);
+			}
+			else if (UWeaponAttachmentBar* AttachmentBar = Cast<UWeaponAttachmentBar>(Widget))
+			{
+				AttachmentBar->SetInventorySource(InventoryComponent);
 			}
 		});
 }

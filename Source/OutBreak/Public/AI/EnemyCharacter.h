@@ -110,7 +110,13 @@ protected:
 		AController* EventInstigator,
 		AActor* DamageCauser) override;
 	
-	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_IsDead();
+
+	// 서버·클라 공통 사망 연출. 드랍/수명/컨트롤러 정리는 Dead()에만 둔다.
+	void PlayDeathCosmetics();
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Asset", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UEnemyAsset> EnemyAsset = nullptr;
@@ -126,6 +132,7 @@ protected:
 	float DeathCleanupDelay = 5.0f;
 
 	UPROPERTY(
+		ReplicatedUsing = OnRep_IsDead,
 		VisibleInstanceOnly,
 		BlueprintReadOnly,
 		Transient,
@@ -133,8 +140,12 @@ protected:
 		meta = (AllowPrivateAccess = "true"))
 	bool bIsDead = false;
 	
-	// UObject가 아니라 UPROPERTY 불필요. 좀비는 복제를 안 하므로 서버에서만 의미가 있다.
+	// 래그돌 임펄스용. 클라도 같은 방향으로 쓰러져야 하므로 복제한다.
+	// bIsDead와 같은 프레임에 갱신되어 같은 번치로 도착한다.
+	UPROPERTY(Replicated)
 	FVector LastHitDirection = FVector::ZeroVector;
+
+	UPROPERTY(Replicated)
 	FName LastHitBoneName = NAME_None;
 	
 	// 처치 시 남길 드랍 테이블. 비우면 아무것도 안 떨어진다.

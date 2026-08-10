@@ -142,6 +142,26 @@ bool UEnemyMemoryComponent::ConsumeStimulus(
 	return true;
 }
 
+bool UEnemyMemoryComponent::ShouldSwitchTargetTo(const AActor* Candidate) const
+{
+	const AActor* Current = TargetActor;
+	if (!IsValid(Current) || Current == Candidate) return true;
+
+	// 지금 표적을 놓친 상태면 새로 보이는 쪽이 낫다.
+	if (!bTargetVisible) return true;
+
+	const AAIController* Controller = Cast<AAIController>(GetOwner());
+	const APawn* SelfPawn = Controller ? Controller->GetPawn() : nullptr;
+	if (!IsValid(SelfPawn) || !IsValid(Candidate)) return false;
+
+	const FVector SelfLocation = SelfPawn->GetActorLocation();
+	const float CurrentDistance = FVector::Dist2D(SelfLocation, Current->GetActorLocation());
+	const float CandidateDistance = FVector::Dist2D(SelfLocation, Candidate->GetActorLocation());
+
+	// 마진이 없으면 두 표적 사이에서 매 프레임 갈아타며 제자리걸음을 한다.
+	return CandidateDistance + TargetSwitchDistanceMargin < CurrentDistance;
+}
+
 void UEnemyMemoryComponent::UpdateSightMemory(
 	AActor* UpdatedActor,
 	const FAIStimulus& Stimulus)
@@ -160,6 +180,9 @@ void UEnemyMemoryComponent::UpdateSightMemory(
 
 	if (Stimulus.WasSuccessfullySensed())
 	{
+		// 더 가까운 표적을 이미 쫓는 중이다. 자극만 무시하고 기억은 유지한다.
+		if (!ShouldSwitchTargetTo(UpdatedActor)) return; 
+		
 		TargetActor = UpdatedActor;
 		bTargetVisible = true;
 		LastKnownTargetLocation = UpdatedActor->GetActorLocation();
