@@ -100,6 +100,7 @@ protected:
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
 	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
+	virtual void OnRep_Pawn() override;
 	//~ End interface
 	
 	// 클라: PlayerState가 복제되어 들어온 시점 → 사망상태 구독.
@@ -315,6 +316,13 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_EndInsertionPresentation(APawn* RestoredPawn);
 
+	/** Client acknowledgement used to diagnose and validate remote insertion setup. */
+	UFUNCTION(Server, Reliable)
+	void Server_ReportInsertionClientReady(
+		AOBInsertionHelicopter* Helicopter,
+		EOBInsertionPhase ClientPhase,
+		bool bViewTargetReady);
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion Presentation Started"))
 	void BP_OnInsertionPresentationStarted(
 		AOBInsertionHelicopter* Helicopter,
@@ -464,6 +472,8 @@ public:
 	void BindToGameStatePhase();   // GameState 준비 대기 후 페이즈 구독
 	UFUNCTION()
 	void HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase);
+	UFUNCTION()
+	void HandleTeamInsertionStatesChanged();
 	void ShowResultScreen();
 	
 	// 서버가 탈출 시점에 찍은 가방을 소유 클라로 보낸다.
@@ -480,6 +490,18 @@ public:
 private:
 	void EnterInsertionInputMode(bool bCanSelectTarget);
 	void ExitInsertionInputMode();
+	void BeginInsertionPresentationLocal(
+		AOBInsertionHelicopter* Helicopter,
+		float SelectionDeadlineServerTime,
+		bool bCanSelectTarget,
+		const TCHAR* Source);
+	void ApplyInsertionPresentationUpdateLocal(
+		EOBInsertionPhase Phase,
+		const FString& StatusMessage,
+		bool bForceMapOpen,
+		const TCHAR* Source);
+	void ReconcileInsertionPresentationFromGameState();
+	void ScheduleInsertionClientReconcile();
 	void TryOpenInsertionMap();
 	void HandleInsertionMapToggle(const TCHAR* InputSource);
 	void HandleInsertionTraceRequest(const TCHAR* InputSource);
@@ -503,6 +525,9 @@ private:
 	float LastInsertionMapInputRealTime = -1000.f;
 	float LastInsertionTraceInputRealTime = -1000.f;
 	float LastInsertionLookDebugRealTime = -1000.f;
+	EOBInsertionPhase LastAppliedInsertionPhase = static_cast<EOBInsertionPhase>(0);
+	bool bInsertionReadyAckSent = false;
 	TWeakObjectPtr<AOBInsertionHelicopter> InsertionHelicopter;
 	FTimerHandle InsertionMapOpenRetryTimer;
+	FTimerHandle InsertionClientReconcileTimer;
 };

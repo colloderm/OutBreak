@@ -4,6 +4,7 @@
 #include "OBHelicopterTypes.generated.h"
 
 class AOBInsertionHelicopter;
+class APawn;
 
 UENUM(BlueprintType)
 enum class EOBHelicopterMission : uint8
@@ -92,6 +93,42 @@ enum class EOBExtractionCallPhase : uint8
 	Cooldown      UMETA(DisplayName = "Cooldown"),
 	Aborted       UMETA(DisplayName = "Aborted"),
 	Expired       UMETA(DisplayName = "Expired")
+};
+
+UENUM(BlueprintType)
+enum class EOBHelicopterPassengerPhase : uint8
+{
+	Seated     UMETA(DisplayName = "Seated"),
+	Rappelling UMETA(DisplayName = "Rappelling")
+};
+
+/**
+ * Compact passenger presentation state replicated by the helicopter.
+ * Controllers do not exist on non-owning clients, so Pawn is the stable
+ * cross-network presentation identity.
+ */
+USTRUCT(BlueprintType)
+struct OUTBREAK_API FOBHelicopterPassengerNetState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Helicopter|Passengers")
+	TObjectPtr<APawn> Pawn = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Helicopter|Passengers")
+	int32 SeatIndex = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Helicopter|Passengers")
+	EOBHelicopterPassengerPhase Phase = EOBHelicopterPassengerPhase::Seated;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Helicopter|Passengers")
+	int32 RopeIndex = INDEX_NONE;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Helicopter|Passengers")
+	FVector_NetQuantize10 RopeStart = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Helicopter|Passengers")
+	FVector_NetQuantize10 RopeEnd = FVector::ZeroVector;
 };
 
 USTRUCT(BlueprintType)

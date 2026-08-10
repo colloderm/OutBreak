@@ -36,17 +36,33 @@ AOBExpeditionGameMode::AOBExpeditionGameMode()
 	LandingZoneScanner = CreateDefaultSubobject<UOBLandingZoneScannerComponent>(TEXT("LandingZoneScanner"));
 }
 
+void AOBExpeditionGameMode::InitGame(
+	const FString& MapName,
+	const FString& Options,
+	FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+
+	// Optional session override for dedicated-server/test URLs. The Blueprint
+	// Class Default remains authoritative when this option is omitted.
+	const FString Override = UGameplayStatics::ParseOption(Options, TEXT("HelicopterInsertion"));
+	if (!Override.IsEmpty())
+	{
+		bEnableHelicopterInsertion = !(Override.Equals(TEXT("0"), ESearchCase::IgnoreCase)
+			|| Override.Equals(TEXT("false"), ESearchCase::IgnoreCase)
+			|| Override.Equals(TEXT("off"), ESearchCase::IgnoreCase)
+			|| Override.Equals(TEXT("no"), ESearchCase::IgnoreCase));
+		UE_LOG(LogTemp, Log,
+			TEXT("[SpawnMode] URL override HelicopterInsertion=%s RawValue=%s Map=%s"),
+			bEnableHelicopterInsertion ? TEXT("true") : TEXT("false"), *Override, *MapName);
+	}
+}
+
 void AOBExpeditionGameMode::PreInitializeComponents()
 {
-	// Expedition entry has a single authoritative path. Serialized Blueprint
-	// defaults from older assets must not restore SpawnZone/PlayerStart spawning.
-	if (!bEnableHelicopterInsertion)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[Insertion] Legacy bEnableHelicopterInsertion=false was ignored; helicopter insertion is mandatory."));
-		bEnableHelicopterInsertion = true;
-	}
-	if (!InsertionHelicopterClass)
+	UE_LOG(LogTemp, Log, TEXT("[SpawnMode] HelicopterInsertion=%s GameMode=%s"),
+		bEnableHelicopterInsertion ? TEXT("true") : TEXT("false"), *GetName());
+	if (bEnableHelicopterInsertion && !InsertionHelicopterClass)
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("[Insertion] No helicopter class was configured; using the native logic-only helicopter."));
@@ -113,7 +129,7 @@ void AOBExpeditionGameMode::StartPlay()
 		UE_LOG(LogTemp, Warning, TEXT("[Expedition] GameSession 없음 → 정원 제한 미적용"));
 	}
 	
-	if (InsertionHelicopterClass)
+	if (bEnableHelicopterInsertion && InsertionHelicopterClass)
 	{
 		BeginInsertionPhase();
 
@@ -128,15 +144,77 @@ void AOBExpeditionGameMode::StartPlay()
 			}
 		}
 	}
-	else
+	else if (bEnableHelicopterInsertion)
 	{
 		UE_LOG(LogTemp, Error,
 			TEXT("[Insertion] Insertion phase cannot start because no helicopter class exists; legacy spawn is blocked."));
+	}
+	else
+	{
+		// HandleStartingNewPlayer may run from Super::StartPlay before map-specific
+		// setup above is ready. Mark the normal path ready now, start the session,
+		// then restart any controller whose spawn was deferred.
+		bInsertionHasStarted = false;
+		bInsertionHasCompleted = true;
+		StartExpedition();
+		UE_LOG(LogTemp, Log,
+			TEXT("[SpawnMode] Normal Unreal spawn active. Helicopter creation and insertion presentation are disabled."));
+
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* PlayerController = It->Get();
+			if (PlayerController && !PlayerController->GetPawn())
+			{
+				Super::HandleStartingNewPlayer_Implementation(PlayerController);
+				if (PlayerController->GetPawn())
+				{
+					UE_LOG(LogTemp, Log,
+						TEXT("[SpawnMode] Normal spawn completed. Player=%s Pawn=%s Location=%s"),
+						*PlayerController->GetName(), *PlayerController->GetPawn()->GetName(),
+						*PlayerController->GetPawn()->GetActorLocation().ToCompactString());
+				}
+				else
+				{
+					UE_LOG(LogTemp, Error,
+						TEXT("[SpawnMode] Normal spawn failed to create a Pawn. Player=%s"),
+						*PlayerController->GetName());
+				}
+			}
+		}
 	}
 }
 
 void AOBExpeditionGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
+	if (!bEnableHelicopterInsertion)
+	{
+		if (!bInsertionHasCompleted)
+		{
+			UE_LOG(LogTemp, Log,
+				TEXT("[SpawnMode] Normal spawn deferred until GameMode StartPlay initialization. Player=%s"),
+				*GetNameSafe(NewPlayer));
+			return;
+		}
+
+		UE_LOG(LogTemp, Log, TEXT("[SpawnMode] Starting player through normal Unreal spawn. Player=%s"),
+			*GetNameSafe(NewPlayer));
+		Super::HandleStartingNewPlayer_Implementation(NewPlayer);
+		if (NewPlayer && NewPlayer->GetPawn())
+		{
+			UE_LOG(LogTemp, Log,
+				TEXT("[SpawnMode] Normal late/player spawn completed. Player=%s Pawn=%s Location=%s"),
+				*NewPlayer->GetName(), *NewPlayer->GetPawn()->GetName(),
+				*NewPlayer->GetPawn()->GetActorLocation().ToCompactString());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error,
+				TEXT("[SpawnMode] Normal late/player spawn failed to create a Pawn. Player=%s"),
+				*GetNameSafe(NewPlayer));
+		}
+		return;
+	}
+
 	AOBExpeditionGameState* GS = GetExpeditionGameState();
 	if (!GS)
 	{
@@ -188,6 +266,13 @@ void AOBExpeditionGameMode::HandleStartingNewPlayer_Implementation(APlayerContro
 
 void AOBExpeditionGameMode::BeginInsertionPhase()
 {
+	if (!bEnableHelicopterInsertion)
+	{
+		UE_LOG(LogOBInsertion, Warning,
+			TEXT("[SpawnMode] BeginInsertionPhase ignored because helicopter insertion is disabled."));
+		return;
+	}
+
 	AOBExpeditionGameState* GS = GetExpeditionGameState();
 	if (!GS)
 	{
@@ -273,6 +358,13 @@ AOBHelicopterRoute* AOBExpeditionGameMode::GetOrAssignInsertionRoute(uint8 TeamI
 
 AOBInsertionHelicopter* AOBExpeditionGameMode::GetOrCreateInsertionHelicopter(uint8 TeamId)
 {
+	if (!bEnableHelicopterInsertion)
+	{
+		UE_LOG(LogOBInsertion, Warning,
+			TEXT("[SpawnMode] Helicopter spawn rejected because helicopter insertion is disabled. Team=%d"), TeamId);
+		return nullptr;
+	}
+
 	if (TObjectPtr<AOBInsertionHelicopter>* Existing = TeamInsertionHelicopters.Find(TeamId))
 	{
 		return *Existing;
@@ -328,6 +420,17 @@ void AOBExpeditionGameMode::RegisterPlayerForInsertion(APlayerController* NewPla
 {
 	if (!NewPlayer)
 	{
+		return;
+	}
+	if (!bEnableHelicopterInsertion)
+	{
+		UE_LOG(LogOBInsertion, Warning,
+			TEXT("[SpawnMode] RegisterPlayerForInsertion redirected to normal spawn. Player=%s"),
+			*NewPlayer->GetName());
+		if (!NewPlayer->GetPawn() && bInsertionHasCompleted)
+		{
+			Super::HandleStartingNewPlayer_Implementation(NewPlayer);
+		}
 		return;
 	}
 
@@ -469,6 +572,19 @@ void AOBExpeditionGameMode::RequestInsertionPoint(
 	AOBPlayerController* RequestingPlayer,
 	const FVector2D& WorldXY)
 {
+	if (!bEnableHelicopterInsertion)
+	{
+		UE_LOG(LogOBInsertion, Warning,
+			TEXT("[SpawnMode] Insertion target request rejected because helicopter insertion is disabled. PC=%s"),
+			*GetNameSafe(RequestingPlayer));
+		if (RequestingPlayer)
+		{
+			RequestingPlayer->Client_InsertionPointResult(
+				false, FVector::ZeroVector, TEXT("Helicopter insertion is disabled for this game mode."));
+		}
+		return;
+	}
+
 	AOBExpeditionGameState* GS = GetExpeditionGameState();
 	AOBPlayerStateBase* PS = RequestingPlayer ? RequestingPlayer->GetPlayerState<AOBPlayerStateBase>() : nullptr;
 	UE_LOG(LogOBInsertion, Log,

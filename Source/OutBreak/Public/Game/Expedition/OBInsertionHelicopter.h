@@ -43,6 +43,8 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void CalcCamera(float DeltaTime, FMinimalViewInfo& OutResult) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual bool IsNetRelevantFor(const AActor* RealViewer, const AActor* ViewTarget,
+		const FVector& SrcLocation) const override;
 
 	FRotator GetCabinViewRotation() const;
 
@@ -63,7 +65,16 @@ public:
 	int32 GetSeatCapacity() const { return PassengerSeats.Num(); }
 
 	UFUNCTION(BlueprintPure, Category = "Helicopter|Passengers")
-	int32 GetPassengerCount() const { return PassengerControllers.Num(); }
+	int32 GetPassengerCount() const
+	{
+		return HasAuthority() ? PassengerControllers.Num() : ReplicatedPassengerStates.Num();
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Helicopter|Passengers")
+	TArray<FOBHelicopterPassengerNetState> GetReplicatedPassengerStates() const
+	{
+		return ReplicatedPassengerStates;
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Helicopter|Passengers")
 	FTransform GetSeatTransform(int32 SeatIndex) const;
@@ -129,6 +140,9 @@ protected:
 	UFUNCTION()
 	void OnRep_DoorsOpen();
 
+	UFUNCTION()
+	void OnRep_PassengerStates();
+
 	void SetInsertionPhase(EOBInsertionPhase NewPhase);
 	void SetExtractionPhase(EOBExtractionCallPhase NewPhase);
 	void SetDoorsOpen(bool bOpen);
@@ -148,6 +162,10 @@ protected:
 	void FinishInsertionDeparture();
 	void FinishExtractionDeparture();
 	void SetPassengerTransitState(AController* Controller, bool bInTransit, AActor* ViewTarget);
+	void AddReplicatedSeatedPassenger(APawn* Pawn, int32 SeatIndex);
+	void SetReplicatedPassengerRappelling(APawn* Pawn, int32 RopeIndex,
+		const FVector& RopeStart, const FVector& RopeEnd);
+	void RemoveReplicatedPassenger(APawn* Pawn);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Helicopter|Presentation", meta = (DisplayName = "On Mission Changed"))
 	void BP_OnMissionChanged(EOBHelicopterMission NewMission);
@@ -172,6 +190,17 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Helicopter|Presentation", meta = (DisplayName = "On Passenger Landed"))
 	void BP_OnPassengerLanded(AController* Passenger);
+
+	/** Pawn-based passenger events are available on every relevant client. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "Helicopter|Presentation|Network", meta = (DisplayName = "On Replicated Passenger Seated"))
+	void BP_OnReplicatedPassengerSeated(APawn* PassengerPawn, int32 SeatIndex);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Helicopter|Presentation|Network", meta = (DisplayName = "On Replicated Passenger Rappel Started"))
+	void BP_OnReplicatedPassengerRappelStarted(
+		APawn* PassengerPawn, int32 RopeIndex, FVector RopeStart, FVector RopeEnd);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Helicopter|Presentation|Network", meta = (DisplayName = "On Replicated Passenger Landed"))
+	void BP_OnReplicatedPassengerLanded(APawn* PassengerPawn);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -369,6 +398,12 @@ private:
 
 	UPROPERTY(Replicated)
 	float ReplicatedSteeringPitchInput = 0.f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_PassengerStates)
+	TArray<FOBHelicopterPassengerNetState> ReplicatedPassengerStates;
+
+	UPROPERTY(Transient)
+	TArray<FOBHelicopterPassengerNetState> PresentedPassengerStates;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<AController>> PassengerControllers;

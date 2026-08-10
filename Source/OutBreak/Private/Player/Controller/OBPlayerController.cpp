@@ -152,6 +152,10 @@ void AOBPlayerController::Client_SetHelicopterTransitView_Implementation(AActor*
 	}
 
 	AActor* EffectiveTarget = NewViewTarget ? NewViewTarget : GetPawn();
+	if (AOBInsertionHelicopter* Helicopter = Cast<AOBInsertionHelicopter>(EffectiveTarget))
+	{
+		InsertionHelicopter = Helicopter;
+	}
 	if (EffectiveTarget)
 	{
 		SetViewTargetWithBlend(EffectiveTarget, InsertionViewBlendSeconds);
@@ -159,6 +163,10 @@ void AOBPlayerController::Client_SetHelicopterTransitView_Implementation(AActor*
 	UE_LOG(LogOBInsertionInput, Log,
 		TEXT("[InsertionInput] Client transit view PC=%s Pawn=%s ViewTarget=%s Locked=true"),
 		*GetName(), *GetNameSafe(GetPawn()), *GetNameSafe(EffectiveTarget));
+	if (!bInsertionPresentationActive)
+	{
+		ScheduleInsertionClientReconcile();
+	}
 }
 
 void AOBPlayerController::RequestInsertionPoint(const FVector2D& WorldXY)
@@ -247,31 +255,18 @@ void AOBPlayerController::Client_BeginInsertionPresentation_Implementation(
 	float SelectionDeadlineServerTime,
 	bool bCanSelectTarget)
 {
-	bInsertionPresentationActive = true;
-	bHelicopterTransitLocked = true;
 	bCanSelectInsertionTarget = bCanSelectTarget;
-	bInsertionTargetSelectionAvailable = bCanSelectTarget;
 	InsertionSelectionDeadlineServerTime = SelectionDeadlineServerTime;
-	InsertionHelicopter = Helicopter;
-	InsertionMapOpenAttempts = 0;
-
-	if (Helicopter)
+	if (!Helicopter)
 	{
-		SetViewTargetWithBlend(Helicopter, InsertionViewBlendSeconds);
-		SetControlRotation(Helicopter->GetCabinViewRotation());
+		UE_LOG(LogOBInsertionInput, Warning,
+			TEXT("[InsertionNet] Begin RPC arrived before helicopter reference resolved PC=%s Deadline=%.2f CanSelect=%s"),
+			*GetName(), SelectionDeadlineServerTime, bCanSelectTarget ? TEXT("true") : TEXT("false"));
+		ScheduleInsertionClientReconcile();
+		return;
 	}
-	EnterInsertionInputMode(bCanSelectTarget);
-
-	UE_LOG(LogOBInsertionInput, Log,
-		TEXT("[InsertionInput] Begin PC=%s Pawn=%s ViewTarget=%s Helicopter=%s LeaderCanSelect=%s Deadline=%.2f"),
-		*GetName(), *GetNameSafe(GetPawn()), *GetNameSafe(GetViewTarget()), *GetNameSafe(Helicopter),
-		bCanSelectTarget ? TEXT("true") : TEXT("false"), SelectionDeadlineServerTime);
-	ShowInsertionDebugMessage(
-		FString::Printf(TEXT("INPUT ACTIVE | Mouse Look | M Map | E Trace | Leader=%s"),
-			bCanSelectTarget ? TEXT("true") : TEXT("false")),
-		FColor::Cyan, 10.f, 77100);
-	BP_OnInsertionPresentationStarted(Helicopter, SelectionDeadlineServerTime, bCanSelectTarget);
-	TryOpenInsertionMap();
+	BeginInsertionPresentationLocal(
+		Helicopter, SelectionDeadlineServerTime, bCanSelectTarget, TEXT("ClientRPC"));
 }
 
 void AOBPlayerController::Client_UpdateInsertionPresentation_Implementation(
@@ -279,9 +274,126 @@ void AOBPlayerController::Client_UpdateInsertionPresentation_Implementation(
 	const FString& StatusMessage,
 	bool bForceMapOpen)
 {
+	if (!bInsertionPresentationActive)
+	{
+		UE_LOG(LogOBInsertionInput, Warning,
+			TEXT("[InsertionNet] Update RPC deferred until presentation reconciliation PC=%s Phase=%d"),
+			*GetName(), static_cast<int32>(Phase));
+		ScheduleInsertionClientReconcile();
+		return;
+	}
+	ApplyInsertionPresentationUpdateLocal(Phase, StatusMessage, bForceMapOpen, TEXT("ClientRPC"));
+}
+
+void AOBPlayerController::Client_EndInsertionPresentation_Implementation(APawn* RestoredPawn)
+{
+	RestoreGameplayViewAndInput(RestoredPawn, TEXT("ServerEndPresentation"));
+	BP_OnInsertionPresentationEnded(RestoredPawn);
+}
+
+void AOBPlayerController::Server_ReportInsertionClientReady_Implementation(
+	AOBInsertionHelicopter* Helicopter,
+	EOBInsertionPhase ClientPhase,
+	bool bViewTargetReady)
+{
+	const AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	const bool bValidTeam = Helicopter && PS && Helicopter->GetTeamId() == PS->GetTeamId();
+	if (bValidTeam)
+	{
+		UE_LOG(LogOBInsertionInput, Log,
+			TEXT("[InsertionNet] Client ready ack PC=%s Team=%d Helicopter=%s HelicopterTeam=%d ClientPhase=%d ViewReady=%s ValidTeam=true"),
+			*GetName(), PS->GetTeamId(), *GetNameSafe(Helicopter), Helicopter->GetTeamId(),
+			static_cast<int32>(ClientPhase), bViewTargetReady ? TEXT("true") : TEXT("false"));
+	}
+	else
+	{
+		UE_LOG(LogOBInsertionInput, Warning,
+			TEXT("[InsertionNet] Rejected client ready ack PC=%s Team=%d Helicopter=%s HelicopterTeam=%d ClientPhase=%d ViewReady=%s ValidTeam=false"),
+			*GetName(), PS ? PS->GetTeamId() : 0, *GetNameSafe(Helicopter),
+			Helicopter ? Helicopter->GetTeamId() : 0, static_cast<int32>(ClientPhase),
+			bViewTargetReady ? TEXT("true") : TEXT("false"));
+	}
+}
+
+void AOBPlayerController::BeginInsertionPresentationLocal(
+	AOBInsertionHelicopter* Helicopter,
+	float SelectionDeadlineServerTime,
+	bool bCanSelectTarget,
+	const TCHAR* Source)
+{
+	if (!IsLocalController() || !IsValid(Helicopter))
+	{
+		ScheduleInsertionClientReconcile();
+		return;
+	}
+
+	const bool bFirstStart = !bInsertionPresentationActive || InsertionHelicopter.Get() != Helicopter;
+	if (bFirstStart)
+	{
+		bInsertionReadyAckSent = false;
+		LastAppliedInsertionPhase = EOBInsertionPhase::None;
+	}
+	const EOBInsertionPhase CurrentPhase = Helicopter->GetInsertionPhase();
+	const bool bSelectionAvailable = CurrentPhase == EOBInsertionPhase::WaitingForTarget
+		|| CurrentPhase == EOBInsertionPhase::Orbiting;
+	const bool bSelectionBusy = CurrentPhase == EOBInsertionPhase::LoadingTarget
+		|| CurrentPhase == EOBInsertionPhase::ValidatingTarget;
+	bInsertionPresentationActive = true;
+	bHelicopterTransitLocked = true;
+	bCanSelectInsertionTarget = bCanSelectTarget;
+	bInsertionTargetSelectionAvailable = bCanSelectTarget && bSelectionAvailable;
+	InsertionSelectionDeadlineServerTime = SelectionDeadlineServerTime;
+	InsertionHelicopter = Helicopter;
+	InsertionMapOpenAttempts = 0;
+	GetWorldTimerManager().ClearTimer(InsertionClientReconcileTimer);
+
+	if (GetViewTarget() != Helicopter)
+	{
+		SetViewTargetWithBlend(Helicopter, InsertionViewBlendSeconds);
+	}
+	if (bFirstStart)
+	{
+		SetControlRotation(Helicopter->GetCabinViewRotation());
+	}
+	EnterInsertionInputMode(bCanSelectTarget);
+
 	UE_LOG(LogOBInsertionInput, Log,
-		TEXT("[InsertionInput] Update PC=%s Phase=%d ForceMap=%s CanSelect=%s Message=%s"),
-		*GetName(), static_cast<int32>(Phase), bForceMapOpen ? TEXT("true") : TEXT("false"),
+		TEXT("[InsertionNet] Presentation active Source=%s PC=%s Pawn=%s ViewTarget=%s Helicopter=%s Team=%d Phase=%d LeaderCanSelect=%s Deadline=%.2f First=%s"),
+		Source, *GetName(), *GetNameSafe(GetPawn()), *GetNameSafe(GetViewTarget()), *GetNameSafe(Helicopter),
+		Helicopter->GetTeamId(), static_cast<int32>(Helicopter->GetInsertionPhase()),
+		bCanSelectTarget ? TEXT("true") : TEXT("false"), SelectionDeadlineServerTime,
+		bFirstStart ? TEXT("true") : TEXT("false"));
+	ShowInsertionDebugMessage(
+		FString::Printf(TEXT("CLIENT READY | Mouse Look | M Map | E Trace | Leader=%s"),
+			bCanSelectTarget ? TEXT("true") : TEXT("false")),
+		FColor::Cyan, 10.f, 77100);
+	if (bFirstStart)
+	{
+		BP_OnInsertionPresentationStarted(Helicopter, SelectionDeadlineServerTime, bCanSelectTarget);
+	}
+	if (bSelectionAvailable || bSelectionBusy)
+	{
+		TryOpenInsertionMap();
+	}
+
+	if (!bInsertionReadyAckSent)
+	{
+		bInsertionReadyAckSent = true;
+		Server_ReportInsertionClientReady(
+			Helicopter, Helicopter->GetInsertionPhase(), GetViewTarget() == Helicopter);
+	}
+}
+
+void AOBPlayerController::ApplyInsertionPresentationUpdateLocal(
+	EOBInsertionPhase Phase,
+	const FString& StatusMessage,
+	bool bForceMapOpen,
+	const TCHAR* Source)
+{
+	LastAppliedInsertionPhase = Phase;
+	UE_LOG(LogOBInsertionInput, Log,
+		TEXT("[InsertionNet] Presentation update Source=%s PC=%s Phase=%d ForceMap=%s CanSelect=%s Message=%s"),
+		Source, *GetName(), static_cast<int32>(Phase), bForceMapOpen ? TEXT("true") : TEXT("false"),
 		bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"), *StatusMessage);
 	ShowInsertionDebugMessage(
 		FString::Printf(TEXT("State Phase=%d CanSelect=%s | %s"),
@@ -289,13 +401,6 @@ void AOBPlayerController::Client_UpdateInsertionPresentation_Implementation(
 			bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"),
 			*StatusMessage),
 		FColor::Cyan, InsertionDebugMessageDuration, 77100);
-	if (!bInsertionPresentationActive)
-	{
-		UE_LOG(LogOBInsertionInput, Verbose,
-			TEXT("[InsertionInput] Update deferred because presentation has not begun PC=%s Phase=%d"),
-			*GetName(), static_cast<int32>(Phase));
-		return;
-	}
 	BP_OnInsertionPresentationUpdated(Phase, StatusMessage, bForceMapOpen);
 
 	const bool bSelectionAvailable = Phase == EOBInsertionPhase::WaitingForTarget
@@ -308,7 +413,11 @@ void AOBPlayerController::Client_UpdateInsertionPresentation_Implementation(
 	{
 		if (bSelectionAvailable)
 		{
-			OBHUD->OpenInsertionMap(bCanSelectInsertionTarget);
+			if (!OBHUD->OpenInsertionMap(bCanSelectInsertionTarget) && bForceMapOpen)
+			{
+				InsertionMapOpenAttempts = 0;
+				TryOpenInsertionMap();
+			}
 		}
 		else if (bSelectionBusy)
 		{
@@ -327,10 +436,68 @@ void AOBPlayerController::Client_UpdateInsertionPresentation_Implementation(
 	}
 }
 
-void AOBPlayerController::Client_EndInsertionPresentation_Implementation(APawn* RestoredPawn)
+void AOBPlayerController::ScheduleInsertionClientReconcile()
 {
-	RestoreGameplayViewAndInput(RestoredPawn, TEXT("ServerEndPresentation"));
-	BP_OnInsertionPresentationEnded(RestoredPawn);
+	if (!IsLocalController() || !GetWorld()
+		|| GetWorldTimerManager().IsTimerActive(InsertionClientReconcileTimer))
+	{
+		return;
+	}
+	GetWorldTimerManager().SetTimer(
+		InsertionClientReconcileTimer,
+		this,
+		&AOBPlayerController::ReconcileInsertionPresentationFromGameState,
+		0.25f,
+		false);
+}
+
+void AOBPlayerController::ReconcileInsertionPresentationFromGameState()
+{
+	if (!IsLocalController() || !GetWorld())
+	{
+		return;
+	}
+
+	AOBExpeditionGameState* GS = GetWorld()->GetGameState<AOBExpeditionGameState>();
+	AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>();
+	if (!GS || !PS)
+	{
+		ScheduleInsertionClientReconcile();
+		return;
+	}
+	if (GS->GetPhase() != EOBExpeditionPhase::Insertion)
+	{
+		return;
+	}
+
+	FOBTeamInsertionState TeamState;
+	const bool bHasTeamState = GS->GetTeamInsertionState(PS->GetTeamId(), TeamState);
+	if (!bHasTeamState || !IsValid(TeamState.Helicopter))
+	{
+		UE_LOG(LogOBInsertionInput, Verbose,
+			TEXT("[InsertionNet] Reconcile waiting PC=%s Team=%d HasState=%s Helicopter=%s"),
+			*GetName(), PS->GetTeamId(),
+			bHasTeamState ? TEXT("true") : TEXT("false"),
+			*GetNameSafe(TeamState.Helicopter));
+		ScheduleInsertionClientReconcile();
+		return;
+	}
+
+	if (!bInsertionPresentationActive || InsertionHelicopter.Get() != TeamState.Helicopter)
+	{
+		BeginInsertionPresentationLocal(
+			TeamState.Helicopter,
+			TeamState.SelectionDeadlineServerTime,
+			PS->IsPartyLeader(),
+			TEXT("GameStateReconcile"));
+	}
+
+	if (bInsertionPresentationActive && LastAppliedInsertionPhase != TeamState.Phase)
+	{
+		ApplyInsertionPresentationUpdateLocal(
+			TeamState.Phase, TEXT("Recovered from replicated team insertion state."), false,
+			TEXT("GameStateReconcile"));
+	}
 }
 
 void AOBPlayerController::EnterInsertionInputMode(bool bCanSelectTarget)
@@ -598,7 +765,10 @@ void AOBPlayerController::RestoreGameplayViewAndInput(APawn* RestoredPawn, const
 	bCanSelectInsertionTarget = false;
 	bInsertionTargetSelectionAvailable = false;
 	InsertionSelectionDeadlineServerTime = 0.f;
+	LastAppliedInsertionPhase = EOBInsertionPhase::None;
+	bInsertionReadyAckSent = false;
 	InsertionHelicopter.Reset();
+	GetWorldTimerManager().ClearTimer(InsertionClientReconcileTimer);
 	ExitInsertionInputMode();
 
 	if (UOBAbilitySystemComponent* ASC = GetOBAbilitySystemComponent())
@@ -753,6 +923,13 @@ void AOBPlayerController::OnRep_PlayerState()
 	Super::OnRep_PlayerState();
 
 	BindToExpeditionStatus();
+	ScheduleInsertionClientReconcile();
+}
+
+void AOBPlayerController::OnRep_Pawn()
+{
+	Super::OnRep_Pawn();
+	ScheduleInsertionClientReconcile();
 }
 
 
@@ -1404,6 +1581,7 @@ void AOBPlayerController::BindToGameStatePhase()
 	}
 	
 	GS->OnPhaseChanged.AddDynamic(this, &AOBPlayerController::HandleExpeditionPhaseChanged);
+	GS->OnTeamInsertionStatesChanged.AddDynamic(this, &AOBPlayerController::HandleTeamInsertionStatesChanged);
 	bPhaseBound = true;
 	
 	// Apply the current phase immediately. This also covers clients that bind
@@ -1422,8 +1600,9 @@ void AOBPlayerController::HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPha
 
 	if (NewPhase == EOBExpeditionPhase::Insertion)
 	{
-		// Seating will provide the helicopter and deadline through the explicit
-		// presentation RPC. Do not open a target-less map here.
+		// The explicit RPC remains the low-latency path. Replicated team state is
+		// the recovery path when a remote client resolves the actor/HUD later.
+		ScheduleInsertionClientReconcile();
 		return;
 	}
 	if (NewPhase == EOBExpeditionPhase::InProgress)
@@ -1446,6 +1625,15 @@ void AOBPlayerController::HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPha
 	{
 		ShowResultScreen();
 	}
+}
+
+void AOBPlayerController::HandleTeamInsertionStatesChanged()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+	ReconcileInsertionPresentationFromGameState();
 }
 
 void AOBPlayerController::ShowResultScreen()

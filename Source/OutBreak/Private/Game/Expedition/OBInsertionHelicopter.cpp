@@ -15,6 +15,7 @@
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "Player/Controller/OBPlayerController.h"
+#include "Player/State/OBPlayerStateBase.h"
 #include "Sound/SoundBase.h"
 #include "TimerManager.h"
 
@@ -155,6 +156,37 @@ void AOBInsertionHelicopter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty
 	DOREPLIFETIME(AOBInsertionHelicopter, ReplicatedSteeringVelocity);
 	DOREPLIFETIME(AOBInsertionHelicopter, ReplicatedSteeringTurnInput);
 	DOREPLIFETIME(AOBInsertionHelicopter, ReplicatedSteeringPitchInput);
+	DOREPLIFETIME(AOBInsertionHelicopter, ReplicatedPassengerStates);
+}
+
+bool AOBInsertionHelicopter::IsNetRelevantFor(
+	const AActor* RealViewer,
+	const AActor* ViewTarget,
+	const FVector& SrcLocation) const
+{
+	// Insertion helicopters can orbit far outside the normal actor cull radius.
+	// Keep the assigned team's aircraft relevant without broadcasting every
+	// team's insertion route and passenger state to the entire server.
+	if (Mission == EOBHelicopterMission::Insertion && TeamId != 0)
+	{
+		const AController* ViewingController = Cast<AController>(RealViewer);
+		if (!ViewingController)
+		{
+			if (const APawn* ViewingPawn = Cast<APawn>(ViewTarget))
+			{
+				ViewingController = ViewingPawn->GetController();
+			}
+		}
+		const AOBPlayerStateBase* ViewerState = ViewingController
+			? ViewingController->GetPlayerState<AOBPlayerStateBase>()
+			: nullptr;
+		if (ViewerState && ViewerState->GetTeamId() == TeamId)
+		{
+			return true;
+		}
+	}
+
+	return Super::IsNetRelevantFor(RealViewer, ViewTarget, SrcLocation);
 }
 
 void AOBInsertionHelicopter::Tick(float DeltaSeconds)
@@ -412,6 +444,7 @@ bool AOBInsertionHelicopter::SeatPassenger(AController* Controller)
 
 	PassengerControllers.Add(Controller);
 	PassengerSeatIndices.Add(FreeSeat);
+	AddReplicatedSeatedPassenger(Pawn, FreeSeat);
 	SetPassengerTransitState(Controller, true, this);
 	UE_LOG(LogOBHelicopterInsertion, Log,
 		TEXT("[Insertion] Passenger seated Helicopter=%s Team=%d Controller=%s Pawn=%s Seat=%d Count=%d"),
@@ -464,6 +497,8 @@ void AOBInsertionHelicopter::ReleaseAllPassengers(const FVector& GroundCenter)
 	PassengerSeatIndices.Reset();
 	RappelQueue.Reset();
 	ActiveRappels.Reset();
+	ReplicatedPassengerStates.Reset();
+	ForceNetUpdate();
 }
 
 void AOBInsertionHelicopter::SetInsertionPhase(EOBInsertionPhase NewPhase)
@@ -1025,6 +1060,7 @@ void AOBInsertionHelicopter::StartNextRappel()
 	Rappel.End = End;
 	Rappel.Duration = FMath::Max(0.1f, FVector::Distance(Start, End) / FMath::Max(50.f, RappelSpeed));
 	Rappel.RopeIndex = RopeIndex;
+	SetReplicatedPassengerRappelling(Pawn, RopeIndex, Start, End);
 	UE_LOG(LogOBHelicopterInsertion, Log,
 		TEXT("[Insertion] Rappel started Helicopter=%s Team=%d Controller=%s Pawn=%s Rope=%d Start=%s End=%s Duration=%.2f Queue=%d Active=%d"),
 		*GetName(), TeamId, *GetNameSafe(Controller), *GetNameSafe(Pawn), RopeIndex,
@@ -1067,6 +1103,7 @@ void AOBInsertionHelicopter::FinishRappel(int32 ActiveIndex)
 	BP_OnRappelLineChanged(Rappel.RopeIndex, false, Rappel.Start, Rappel.End);
 	BP_OnPassengerLanded(Controller);
 	OnPassengerDeployed.Broadcast(this, Controller);
+	RemoveReplicatedPassenger(Pawn);
 
 	const int32 PassengerIndex = PassengerControllers.IndexOfByKey(Controller);
 	if (PassengerIndex != INDEX_NONE)
@@ -1109,6 +1146,64 @@ void AOBInsertionHelicopter::SetPassengerTransitState(AController* Controller, b
 	}
 }
 
+void AOBInsertionHelicopter::AddReplicatedSeatedPassenger(APawn* Pawn, int32 SeatIndex)
+{
+	if (!HasAuthority() || !Pawn)
+	{
+		return;
+	}
+
+	FOBHelicopterPassengerNetState* Existing = ReplicatedPassengerStates.FindByPredicate(
+		[Pawn](const FOBHelicopterPassengerNetState& State) { return State.Pawn == Pawn; });
+	if (!Existing)
+	{
+		Existing = &ReplicatedPassengerStates.AddDefaulted_GetRef();
+	}
+	Existing->Pawn = Pawn;
+	Existing->SeatIndex = SeatIndex;
+	Existing->Phase = EOBHelicopterPassengerPhase::Seated;
+	Existing->RopeIndex = INDEX_NONE;
+	Existing->RopeStart = FVector::ZeroVector;
+	Existing->RopeEnd = FVector::ZeroVector;
+	ForceNetUpdate();
+}
+
+void AOBInsertionHelicopter::SetReplicatedPassengerRappelling(
+	APawn* Pawn,
+	int32 RopeIndex,
+	const FVector& RopeStart,
+	const FVector& RopeEnd)
+{
+	if (!HasAuthority() || !Pawn)
+	{
+		return;
+	}
+
+	FOBHelicopterPassengerNetState* Existing = ReplicatedPassengerStates.FindByPredicate(
+		[Pawn](const FOBHelicopterPassengerNetState& State) { return State.Pawn == Pawn; });
+	if (!Existing)
+	{
+		Existing = &ReplicatedPassengerStates.AddDefaulted_GetRef();
+		Existing->Pawn = Pawn;
+	}
+	Existing->Phase = EOBHelicopterPassengerPhase::Rappelling;
+	Existing->RopeIndex = RopeIndex;
+	Existing->RopeStart = RopeStart;
+	Existing->RopeEnd = RopeEnd;
+	ForceNetUpdate();
+}
+
+void AOBInsertionHelicopter::RemoveReplicatedPassenger(APawn* Pawn)
+{
+	if (!HasAuthority() || !Pawn)
+	{
+		return;
+	}
+	ReplicatedPassengerStates.RemoveAll(
+		[Pawn](const FOBHelicopterPassengerNetState& State) { return State.Pawn == Pawn; });
+	ForceNetUpdate();
+}
+
 void AOBInsertionHelicopter::OnRep_Mission()
 {
 	BP_OnMissionChanged(Mission);
@@ -1143,4 +1238,75 @@ void AOBInsertionHelicopter::OnRep_ExtractionPhase()
 void AOBInsertionHelicopter::OnRep_DoorsOpen()
 {
 	BP_OnDoorsChanged(bDoorsOpen);
+}
+
+void AOBInsertionHelicopter::OnRep_PassengerStates()
+{
+	auto FindPresented = [this](const APawn* Pawn) -> const FOBHelicopterPassengerNetState*
+	{
+		return PresentedPassengerStates.FindByPredicate(
+			[Pawn](const FOBHelicopterPassengerNetState& State) { return State.Pawn == Pawn; });
+	};
+
+	for (const FOBHelicopterPassengerNetState& Previous : PresentedPassengerStates)
+	{
+		const bool bStillPresent = ReplicatedPassengerStates.ContainsByPredicate(
+			[Pawn = Previous.Pawn](const FOBHelicopterPassengerNetState& State) { return State.Pawn == Pawn; });
+		if (!bStillPresent && Previous.Pawn)
+		{
+			if (Previous.Phase == EOBHelicopterPassengerPhase::Rappelling)
+			{
+				BP_OnRappelLineChanged(Previous.RopeIndex, false,
+					FVector(Previous.RopeStart), FVector(Previous.RopeEnd));
+			}
+			BP_OnReplicatedPassengerLanded(Previous.Pawn);
+			if (AController* LocalController = Previous.Pawn->GetController();
+				LocalController && LocalController->IsLocalController())
+			{
+				BP_OnPassengerLanded(LocalController);
+			}
+		}
+	}
+
+	for (const FOBHelicopterPassengerNetState& Current : ReplicatedPassengerStates)
+	{
+		if (!Current.Pawn)
+		{
+			continue;
+		}
+		const FOBHelicopterPassengerNetState* Previous = FindPresented(Current.Pawn);
+		if (!Previous && Current.Phase == EOBHelicopterPassengerPhase::Seated)
+		{
+			BP_OnReplicatedPassengerSeated(Current.Pawn, Current.SeatIndex);
+			if (AController* LocalController = Current.Pawn->GetController();
+				LocalController && LocalController->IsLocalController())
+			{
+				BP_OnPassengerSeated(LocalController, Current.SeatIndex);
+			}
+		}
+
+		const bool bRappelChanged = Current.Phase == EOBHelicopterPassengerPhase::Rappelling
+			&& (!Previous
+				|| Previous->Phase != EOBHelicopterPassengerPhase::Rappelling
+				|| Previous->RopeIndex != Current.RopeIndex
+				|| Previous->RopeStart != Current.RopeStart
+				|| Previous->RopeEnd != Current.RopeEnd);
+		if (bRappelChanged)
+		{
+			BP_OnRappelLineChanged(Current.RopeIndex, true,
+				FVector(Current.RopeStart), FVector(Current.RopeEnd));
+			BP_OnReplicatedPassengerRappelStarted(Current.Pawn, Current.RopeIndex,
+				FVector(Current.RopeStart), FVector(Current.RopeEnd));
+			if (AController* LocalController = Current.Pawn->GetController();
+				LocalController && LocalController->IsLocalController())
+			{
+				BP_OnPassengerRappelStarted(LocalController, Current.RopeIndex);
+			}
+		}
+	}
+
+	PresentedPassengerStates = ReplicatedPassengerStates;
+	UE_LOG(LogOBHelicopterInsertion, Verbose,
+		TEXT("[InsertionNet] Passenger state applied Client Helicopter=%s Team=%d Count=%d"),
+		*GetName(), TeamId, ReplicatedPassengerStates.Num());
 }
