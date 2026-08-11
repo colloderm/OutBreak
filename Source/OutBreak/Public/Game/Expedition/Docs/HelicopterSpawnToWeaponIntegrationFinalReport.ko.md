@@ -1,8 +1,8 @@
 # 헬기 투입부터 플레이어 사격까지 통합 감사 및 수정 결과
 
-작성일: 2026-08-10  
+작성일: 2026-08-10, 최종 갱신 2026-08-11
 대상: `OutBreak_Exterior`, `AOBExpeditionGameMode`, `AOBInsertionHelicopter`, `AOBPlayerController`, GAS 사격 경로  
-결론: C++ 통합 수정과 UE 5.7 Editor 빌드, 일반 스폰/헬기 투입 단독 런타임 시험까지 완료했다. 레펠 종료 후 다시 헬기에 잠기던 결정적 레이스와 원격 소유 클라이언트에서 총구/탄착 Gameplay Cue가 누락되던 원인을 제거했다.
+결론: C++ 통합 수정과 UE 5.7 Editor 빌드, 일반 스폰/헬기 투입 단독 및 dedicated server + 원격 클라이언트 2개 시험까지 완료했다. 레펠 종료 후 다시 헬기에 잠기던 결정적 레이스, 원격 소유 클라이언트에서 총구/탄착 Gameplay Cue가 누락되던 원인, 모든 클라이언트가 리더 권한을 주장하던 문제를 제거했다.
 
 ## 1. 최종 동작 계약
 
@@ -90,6 +90,12 @@ Impact Cue도 같은 key를 쓰면 발사 클라이언트가 예측하지 않은
 
 Landing scanner 기본 검증 반경은 450 cm인데 기존 승객 배치 offset은 인원에 따라 최대 약 900 cm까지 커졌다. 후반 승객이 검증된 지형 바깥에 강제 배치될 수 있었다.
 
+### 2.10 원격 배치 poll과 파티 리더 권한 문제
+
+배치 준비 확인은 one-shot timer를 사용했다. timer callback 실행 중에는 해당 handle이 아직 active로 보일 수 있어, 첫 poll 때 Pawn detach 복제가 도착하지 않았으면 다음 poll을 예약하지 못했다. 그 결과 먼저 내려온 원격 클라이언트 한 명이 실제 지상 배치 뒤에도 InProgress 전환까지 약 3초 더 잠겨 있었다.
+
+또한 현재 로컬 `UOBPartySubsystem`은 동기화된 온라인 파티 정보가 없으면 각 클라이언트를 솔로 리더로 초기화한다. `Server_SetPartyLeader(bool)`가 이 값을 그대로 PlayerState에 기록해 같은 팀의 두 원격 클라이언트가 모두 `Leader=true`, `CanSelect=true`가 됐다. 이는 단순 UI 문제가 아니라 착륙지점 선택 권한을 클라이언트가 스스로 획득할 수 있는 서버 권한 결함이었다.
+
 ## 3. 적용한 통합 수정
 
 ### 3.1 소유자 전용 개인 transit 상태
@@ -115,6 +121,8 @@ Helicopter의 공통 `FinalizePassenger`가 다음 순서를 지킨다.
 4. 마지막에 deploy delegate를 정확히 한 번 알림
 
 PlayerController가 `Deployed`를 먼저 복제받더라도 Pawn actor channel에서 detach와 movement mode가 도착할 때까지 짧게 poll한다. Pawn이 더 이상 헬기에 attach되어 있지 않고 movement가 `MOVE_None`이 아닐 때 gameplay view/input을 복원한다. 대기는 3초로 제한하고 timeout 시 오류 로그와 함께 복원한다.
+
+one-shot poll callback 시작 시 timer handle을 먼저 clear하도록 수정했다. 아직 준비되지 않았으면 다음 0.05초 poll이 확실히 예약된다. 최종 원격 시험에서 서버 `Deployed` commit 후 두 클라이언트가 각각 약 70 ms, 123 ms 뒤 `DeploymentReadyPoll`로 입력과 카메라를 복원했다.
 
 Pawn/controller 소실, Logout, ReleaseAll, EndPlay도 같은 승객 정리 함수로 수렴시켰다. 마지막 승객 알림은 idempotent하게 한 번만 발생한다.
 
@@ -154,6 +162,7 @@ Pawn/controller 소실, Logout, ReleaseAll, EndPlay도 같은 승객 정리 함�
 - Impact Cue는 서버에서 invalid/server key scope로 보내므로 소유 클라이언트도 authoritative hit FX를 받는다.
 - `[WeaponFire] Local predicted fire cue`, `Authoritative shot committed ... PredictionKey=...` 로그를 추가했다.
 - 발사 origin은 `GetPlayerViewPoint`, 실제 탄도 시작점은 muzzle, aim point는 camera trace 결과로 유지한다. 캐릭터 엉덩이/골반 기준의 임시 보정은 사용하지 않는다.
+- 총구가 벽을 관통한 경우에도 trace 시작점을 `Character::ActorLocation`으로 내리던 레거시 fallback을 제거했다. 탄도 시작점은 항상 muzzle이고, 무기 mesh origin과 muzzle 사이가 막혔으면 그 차폐면을 즉시 authoritative hit으로 처리한다.
 
 ### 3.7 후보 검증, 실패 복구, 레펠 진형
 
@@ -163,6 +172,17 @@ Pawn/controller 소실, Logout, ReleaseAll, EndPlay도 같은 승객 정리 함�
 - missing-helicopter watchdog도 같은 bounded failure 경로를 사용한다.
 - InProgress 전환 직전에 유효한 PC가 active owner transit에 남아 있지 않은지 검증하고 필요하면 `Deployed`를 commit한다.
 - `RappelLandingFormationRadius` 기본값을 350 cm로 노출했다. 기본 scanner `FootprintRadius` 450 cm 안쪽의 원형 진형으로 끝점을 계산한다.
+
+### 3.8 서버 권위 파티 리더
+
+Expedition GameMode가 팀별 리더를 정확히 한 명으로 정규화한다.
+
+- 첫 서버 PlayerArray 멤버를 최초 리더로 선출한다.
+- 이미 확정된 팀 리더가 있으면 뒤늦은 클라이언트의 `leader=true` 주장은 리더를 교체하지 못한다.
+- 모든 팀원의 `bIsPartyLeader`를 한 명만 true가 되도록 서버가 교정한다.
+- 교정 뒤 active owner transit revision을 다시 commit해 `bCanSelectTarget`도 즉시 갱신한다.
+- 리더 Logout 시 남은 팀원 중 한 명을 서버가 다시 선출한다.
+- Expedition 외 GameMode의 기존 로컬/로비 동작은 유지한다.
 
 ## 4. 블루프린트/uasset에서 연결해야 할 항목
 
@@ -292,9 +312,30 @@ BP에서 다음을 수정해야 한다.
 - 3초 뒤 Expedition InProgress에도 transit=false/presentation=false 유지
 - 배치 뒤 다시 locked=true가 되는 로그 없음
 
-### 6.4 아직 수동 확인이 필요한 항목
+### 6.4 dedicated server + 원격 클라이언트 2개
 
-- 실제 두 원격 클라이언트가 같은 팀으로 접속해 먼저 내린 플레이어가 두 번째 플레이어 레펠 중 이동/조준/사격 가능한지 PIE 또는 packaged network 환경에서 확인
+로그:
+
+- `Saved/Logs/NetSmokeFinal_20260811_Server.log`
+- `Saved/Logs/NetSmokeFinal_20260811_RetryClient1.log`
+- `Saved/Logs/NetSmokeFinal_20260811_RetryClient2.log`
+
+조건: `OutBreak_Exterior?HelicopterInsertion=1`, dedicated server, `party=NETSMOKE_FINAL`을 사용한 원격 headless 클라이언트 2개.
+
+- 둘 다 Team 1, 동일 헬기의 Seat 0/1에 배치
+- 서버가 Player 0만 `Leader=true`, Player 1은 `Leader=false`로 정규화
+- 두 클라이언트가 이후 `leader=true`를 다시 주장해도 Player 0 리더 유지, 변경 수 0
+- 자동 후보 검증, 접근, 스캔, hover, 동시 레펠 완료
+- 첫 배치자 `Deployed` 뒤 Remaining=1 동안 다시 `Locked=true` commit 없음
+- 첫 클라이언트는 서버 배치 후 약 70 ms, 두 번째는 약 123 ms 뒤 `DeploymentReadyPoll`로 IMC/Pawn 입력과 Gameplay Camera 복원
+- 둘 다 InProgress 전에 `TransitLocked=false`, `Presentation=false`
+- `ExpeditionInProgressFailsafe`, deployment timeout, active-owner 경고 없음
+
+결과: 원격 owner-only 상태, 다인 승객 순서, 재잠금 방지, 단일 리더 권한, 반복 배치 poll이 통과했다.
+
+### 6.5 아직 수동 확인이 필요한 항목
+
+- 화면이 있는 PIE 또는 packaged client에서 먼저 내린 플레이어가 두 번째 플레이어 레펠 중 실제 키 이동/조준/사격 가능한지 체감 확인
 - BP Gameplay Cue 자산이 실제 총기별 muzzle/socket과 정상 연결됐는지 시각 확인
 - Character BP 평시 입력 중복 정리 후 sprint/crouch/interaction 회귀 시험
 - CallTrigger radius 수정 뒤 개인/공용 flare, 헬기 도착 타이머, 탑승 완료 시험
@@ -302,6 +343,8 @@ BP에서 다음을 수정해야 한다.
 ## 7. 남은 의도된 트레이드오프
 
 Fire Cue는 입력 반응성을 위해 클라이언트가 먼저 예측한다. 서버가 camera/상태/탄약 검증으로 그 샷을 거절하면 소유자는 순간적인 총구 FX/소리를 봤지만 탄약, 피해, Impact가 없는 false-positive를 볼 수 있다. 이를 완전히 제거하려면 발사 accept/reject cosmetic protocol을 별도로 추가하거나 모든 Fire Cue를 서버 확인 후 재생해 지연을 감수해야 한다. 현재 구현은 일반적인 즉시 반응형 선택을 사용한다.
+
+레펠 직후 클라이언트 ControlRotation보다 서버 aim rotation 갱신이 늦으면 첫 발이 30도 검증에서 거절될 가능성도 위 false-positive 범주에 포함된다. 실제 화면 환경에서 문제가 재현되면 배치 완료 owner state에 exit aim rotation/revision을 함께 싣는 것이 다음 단계다.
 
 ## 8. 변경 파일
 

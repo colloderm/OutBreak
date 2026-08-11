@@ -754,6 +754,111 @@ bool AOBExpeditionGameMode::ResolveInsertionRegistrationFailure(
 	return false;
 }
 
+void AOBExpeditionGameMode::HandlePartyLeaderClaim(
+	AOBPlayerController* RequestingPlayer,
+	const bool bRequestedLeader)
+{
+	AOBPlayerStateBase* RequestingPlayerState = RequestingPlayer
+		? RequestingPlayer->GetPlayerState<AOBPlayerStateBase>()
+		: nullptr;
+	if (!RequestingPlayerState || RequestingPlayerState->GetTeamId() == 0)
+	{
+		UE_LOG(LogOBInsertion, Warning,
+			TEXT("[PartyAuthority] Leadership claim rejected: missing player/team PC=%s PS=%s Requested=%s"),
+			*GetNameSafe(RequestingPlayer), *GetNameSafe(RequestingPlayerState),
+			bRequestedLeader ? TEXT("true") : TEXT("false"));
+		return;
+	}
+
+	EnforceSinglePartyLeader(
+		RequestingPlayerState->GetTeamId(),
+		RequestingPlayerState,
+		bRequestedLeader);
+}
+
+void AOBExpeditionGameMode::EnforceSinglePartyLeader(
+	const uint8 TeamId,
+	AOBPlayerStateBase* RequestingPlayerState,
+	const bool bRequestedLeader)
+{
+	AOBExpeditionGameState* GS = GetExpeditionGameState();
+	if (!GS || TeamId == 0)
+	{
+		return;
+	}
+
+	TArray<AOBPlayerStateBase*> TeamMembers;
+	for (APlayerState* PlayerState : GS->PlayerArray)
+	{
+		AOBPlayerStateBase* OBPlayerState = Cast<AOBPlayerStateBase>(PlayerState);
+		if (IsValid(OBPlayerState) && OBPlayerState->GetTeamId() == TeamId)
+		{
+			TeamMembers.Add(OBPlayerState);
+		}
+	}
+	if (IsValid(RequestingPlayerState)
+		&& RequestingPlayerState->GetTeamId() == TeamId)
+	{
+		TeamMembers.AddUnique(RequestingPlayerState);
+	}
+	if (TeamMembers.IsEmpty())
+	{
+		return;
+	}
+
+	// Client claims are advisory. Preserve an established teammate first, then
+	// the requester's existing server state, and finally elect the first member.
+	// This closes the current local PartySubsystem's leader=true default race.
+	AOBPlayerStateBase* ChosenLeader = nullptr;
+	for (AOBPlayerStateBase* Member : TeamMembers)
+	{
+		if (Member != RequestingPlayerState && Member->IsPartyLeader())
+		{
+			ChosenLeader = Member;
+			break;
+		}
+	}
+	if (!ChosenLeader
+		&& IsValid(RequestingPlayerState)
+		&& RequestingPlayerState->IsPartyLeader())
+	{
+		ChosenLeader = RequestingPlayerState;
+	}
+	if (!ChosenLeader)
+	{
+		ChosenLeader = TeamMembers[0];
+	}
+
+	int32 ChangedCount = 0;
+	for (AOBPlayerStateBase* Member : TeamMembers)
+	{
+		const bool bShouldBeLeader = Member == ChosenLeader;
+		if (Member->IsPartyLeader() != bShouldBeLeader)
+		{
+			Member->SetPartyLeader(bShouldBeLeader);
+			++ChangedCount;
+		}
+	}
+
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		AOBPlayerController* PlayerController = Cast<AOBPlayerController>(It->Get());
+		const AOBPlayerStateBase* PlayerState = PlayerController
+			? PlayerController->GetPlayerState<AOBPlayerStateBase>()
+			: nullptr;
+		if (PlayerState && PlayerState->GetTeamId() == TeamId)
+		{
+			PlayerController->RefreshInsertionTransitSelectionPermission();
+		}
+	}
+
+	UE_LOG(LogOBInsertion, Log,
+		TEXT("[PartyAuthority] Team leadership normalized Team=%d Requester=%s Requested=%s Leader=%s Members=%d Changed=%d"),
+		TeamId, *GetNameSafe(RequestingPlayerState),
+		bRequestedLeader ? TEXT("true") : TEXT("false"),
+		*GetNameSafe(ChosenLeader), TeamMembers.Num(), ChangedCount);
+}
+
 void AOBExpeditionGameMode::RequestInsertionPoint(
 	AOBPlayerController* RequestingPlayer,
 	const FVector2D& WorldXY)
@@ -1660,6 +1765,11 @@ void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, A
 
 void AOBExpeditionGameMode::Logout(AController* Exiting)
 {
+	const AOBPlayerStateBase* ExitingPlayerState = Exiting
+		? Exiting->GetPlayerState<AOBPlayerStateBase>()
+		: nullptr;
+	const uint8 ExitingTeamId = ExitingPlayerState ? ExitingPlayerState->GetTeamId() : 0;
+
 	for (const TPair<uint8, TObjectPtr<AOBInsertionHelicopter>>& Pair : TeamInsertionHelicopters)
 	{
 		AOBInsertionHelicopter* Helicopter = Pair.Value.Get();
@@ -1678,6 +1788,10 @@ void AOBExpeditionGameMode::Logout(AController* Exiting)
 	}
 	PendingInsertionControllers.Remove(Exiting);
 	Super::Logout(Exiting);
+	if (ExitingTeamId != 0)
+	{
+		EnforceSinglePartyLeader(ExitingTeamId, nullptr, false);
+	}
 	
 	if (const AOBExpeditionGameState* GS = GetExpeditionGameState(); GS && GS->GetPhase() == EOBExpeditionPhase::Insertion)
 	{
@@ -1975,10 +2089,13 @@ FString AOBExpeditionGameMode::InitNewPlayer(APlayerController* NewPlayerControl
 		PartyCodeByController.Add(NewPlayerController, PartyCode);
 		
 		// [중요] 팀 배정을 스폰(ChoosePlayerStart) 이전인 여기서 수행.
-		if (AOBPlayerStateBase* PS = NewPlayerController->GetPlayerState<AOBPlayerStateBase>();
-			PS && PS->GetTeamId() == 0)
+		if (AOBPlayerStateBase* PS = NewPlayerController->GetPlayerState<AOBPlayerStateBase>())
 		{
-			PS->SetTeamId(ResolveTeamForCode(PartyCode));
+			if (PS->GetTeamId() == 0)
+			{
+				PS->SetTeamId(ResolveTeamForCode(PartyCode));
+			}
+			EnforceSinglePartyLeader(PS->GetTeamId(), PS, PS->IsPartyLeader());
 		}
 	}
 	

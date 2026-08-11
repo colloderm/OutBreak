@@ -40,6 +40,9 @@ public:
 		EOBPlayerInsertionTransitPhase Phase,
 		AActor* NewViewTarget);
 
+	/** Recommits an active owner state after server-authoritative leader changes. */
+	void RefreshInsertionTransitSelectionPermission();
+
 	UFUNCTION(BlueprintPure, Category = "Expedition|Helicopter")
 	bool IsHelicopterTransitLocked() const { return bHelicopterTransitLocked; }
 

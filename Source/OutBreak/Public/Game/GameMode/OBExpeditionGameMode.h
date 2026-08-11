@@ -66,6 +66,12 @@ public:
 	/** Server entry point used by AOBPlayerController's insertion-map RPC. */
 	void RequestInsertionPoint(AOBPlayerController* RequestingPlayer, const FVector2D& WorldXY);
 
+	/**
+	 * Validates a client leadership claim against the server's one-leader-per-team
+	 * invariant. Expedition clients cannot directly write PlayerState leadership.
+	 */
+	void HandlePartyLeaderClaim(AOBPlayerController* RequestingPlayer, bool bRequestedLeader);
+
 	TSubclassOf<AOBInsertionHelicopter> GetDefaultExtractionHelicopterClass() const;
 	
 	// 팀별 존 배정에 따라 시작지점을 고른다.
@@ -99,6 +105,10 @@ protected:
 	// 진입 플레이어 공통 초기화(신규 접속 + 심리스 트래블 양쪽에서 호출됨).
 	// - TeamId 부여 + ExpeditionStatus=Alive 리셋.
 	virtual void GenericPlayerInitialization(AController* C) override;
+	void EnforceSinglePartyLeader(
+		uint8 TeamId,
+		AOBPlayerStateBase* RequestingPlayerState,
+		bool bRequestedLeader);
 
 	//~ 세션 진행 ------------------------------------------------------------
 	
