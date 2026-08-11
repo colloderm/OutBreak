@@ -545,6 +545,41 @@ void AOBPlayerController::Server_ReportInsertionClientReady_Implementation(
 	}
 }
 
+void AOBPlayerController::Client_BeginInsertionPresentation_Implementation(
+	AOBInsertionHelicopter* Helicopter,
+	const float SelectionDeadlineServerTime,
+	const bool bCanSelectTarget)
+{
+	BeginInsertionPresentationLocal(
+		Helicopter,
+		SelectionDeadlineServerTime,
+		bCanSelectTarget,
+		TEXT("ClientRPC"));
+}
+
+void AOBPlayerController::Client_UpdateInsertionPresentation_Implementation(
+	const EOBInsertionPhase Phase,
+	const FString& StatusMessage,
+	const bool bForceMapOpen)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (!bInsertionPresentationActive)
+	{
+		ScheduleInsertionClientReconcile();
+		return;
+	}
+
+	ApplyInsertionPresentationUpdateLocal(
+		Phase,
+		StatusMessage,
+		bForceMapOpen,
+		TEXT("ClientRPC"));
+}
+
 void AOBPlayerController::BeginInsertionPresentationLocal(
 	AOBInsertionHelicopter* Helicopter,
 	float SelectionDeadlineServerTime,

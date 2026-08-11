@@ -35,6 +35,7 @@ UEnemyPhysicalComponent::UEnemyPhysicalComponent()
 void UEnemyPhysicalComponent::BeginPlay()
 {
 	Super::BeginPlay();
+	Health = FMath::Max(1.0f, MaxHealth);
 	
 	
 	
@@ -107,6 +108,37 @@ void UEnemyPhysicalComponent::ApplyDamage(const float DamageAmount)
 	if (Health <= 0.0f)
 	{
 		Action_Dead();
+	}
+}
+
+void UEnemyPhysicalComponent::ResetForPool()
+{
+	if (GetOwner() && !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	Health = FMath::Max(1.0f, MaxHealth);
+	ReactTimeline.Stop();
+	bIsHit = false;
+	CacheBoneName = NAME_None;
+	DestroyedLimbs.Reset();
+
+	for (TPair<FName, FLimbData>& Pair : Limbes)
+	{
+		Pair.Value.bIsHas = true;
+		Pair.Value.Durability = Pair.Value.MaxDurability;
+		if (IsValid(ProxyMesh))
+		{
+			ProxyMesh->UnHideBoneByName(Pair.Key);
+		}
+	}
+
+	if (IsValid(TargetMesh))
+	{
+		TargetMesh->SetSimulatePhysics(false);
+		TargetMesh->SetAllBodiesSimulatePhysics(false);
+		TargetMesh->SetAllBodiesPhysicsBlendWeight(0.0f);
 	}
 }
 
@@ -437,6 +469,16 @@ void UEnemyPhysicalComponent::ApplyLimbDestruction(const FName BoneName)
 
 void UEnemyPhysicalComponent::OnRep_DestroyedLimbs()
 {
+	for (TPair<FName, FLimbData>& Pair : Limbes)
+	{
+		Pair.Value.bIsHas = true;
+		Pair.Value.Durability = Pair.Value.MaxDurability;
+		if (IsValid(ProxyMesh))
+		{
+			ProxyMesh->UnHideBoneByName(Pair.Key);
+		}
+	}
+
 	// 배열 전체를 훑는다. 늦게 접속한 클라는 여기서 한 번에 따라잡는다.
 	for (const FName& BoneName : DestroyedLimbs)
 	{

@@ -30,6 +30,9 @@ public:
 	void InitializeComponents();
 
 	void Dead(float CleanupDelay);
+	void SuspendForPool();
+	void ResumeFromPool();
+	void InvestigateNoise(const FVector& NoiseLocation);
 
 	UFUNCTION(BlueprintPure, Category = "AI|Memory")
 	UEnemyMemoryComponent* GetEnemyMemoryComponent() const

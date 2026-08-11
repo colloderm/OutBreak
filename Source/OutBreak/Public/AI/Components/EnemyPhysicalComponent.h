@@ -45,6 +45,7 @@ public:
 	bool bIsDrawDebug = false;
 	
 	void SetHealth(float NewHealth) { Health = NewHealth; }
+	void ResetForPool();
 
 protected:
 	// Called when the game starts
@@ -86,6 +87,9 @@ private:
 	UPROPERTY(ReplicatedUsing = OnRep_DestroyedLimbs)
 	TArray<FName> DestroyedLimbs;
 	
+	UPROPERTY(EditAnywhere, Category="Physical", meta=(ClampMin="1.0"))
+	float MaxHealth = 175.f;
+
 	float Health = 175.f;
 	
 	FTimeline ReactTimeline;

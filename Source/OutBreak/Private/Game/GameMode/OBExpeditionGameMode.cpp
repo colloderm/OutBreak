@@ -1373,8 +1373,18 @@ void AOBExpeditionGameMode::RestartPlayerAtPlayerStart(AController* NewPlayer, A
 
 void AOBExpeditionGameMode::Logout(AController* Exiting)
 {
+	const AOBPlayerStateBase* ExitingPlayerState =
+		Exiting ? Exiting->GetPlayerState<AOBPlayerStateBase>() : nullptr;
+	const uint8 ExitingTeamId =
+		ExitingPlayerState ? ExitingPlayerState->GetTeamId() : 0;
+
 	PendingInsertionControllers.Remove(Exiting);
 	Super::Logout(Exiting);
+
+	if (ExitingTeamId != 0)
+	{
+		NormalizePartyLeaderForTeam(ExitingTeamId);
+	}
 	
 	if (const AOBExpeditionGameState* GS = GetExpeditionGameState(); GS && GS->GetPhase() == EOBExpeditionPhase::Insertion)
 	{
@@ -1388,6 +1398,78 @@ void AOBExpeditionGameMode::Logout(AController* Exiting)
 	// 개인 탈출구는 이제 팀 공유다. 한 명 나갔다고 파괴하면 남은 팀원의 탈출구가 사라진다.
 	// 팀 전원이 나가도 세션 종료 시 레벨과 함께 정리되므로 개별 파괴는 하지 않는다.
 	PartyCodeByController.Remove(Exiting);
+}
+
+void AOBExpeditionGameMode::HandlePartyLeaderClaim(
+	AOBPlayerController* RequestingPlayer,
+	const bool bRequestedLeader)
+{
+	if (!HasAuthority() || !IsValid(RequestingPlayer))
+	{
+		return;
+	}
+
+	AOBPlayerStateBase* RequestingPlayerState =
+		RequestingPlayer->GetPlayerState<AOBPlayerStateBase>();
+	if (!IsValid(RequestingPlayerState) ||
+		RequestingPlayerState->GetTeamId() == 0)
+	{
+		return;
+	}
+
+	// The client value is only a claim. The first valid server PlayerArray
+	// member remains leader so multiple clients cannot grant themselves target
+	// selection permission.
+	NormalizePartyLeaderForTeam(RequestingPlayerState->GetTeamId());
+
+	UE_LOG(
+		LogOBInsertion,
+		Verbose,
+		TEXT("[InsertionLeader] Claim PC=%s Team=%d Requested=%s Effective=%s"),
+		*GetNameSafe(RequestingPlayer),
+		RequestingPlayerState->GetTeamId(),
+		bRequestedLeader ? TEXT("true") : TEXT("false"),
+		RequestingPlayerState->IsPartyLeader() ? TEXT("true") : TEXT("false"));
+}
+
+void AOBExpeditionGameMode::NormalizePartyLeaderForTeam(const uint8 TeamId)
+{
+	if (!HasAuthority() || TeamId == 0 || !GameState)
+	{
+		return;
+	}
+
+	AOBPlayerStateBase* SelectedLeader = nullptr;
+	for (APlayerState* PlayerState : GameState->PlayerArray)
+	{
+		AOBPlayerStateBase* TeamMember = Cast<AOBPlayerStateBase>(PlayerState);
+		if (IsValid(TeamMember) && TeamMember->GetTeamId() == TeamId)
+		{
+			SelectedLeader = TeamMember;
+			break;
+		}
+	}
+
+	if (!IsValid(SelectedLeader))
+	{
+		return;
+	}
+
+	for (APlayerState* PlayerState : GameState->PlayerArray)
+	{
+		AOBPlayerStateBase* TeamMember = Cast<AOBPlayerStateBase>(PlayerState);
+		if (!IsValid(TeamMember) || TeamMember->GetTeamId() != TeamId)
+		{
+			continue;
+		}
+
+		TeamMember->SetPartyLeader(TeamMember == SelectedLeader);
+		if (AOBPlayerController* TeamController =
+			Cast<AOBPlayerController>(TeamMember->GetOwningController()))
+		{
+			TeamController->RefreshInsertionTransitSelectionPermission();
+		}
+	}
 }
 
 void AOBExpeditionGameMode::ValidateZoneSeparation() const

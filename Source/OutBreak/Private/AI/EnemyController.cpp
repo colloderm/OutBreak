@@ -14,6 +14,7 @@
 #include "Perception/AISenseConfig_Damage.h"
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "NavigationSystem.h"
 #include "StateTreeEvents.h"
 
 AEnemyController::AEnemyController()
@@ -139,13 +140,13 @@ void AEnemyController::Dead(const float CleanupDelay)
 	}
 
 	bIsDead = true;
-	StopMovement();
-	StopStateTreeLogic(TEXT("Enemy died"));
+	SuspendForPool();
+}
 
-	if (IsValid(GetPawn()))
-	{
-		UnPossess();
-	}
+void AEnemyController::SuspendForPool()
+{
+	StopMovement();
+	StopStateTreeLogic(TEXT("Enemy suspended for pool"));
 
 	if (IsValid(AIPerceptionComponent))
 	{
@@ -159,14 +160,67 @@ void AEnemyController::Dead(const float CleanupDelay)
 	}
 
 	SetActorTickEnabled(false);
+}
 
-	if (CleanupDelay <= 0.0f)
+void AEnemyController::ResumeFromPool()
+{
+	bIsDead = false;
+	SetLifeSpan(0.0f);
+	SetActorTickEnabled(true);
+
+	if (IsValid(AIPerceptionComponent))
 	{
-		Destroy();
+		AIPerceptionComponent->ForgetAll();
+		AIPerceptionComponent->SetComponentTickEnabled(true);
+	}
+
+	if (IsValid(EnemyMemoryComponent))
+	{
+		EnemyMemoryComponent->ResetMemory();
+		EnemyMemoryComponent->SetComponentTickEnabled(true);
+	}
+
+	if (IsValid(StateTreeComponent) && IsValid(GetPawn()) &&
+		!StateTreeComponent->IsRunning())
+	{
+		StateTreeComponent->StartLogic();
+	}
+}
+
+void AEnemyController::InvestigateNoise(const FVector& NoiseLocation)
+{
+	if (bIsDead || !IsValid(GetPawn()) || !GetPawn()->HasAuthority())
+	{
 		return;
 	}
 
-	SetLifeSpan(CleanupDelay);
+	FVector MoveLocation = NoiseLocation;
+	if (UNavigationSystemV1* Navigation = UNavigationSystemV1::GetCurrent(GetWorld()))
+	{
+		FNavLocation ProjectedLocation;
+		if (Navigation->ProjectPointToNavigation(
+			NoiseLocation,
+			ProjectedLocation,
+			FVector(300.0f, 300.0f, 500.0f)))
+		{
+			MoveLocation = ProjectedLocation.Location;
+		}
+	}
+
+	if (IsValid(EnemyMemoryComponent))
+	{
+		EnemyMemoryComponent->SetDirectedHearingStimulus(MoveLocation);
+	}
+
+	MoveToLocation(
+		MoveLocation,
+		80.0f,
+		true,
+		true,
+		true,
+		false,
+		nullptr,
+		true);
 }
 
 void AEnemyController::BeginPlay()

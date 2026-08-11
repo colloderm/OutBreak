@@ -326,6 +326,19 @@ public:
 		EOBInsertionPhase ClientPhase,
 		bool bViewTargetReady);
 
+	/** Low-latency path; replicated owner/team state remains the recovery path. */
+	UFUNCTION(Client, Reliable)
+	void Client_BeginInsertionPresentation(
+		AOBInsertionHelicopter* Helicopter,
+		float SelectionDeadlineServerTime,
+		bool bCanSelectTarget);
+
+	UFUNCTION(Client, Reliable)
+	void Client_UpdateInsertionPresentation(
+		EOBInsertionPhase Phase,
+		const FString& StatusMessage,
+		bool bForceMapOpen);
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion Presentation Started"))
 	void BP_OnInsertionPresentationStarted(
 		AOBInsertionHelicopter* Helicopter,

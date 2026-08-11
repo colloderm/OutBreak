@@ -18,6 +18,8 @@
 #include "AI/Components/EnemyMovementComponent.h"
 #include "AI/Components/EnemyStatusComponent.h"
 #include "AI/Components/EnemyPhysicalComponent.h"
+#include "AI/Components/EnemySpawnableComponent.h"
+#include "Animation/AnimInstance.h"
 #include "Perception/AISense_Damage.h"
 #include "Sound/SoundCue.h"
 
@@ -48,6 +50,9 @@ AEnemyCharacter::AEnemyCharacter(
 				ACharacter::CharacterMovementComponentName))
 {
 	PrimaryActorTick.bCanEverTick = true;
+	bReplicates = true;
+	SetReplicateMovement(true);
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
 
 	
 
@@ -138,6 +143,7 @@ void AEnemyCharacter::InitializeComponents()
 	
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
 	PhysicalComponent = CreateDefaultSubobject<UEnemyPhysicalComponent>(TEXT("PhysicalComponent"));
+	SpawnableComponent = CreateDefaultSubobject<UEnemySpawnableComponent>(TEXT("SpawnableComponent"));
 	
 	ChildActorComponent = CreateDefaultSubobject<UChildActorComponent>(TEXT("ChildActorComponent"));
 	ChildActorComponent->SetupAttachment(GetMesh());
@@ -362,6 +368,12 @@ void AEnemyCharacter::OnRep_IsDead()
 	{
 		PlayDeathCosmetics();
 	}
+	else if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		MeshComp->SetSimulatePhysics(false);
+		MeshComp->SetAllBodiesSimulatePhysics(false);
+		MeshComp->SetAllBodiesPhysicsBlendWeight(0.0f);
+	}
 }
 
 void AEnemyCharacter::PlayDeathCosmetics()
@@ -437,13 +449,71 @@ void AEnemyCharacter::Dead()
 			FTransform(FRotator::ZeroRotator, DropLoc), DeathLootRow);
 	}
 
-	if (DeathCleanupDelay <= 0.0f)
+	if (IsValid(SpawnableComponent))
 	{
-		Destroy();
+		SpawnableComponent->ScheduleReturnToPool(DeathCleanupDelay);
 		return;
 	}
 
-	SetLifeSpan(DeathCleanupDelay);
+	if (DeathCleanupDelay <= 0.0f)
+	{
+		Destroy();
+	}
+	else
+	{
+		SetLifeSpan(DeathCleanupDelay);
+	}
+}
+
+void AEnemyCharacter::ResetForPoolActivation()
+{
+	SetLifeSpan(0.0f);
+	bIsDead = false;
+	LastHitDirection = FVector::ZeroVector;
+	LastHitBoneName = NAME_None;
+
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		if (UAnimInstance* AnimInstance = MeshComp->GetAnimInstance())
+		{
+			AnimInstance->StopAllMontages(0.0f);
+		}
+		MeshComp->SetSimulatePhysics(false);
+		MeshComp->SetAllBodiesSimulatePhysics(false);
+		MeshComp->SetAllBodiesPhysicsBlendWeight(0.0f);
+	}
+
+	if (HasAuthority() && IsValid(PhysicalComponent))
+	{
+		PhysicalComponent->ResetForPool();
+	}
+
+	if (UEnemyMovementComponent* EnemyMovementComponent =
+		Cast<UEnemyMovementComponent>(GetMovementComponent()))
+	{
+		EnemyMovementComponent->SetLocomotationState(ELocomotionWalkRunState::Walking);
+	}
+
+	if (!CryingSoundComponent.IsValid() && IsValid(EnemyAsset))
+	{
+		if (USoundCue* CryingSound = EnemyAsset->GetSoundAssets()->ZombieCryingSound)
+		{
+			CryingSoundComponent = UGameplayStatics::SpawnSoundAttached(CryingSound, RootComponent);
+		}
+	}
+
+	ForceNetUpdate();
+}
+
+void AEnemyCharacter::PrepareForPoolStorage()
+{
+	ResetForPoolActivation();
+
+	if (UAudioComponent* CryingAudio = CryingSoundComponent.Get())
+	{
+		CryingAudio->Stop();
+		CryingSoundComponent.Reset();
+	}
 }
 
 void AEnemyCharacter::SetAnimationSignificance(

@@ -1,5 +1,9 @@
 #include "Global/OutBreakGlobal.h"
 
+#include "AI/Spawning/EnemySpawnTypes.h"
+#include "AI/Spawning/ZombieDirectorWorldSubsystem.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/GameplayStatics.h"
 #include "Perception/AISense_Hearing.h"
@@ -63,13 +67,37 @@ void UOutBreakGlobal::PlaySoundAndReportNoise(
 
 	constexpr float NoiseLoudness = 1.0f;
 
-	UAISense_Hearing::ReportNoiseEvent(
-		WorldContextObject,
-		Location,
-		NoiseLoudness,
-		Instigator,
-		MaxNoiseRange,
-		NoiseTag);
+
+	UWorld* World = GEngine
+		? GEngine->GetWorldFromContextObject(
+			WorldContextObject,
+			EGetWorldErrorMode::LogAndReturnNull)
+		: nullptr;
+
+	// Hearing and Director orchestration are authoritative. This prevents a
+	// listen client/server pair from turning one gunshot into two spawn requests.
+	if (IsValid(World) && World->GetNetMode() != NM_Client)
+	{
+		UAISense_Hearing::ReportNoiseEvent(
+			WorldContextObject,
+			Location,
+			NoiseLoudness,
+			Instigator,
+			MaxNoiseRange,
+			NoiseTag);
+
+		if (UZombieDirectorWorldSubsystem* Director =
+			World->GetSubsystem<UZombieDirectorWorldSubsystem>())
+		{
+			FEnemyNoiseEvent NoiseEvent;
+			NoiseEvent.Location = Location;
+			NoiseEvent.Instigator = Instigator;
+			NoiseEvent.NoiseTag = NoiseTag;
+			NoiseEvent.Loudness = NoiseLoudness;
+			NoiseEvent.MaxRange = MaxNoiseRange;
+			Director->ReportNoise(NoiseEvent);
+		}
+	}
 
 	UE_LOG(
 		LogTemp,

@@ -21,6 +21,7 @@ class UChildActorComponent;
 class AModularSkeletalMeshActor;
 class UEnemyStatusComponent;
 class UEnemyPhysicalComponent;
+class UEnemySpawnableComponent;
 class UStateTreeAIComponent;
 class UAudioComponent;
 
@@ -91,6 +92,9 @@ public:
 	
 	void Dead();
 	bool IsDead() const { return bIsDead; }
+	void ResetForPoolActivation();
+	void PrepareForPoolStorage();
+	UEnemySpawnableComponent* GetEnemySpawnableComponent() const { return SpawnableComponent; }
 	
 	// 서버: 마지막 피격 방향/부위. Dead()에서 래그돌 임펄스로 쓴다.
 	void NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection);
@@ -169,6 +173,9 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Status", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UEnemyPhysicalComponent> PhysicalComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Spawning", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UEnemySpawnableComponent> SpawnableComponent;
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "ProxySystem", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UChildActorComponent> ChildActorComponent;

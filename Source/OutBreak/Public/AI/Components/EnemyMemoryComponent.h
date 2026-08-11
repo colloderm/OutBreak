@@ -52,6 +52,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AI|Memory")
 	bool ConsumeStimulus(EEnemyStimulusType ExpectedType);
 
+	/** Injects an authoritative Director command through the same memory path as hearing. */
+	void SetDirectedHearingStimulus(const FVector& NoiseLocation);
+
+	/** Clears target and stimulus state before pool reuse. */
+	void ResetMemory();
+
 	/**
 	 * A single wake-up signal for every meaningful memory update.
 	 * Consumers must read the complete snapshot instead of inferring state from

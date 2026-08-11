@@ -65,6 +65,9 @@ public:
 	/** Server entry point used by AOBPlayerController's insertion-map RPC. */
 	void RequestInsertionPoint(AOBPlayerController* RequestingPlayer, const FVector2D& WorldXY);
 
+	/** Normalizes an untrusted client claim to one server-selected leader per team. */
+	void HandlePartyLeaderClaim(AOBPlayerController* RequestingPlayer, bool bRequestedLeader);
+
 	TSubclassOf<AOBInsertionHelicopter> GetDefaultExtractionHelicopterClass() const;
 	
 	// 팀별 존 배정에 따라 시작지점을 고른다.
@@ -278,6 +281,7 @@ protected:
 	
 private:
 	void CheckTeamWipe(uint8 TeamId);          // 팀에 Alive 0명이면 다운자 전원 사망
+	void NormalizePartyLeaderForTeam(uint8 TeamId);
 
 private:	
 	FTimerHandle SessionTimerHandle;
