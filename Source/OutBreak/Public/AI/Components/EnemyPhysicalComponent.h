@@ -60,6 +60,11 @@ public:
 	void ApplyDamage(float DamageAmount);
 	void ActionPhysical(const FHitResult& HitResult, float DamageAmount);
 	void BloodVFX(const FHitResult& HitResult);
+	
+	// 나이아가라는 복제되지 않는다. 피격 연출은 서버가 모두에게 쏜다.
+	// Unreliable: 연출이라 부하 시 버려도 된다.
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_BloodVFX(FVector_NetQuantize ImpactPoint, FVector_NetQuantizeNormal ImpactNormal);
 
 	ELocomotionWalkRunState EvaluateLocomotionState() const;
 

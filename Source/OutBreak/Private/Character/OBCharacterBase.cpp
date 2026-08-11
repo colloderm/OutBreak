@@ -161,6 +161,10 @@ void AOBCharacterBase::HandleDeath()
 	
 	if (EquipmentComponent)
 		EquipmentComponent->UnequipWeapon();
+
+	// 죽은 플레이어는 AI에게 존재하지 않는다. 이게 없으면 시체를 계속 표적으로
+	// 잡고, 표적이 유효하니 다른 자극도 무시한다.
+	AEnemyController::ForgetActorForAll(GetWorld(), this);
 	
 	// 서버측 물리/이동 비활성
 	StartDeath();
@@ -497,6 +501,10 @@ void AOBCharacterBase::FinishDeathFromDowned()
 		AbilitySystemComponent->RemoveLooseGameplayTag(OBGameplayTags::State_Downed);
 		AbilitySystemComponent->AddLooseGameplayTag(OBGameplayTags::State_Dead);
 	}
+	
+	// 다운 상태에서는 표적으로 남아야 하지만, 사망이 확정되면 지운다.
+	AEnemyController::ForgetActorForAll(GetWorld(), this);
+	
 	StartDeath(); // 래그돌
 }
 

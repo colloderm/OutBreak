@@ -120,7 +120,8 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 		return;
 	}
 	
-	BloodVFX(HitResult);
+	// 서버에서만 판정하고, 연출은 모두에게 보낸다.
+	Multicast_BloodVFX(HitResult.ImpactPoint, HitResult.ImpactNormal);
 
 	const auto PhysicalReact = EnemyAsset->GetPhysicalReact();
 	const auto LimbMeshes = EnemyAsset->GetLimbMeshes();
@@ -199,6 +200,18 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 	ReactTimeline.PlayFromStart();
 	
 	bIsHit = true;
+}
+
+void UEnemyPhysicalComponent::Multicast_BloodVFX_Implementation(
+	const FVector_NetQuantize ImpactPoint,
+	const FVector_NetQuantizeNormal ImpactNormal)
+{
+	// 기존 BloodVFX가 HitResult에서 쓰는 값은 이 둘뿐이다.
+	FHitResult Hit;
+	Hit.ImpactPoint = ImpactPoint;
+	Hit.ImpactNormal = ImpactNormal;
+
+	BloodVFX(Hit);
 }
 
 void UEnemyPhysicalComponent::BloodVFX(const FHitResult& HitResult)
