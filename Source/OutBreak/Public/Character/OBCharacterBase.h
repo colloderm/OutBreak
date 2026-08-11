@@ -329,7 +329,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Spawn")
 	float GroundTraceDistance = 20000.f;
 
-	// 이 시간까지 바닥이 안 올라오면 포기하고 낙하 허용(영구 정지보다 낫다).
+	// MOVE_Falling 상태로 지면을 재탐색하고 timeout 진단을 남기는 최대 시간.
 	UPROPERTY(EditDefaultsOnly, Category = "Spawn")
 	float MaxGroundWaitSeconds = 15.f;
 

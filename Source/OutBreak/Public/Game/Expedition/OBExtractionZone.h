@@ -50,6 +50,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Extraction")
 	uint8 GetOwningTeamId() const { return OwningTeamId; }
 
+	UFUNCTION(BlueprintPure, Category = "Extraction")
+	EOBExtractionType GetExtractType() const { return ExtractType; }
+
+	/**
+	 * True only for personal zones that received their team assignment through
+	 * the expedition GameMode's deferred-spawn path. A personal BP placed
+	 * directly in a level has no owning team and is not an assigned extract.
+	 */
+	UFUNCTION(BlueprintPure, Category = "Extraction|Debug")
+	bool IsRuntimeAssignedPersonalZone() const;
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "Extraction")
 	void OnExtractionActiveChanged(bool bActive);
 
@@ -94,7 +105,9 @@ protected:
 	void OnRep_CallState();
 
 	bool CanPlayerExtract(AController* Controller) const;
+	FString GetPlayerExtractionBlockReason(AController* Controller) const;
 	void CheckActiveState();
+	void DrawDebugStatus() const;
 	void StartExtractionCall(AController* CallingController);
 	void SpawnExtractionHelicopter();
 	void OpenBoardingWindow();
@@ -173,6 +186,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction|Rules")
 	bool bPublicAllowsAllTeams = true;
+
+	/** Draw this zone's trigger, anchors, state and local-player eligibility. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction|Debug")
+	bool bDrawDebugVisualization = false;
 
 private:
 	UPROPERTY(ReplicatedUsing = OnRep_CallState)

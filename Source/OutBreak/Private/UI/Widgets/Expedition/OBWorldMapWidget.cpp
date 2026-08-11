@@ -79,7 +79,12 @@ void UOBWorldMapWidget::SetMapOpen(bool bOpen)
 
 	if (APlayerController* PC = GetOwningPlayer())
 	{
-		if (bOpen)
+		if (AOBPlayerController* OBPlayerController = Cast<AOBPlayerController>(PC))
+		{
+			SetIsFocusable(true);
+			OBPlayerController->ApplyWorldMapInputMode(this, bOpen);
+		}
+		else if (bOpen)
 		{
 			// GameAndUI: WASD 이동은 캐릭터로 계속 가고, 마우스만 지도가 가져간다.
 			// 지도를 보는 동안 시점 회전이 멈추는 건 의도된 대가다.
