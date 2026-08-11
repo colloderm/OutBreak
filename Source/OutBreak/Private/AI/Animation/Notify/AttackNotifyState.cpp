@@ -123,8 +123,14 @@ void UAttackNotifyState::ProcessCollectedActors_Implementation(
 
 void UAttackNotifyState::ApplyDamageEffect(AActor* AttackOwner, const FHitResult& Hit) const
 {
+	// 판정은 서버 전용. 몽타주가 클라에도 복제되므로 이 가드가 없으면 이중 피해가 난다.
+	if (!IsValid(AttackOwner) || !AttackOwner->HasAuthority())
+	{
+		return;
+	}
+	
 	AActor* HitActor = Hit.GetActor();
-	if (!IsValid(AttackOwner) || !IsValid(HitActor) || !DamageEffect || DamageAmount <= 0.0f)
+	if (!IsValid(HitActor) || !DamageEffect || DamageAmount <= 0.0f)
 	{
 		return;
 	}

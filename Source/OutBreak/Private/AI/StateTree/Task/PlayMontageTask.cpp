@@ -94,6 +94,12 @@ EStateTreeRunStatus FSTTPlayMontageTask::StartMontage(
 	{
 		return EStateTreeRunStatus::Failed;
 	}
+	
+	// 서버에서만 재생됐다. 클라에도 같은 몽타주를 보낸다.
+	Character->Multicast_PlayMontage(
+		InstanceData.AttackMontage,
+		InstanceData.PlayRate,
+		InstanceData.StartSectionName);
 
 	InstanceData.bMontageStarted = true;
 

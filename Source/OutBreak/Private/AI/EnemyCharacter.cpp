@@ -705,3 +705,11 @@ void AEnemyCharacter::NotifyHitForRagdoll(FName BoneName, const FVector& HitDire
 	LastHitDirection = HitDirection.GetSafeNormal();
 	LastHitBoneName = BoneName;
 }
+
+void AEnemyCharacter::Multicast_PlayMontage_Implementation(UAnimMontage* Montage, const float PlayRate, const FName StartSection)
+{
+	// 서버는 StateTree가 이미 재생했다. 다시 틀면 몽타주가 처음부터 되감긴다.
+	if (HasAuthority() || !Montage) return;
+
+	PlayAnimMontage(Montage, PlayRate, StartSection);
+}
