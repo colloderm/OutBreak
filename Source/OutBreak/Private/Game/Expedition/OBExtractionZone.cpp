@@ -55,12 +55,14 @@ AOBExtractionZone::AOBExtractionZone()
 	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = true;
 	// Calls and countdowns must exist even before this area is streamed around a player.
+#if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
+#endif
 	// Public call state drives map/HUD countdowns even when the site is far away.
 	// Personal zones still apply the team filter in IsNetRelevantFor.
 	bAlwaysRelevant = true;
 
-	Trigger = CreateDefaultSubobject<USphereComponent>(TEXT("CallTrigger"));
+	Trigger = CreateDefaultSubobject<USphereComponent>(TEXT("Trigger"));
 	SetRootComponent(Trigger);
 	Trigger->InitSphereRadius(300.f);
 	Trigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
@@ -188,6 +190,23 @@ void AOBExtractionZone::BeginPlay()
 
 	CheckActiveState();
 	GetWorldTimerManager().SetTimer(ActiveCheckTimer, this, &AOBExtractionZone::CheckActiveState, 1.f, true);
+}
+
+void AOBExtractionZone::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+
+	// 네이티브 서브오브젝트 이름이 "Trigger" -> "CallTrigger"로 바뀌면서
+	// BP에 남은 옛 오버라이드가 생성자의 InitSphereRadius를 덮고 있다.
+	// 생성자가 아니라 여기서 쓰면 직렬화 값보다 뒤에 실행되므로 항상 이긴다.
+	if (Trigger)
+	{
+		Trigger->SetSphereRadius(CallTriggerRadius, /*bUpdateOverlaps=*/true);
+	}
+	if (BoardingTrigger)
+	{
+		BoardingTrigger->SetSphereRadius(BoardingTriggerRadius, /*bUpdateOverlaps=*/true);
+	}
 }
 
 void AOBExtractionZone::Tick(float DeltaSeconds)

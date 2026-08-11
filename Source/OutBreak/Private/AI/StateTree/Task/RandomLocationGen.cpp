@@ -26,22 +26,22 @@ EStateTreeRunStatus FRandomLocationGen::EnterState(
 
 	if (!IsValid(ControlledPawn))
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("Generate Random Reachable Location: ControlledPawn is invalid."));
+		// UE_LOG(
+		// 	LogTemp,
+		// 	Warning,
+		// 	TEXT("Generate Random Reachable Location: ControlledPawn is invalid."));
 
 		return EStateTreeRunStatus::Failed;
 	}
 
 	if (InstanceData.SearchRadius <= 0.0f)
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT(
-				"Generate Random Reachable Location: SearchRadius must be greater than zero. Pawn=%s"),
-			*GetNameSafe(ControlledPawn));
+		// UE_LOG(
+		// 	LogTemp,
+		// 	Warning,
+		// 	TEXT(
+		// 		"Generate Random Reachable Location: SearchRadius must be greater than zero. Pawn=%s"),
+		// 	*GetNameSafe(ControlledPawn));
 
 		return EStateTreeRunStatus::Failed;
 	}
@@ -52,12 +52,12 @@ EStateTreeRunStatus FRandomLocationGen::EnterState(
 
 	if (!IsValid(NavigationSystem))
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT(
-				"Generate Random Reachable Location: NavigationSystem is invalid. Pawn=%s"),
-			*GetNameSafe(ControlledPawn));
+		// UE_LOG(
+		// 	LogTemp,
+		// 	Warning,
+		// 	TEXT(
+		// 		"Generate Random Reachable Location: NavigationSystem is invalid. Pawn=%s"),
+		// 	*GetNameSafe(ControlledPawn));
 
 		return EStateTreeRunStatus::Failed;
 	}
@@ -70,12 +70,12 @@ EStateTreeRunStatus FRandomLocationGen::EnterState(
 
 	if (!IsValid(NavigationData))
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT(
-				"Generate Random Reachable Location: No matching NavigationData was found. Pawn=%s"),
-			*GetNameSafe(ControlledPawn));
+		// UE_LOG(
+		// 	LogTemp,
+		// 	Warning,
+		// 	TEXT(
+		// 		"Generate Random Reachable Location: No matching NavigationData was found. Pawn=%s"),
+		// 	*GetNameSafe(ControlledPawn));
 
 		return EStateTreeRunStatus::Failed;
 	}
@@ -90,13 +90,13 @@ EStateTreeRunStatus FRandomLocationGen::EnterState(
 
 	if (!bFoundLocation)
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT(
-				"Generate Random Reachable Location: No reachable point found. Pawn=%s, Radius=%.2f"),
-			*GetNameSafe(ControlledPawn),
-			InstanceData.SearchRadius);
+		// UE_LOG(
+		// 	LogTemp,
+		// 	Warning,
+		// 	TEXT(
+		// 		"Generate Random Reachable Location: No reachable point found. Pawn=%s, Radius=%.2f"),
+		// 	*GetNameSafe(ControlledPawn),
+		// 	InstanceData.SearchRadius);
 
 		return EStateTreeRunStatus::Failed;
 	}
