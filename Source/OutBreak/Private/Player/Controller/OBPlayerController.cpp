@@ -154,6 +154,19 @@ void AOBPlayerController::OnRep_InsertionTransitState()
 	ApplyInsertionTransitStateLocal(TEXT("OwnerReplication"));
 }
 
+void AOBPlayerController::RefreshInsertionTransitSelectionPermission()
+{
+	if (!HasAuthority() || !HasActiveInsertionTransit())
+	{
+		return;
+	}
+
+	SetInsertionTransitState(
+		ReplicatedInsertionTransitState.Helicopter,
+		ReplicatedInsertionTransitState.Phase,
+		ReplicatedInsertionTransitState.ViewTarget);
+}
+
 void AOBPlayerController::SetPawnInputSuppressedForInsertion(const bool bSuppress)
 {
 	if (!IsLocalController())
@@ -381,6 +394,9 @@ bool AOBPlayerController::IsInsertionDeploymentReady() const
 
 void AOBPlayerController::PollInsertionDeploymentReady()
 {
+	// A one-shot timer may still report itself active while executing its callback.
+	// Clear the handle first so a still-attached Pawn can schedule the next poll.
+	GetWorldTimerManager().ClearTimer(InsertionDeploymentReadyTimer);
 	ApplyInsertionTransitStateLocal(TEXT("DeploymentReadyPoll"));
 }
 
@@ -2125,16 +2141,17 @@ void AOBPlayerController::CloseInteractionWidget()
 
 void AOBPlayerController::Server_SetPartyLeader_Implementation(bool bLeader)
 {
+	if (AOBExpeditionGameMode* ExpeditionGameMode =
+		GetWorld() ? GetWorld()->GetAuthGameMode<AOBExpeditionGameMode>() : nullptr)
+	{
+		ExpeditionGameMode->HandlePartyLeaderClaim(this, bLeader);
+		return;
+	}
+
 	if (AOBPlayerStateBase* PS = GetPlayerState<AOBPlayerStateBase>())
 	{
 		PS->SetPartyLeader(bLeader);
-		if (HasActiveInsertionTransit())
-		{
-			SetInsertionTransitState(
-				ReplicatedInsertionTransitState.Helicopter,
-				ReplicatedInsertionTransitState.Phase,
-				ReplicatedInsertionTransitState.ViewTarget);
-		}
+		RefreshInsertionTransitSelectionPermission();
 	}
 }
 

@@ -13,6 +13,7 @@
 #include "Abilities/GameplayAbilityTargetTypes.h"
 #include "Abilities/Tasks/AbilityTask_WaitInputRelease.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameplayPrediction.h"
 #include "Kismet/GameplayStatics.h"
@@ -674,14 +675,34 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	
 	const float SpreadRadians = FMath::DegreesToRadians(GetCurrentSpreadAngle());
 	
-	// 벽에 밀착하면 무기 메시가 벽을 관통해 머즐이 벽 너머에 놓인다.
-	// 몸통→머즐 구간이 막혀 있으면 시작점을 몸통으로 당겨 탄이 벽에 정상적으로 박히게 한다.
-	const FVector BodyOrigin = Character->GetActorLocation();
-	FHitResult MuzzleBlock;
-	const bool bMuzzleBlocked = GetWorld()->LineTraceSingleByChannel(
-		MuzzleBlock, BodyOrigin, MuzzleLoc, OB_TraceChannel_Weapon, AimParams);
-	
-	const FVector TraceStart = bMuzzleBlocked ? BodyOrigin : MuzzleLoc;
+	// 탄도는 항상 총구에서 시작한다. 이전 코드는 총구가 벽을 통과하면 시작점을
+	// Character::ActorLocation(골반 높이)으로 내렸고, 카메라 조준은 정상이어도
+	// 탄환이 캐릭터 뒤쪽에서 발사되는 것처럼 보이는 회귀를 만들었다.
+	//
+	// 벽 관통 방지는 무기 본체(손/리시버 측)와 총구 사이를 별도로 검사한다.
+	// 이 짧은 구간이 막혔으면 골반에서 새 trace를 쏘지 않고 그 차폐면을
+	// authoritative immediate hit으로 사용한다.
+	const USkeletalMeshComponent* WeaponMesh = Weapon->GetWeaponMesh();
+	const FVector WeaponOrigin = WeaponMesh
+		? WeaponMesh->GetComponentLocation()
+		: Weapon->GetActorLocation();
+	FHitResult MuzzleObstruction;
+	const bool bMuzzleObstructed = !WeaponOrigin.Equals(MuzzleLoc, 1.f)
+		&& GetWorld()->LineTraceSingleByChannel(
+			MuzzleObstruction,
+			WeaponOrigin,
+			MuzzleLoc,
+			OB_TraceChannel_Weapon,
+			AimParams);
+	const FVector TraceStart = MuzzleLoc;
+	if (bMuzzleObstructed)
+	{
+		UE_LOG(LogOBWeaponAim, Log,
+			TEXT("[WeaponAim] Muzzle path obstructed; committing immediate surface hit Character=%s WeaponOrigin=%s Muzzle=%s Hit=%s Actor=%s"),
+			*Character->GetName(), *WeaponOrigin.ToCompactString(), *MuzzleLoc.ToCompactString(),
+			*MuzzleObstruction.ImpactPoint.ToCompactString(),
+			*GetNameSafe(MuzzleObstruction.GetActor()));
+	}
 
 	// 사격 트레이스: Weapon 채널(캐릭터/벽 Block, 카메라 프로브와 분리).
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OBWeaponTrace), /*bTraceComplex=*/true);
@@ -734,8 +755,10 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 		const FVector TraceEnd = TraceStart + ShotDirection * Stats.Range;
 		
 		FHitResult Hit;
-		const bool bHit = GetWorld()->LineTraceSingleByChannel(
-			Hit, TraceStart, TraceEnd, OB_TraceChannel_Weapon, QueryParams);
+		const bool bHit = bMuzzleObstructed
+			? (Hit = MuzzleObstruction, true)
+			: GetWorld()->LineTraceSingleByChannel(
+				Hit, TraceStart, TraceEnd, OB_TraceChannel_Weapon, QueryParams);
 		
 		AActor* HitActor = Hit.GetActor();
 

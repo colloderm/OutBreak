@@ -23,19 +23,10 @@
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Blueprint/Character/BP_ExpeditionGameMode.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Blueprint/Character/BP_ExpeditionGameMode.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Abilities/OBGameplayAbility_RangedWeapon.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Components/OBAbilitySystemComponent.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Ability/Components/OBAbilitySystemComponent.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Character/OBCharacterBase.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Character/OBCharacterBase.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Game/Expedition/OBInsertionHelicopter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Game/Expedition/OBInsertionHelicopter.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Game/GameMode/OBExpeditionGameMode.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Game/GameMode/OBExpeditionGameMode.cpp" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Expedition/OBWorldMapWidget.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/UI/Widgets/Expedition/OBWorldMapWidget.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Abilities/OBGameplayAbility.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Abilities/OBGameplayAbility.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Components/OBAbilitySystemComponent.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Ability/Components/OBAbilitySystemComponent.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Character/OBCharacterBase.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Character/OBCharacterBase.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Game/Expedition/OBHelicopterTypes.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Game/Expedition/OBHelicopterTypes.h" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Game/Expedition/OBInsertionHelicopter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Game/Expedition/OBInsertionHelicopter.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Game/Expedition/Docs/HelicopterSpawnToWeaponIntegrationFinalReport.ko.md" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Game/Expedition/Docs/HelicopterSpawnToWeaponIntegrationFinalReport.ko.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Game/GameMode/OBExpeditionGameMode.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Game/GameMode/OBExpeditionGameMode.h" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" afterDir="false" />
     </list>
@@ -432,6 +423,7 @@
       <workItem from="1786067483541" duration="735000" />
       <workItem from="1786322784052" duration="4607000" />
       <workItem from="1786335026005" duration="11527000" />
+      <workItem from="1786407637881" duration="1948000" />
     </task>
     <servers />
   </component>
