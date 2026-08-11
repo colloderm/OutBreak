@@ -89,6 +89,7 @@ public:
 	void UpdateSpectatorsForTeam(uint8 TeamId);
 	
 protected:
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void StartPlay() override;
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 	
@@ -209,8 +210,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Spawn")
 	float MinZoneSeparation = 100000.f;
 
-	/** Kept for Blueprint serialization compatibility; false is ignored at runtime. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (DeprecatedProperty, DeprecationMessage = "Expedition entry always uses helicopter insertion."))
+	/**
+	 * Selects the authoritative entry path for this GameMode.
+	 * True: spawn and seat players in the insertion helicopter.
+	 * False: use the existing SpawnZone/PlayerStart Unreal restart path.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion",
+		meta = (DisplayName = "Enable Helicopter Insertion"))
 	bool bEnableHelicopterInsertion = true;
 
 	/** Assign BP_OBInsertionHelicopter here. Native class remains a logic-only fallback. */
