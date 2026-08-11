@@ -19,15 +19,24 @@ class OUTBREAK_API AEnemyCharacterSpawner : public AActor
 
 public:
 	AEnemyCharacterSpawner();
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	bool CanSpawnForNoise(const FEnemyNoiseEvent& NoiseEvent, FString* OutFailureReason = nullptr) const;
 	FTransform ResolveSpawnTransform() const;
+	bool TryResolveSafeSpawnTransform(FTransform& OutTransform, FString* OutFailureReason = nullptr) const;
 	TSubclassOf<AEnemyCharacter> ResolveEnemyClass() const;
 	FName ResolvePoolKey() const;
 	UAnimMontage* ResolveSpawnMontage() const;
 	float ResolvePresentationDuration() const;
 	int32 ResolveWarmPoolCount() const;
+	int32 ResolveInitialSpawnCharges() const;
+	int32 ResolveMaxSpawnCharges() const;
+	int32 ResolveRechargeAmount() const;
+	float ResolveRechargeInterval() const;
 	void MarkUsed();
+
+	UFUNCTION(BlueprintPure, Category="Enemy Spawner|Charge")
+	int32 GetCurrentSpawnCharges() const { return CurrentSpawnCharges; }
 
 	UFUNCTION(BlueprintImplementableEvent, Category="Enemy Spawner", meta=(DisplayName="On Enemy Emerging"))
 	void BP_OnEnemyEmerging(AEnemyCharacter* Enemy, const FVector& NoiseLocation);
@@ -69,6 +78,20 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Spawn", meta=(AllowPrivateAccess="true"))
 	FName SectorId = NAME_None;
 
+	/** Per-instance additions to the Enemy Director's shared charge values. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Spawn|Charge Adjustments", meta=(AllowPrivateAccess="true"))
+	int32 InitialChargeBonus = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Spawn|Charge Adjustments", meta=(AllowPrivateAccess="true"))
+	int32 MaxChargeBonus = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Spawn|Charge Adjustments", meta=(AllowPrivateAccess="true"))
+	int32 RechargeAmountBonus = 0;
+
+	/** Added to the shared interval. Negative values recharge this spawner faster. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Spawn|Charge Adjustments", meta=(AllowPrivateAccess="true", Units="s"))
+	float RechargeIntervalAdjustment = 0.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="s"))
 	float ReuseCooldown = 2.0f;
 
@@ -78,8 +101,33 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation", meta=(AllowPrivateAccess="true"))
 	bool bRequireNavigation = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
+	float NavigationSearchRadius = 600.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
+	float NavigationSearchHeight = 1200.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
+	float CollisionSearchRadius = 900.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
+	float MaxVerticalSpawnAdjustment = 800.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
+	float SpawnCapsuleClearance = 8.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true"))
+	bool bAllowNavigationFallback = true;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation", meta=(AllowPrivateAccess="true"))
 	bool bEnabled = true;
 
+	UPROPERTY(Replicated, VisibleInstanceOnly, BlueprintReadOnly, Category="Spawn|Charge", meta=(AllowPrivateAccess="true"))
+	int32 CurrentSpawnCharges = 0;
+
 	double LastUsedTime = -DBL_MAX;
+	FTimerHandle ChargeRechargeTimerHandle;
+
+	void InitializeSpawnCharges();
+	void RechargeSpawnCharges();
 };

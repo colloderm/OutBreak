@@ -22,6 +22,14 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Budget", meta=(ClampMin="1"))
 	int32 SpawnBurstPerFrame = 4;
 
+	/** Resident zombies maintained independently for every registered sector. */
+	UPROPERTY(Config, EditAnywhere, Category="Population", meta=(ClampMin="0"))
+	int32 DefaultBaseZombiesPerSector = 6;
+
+	UPROPERTY(Config, EditAnywhere, Category="Population", meta=(ClampMin="0.1", Units="s"))
+	float BasePopulationCheckInterval = 0.5f;
+
+	/** Additional pooled reinforcements requested by each noise event. */
 	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0"))
 	int32 DefaultResponders = 6;
 
@@ -45,4 +53,21 @@ public:
 
 	UPROPERTY(Config, EditAnywhere, Category="Pool", meta=(ClampMin="1000.0", Units="cm"))
 	float PooledActorZOffset = 200000.0f;
+
+	/** Shared charge values. Every spawner adds its instance adjustments to these. */
+	UPROPERTY(Config, EditAnywhere, Category="Spawner Charge", meta=(ClampMin="0"))
+	int32 DefaultSpawnerInitialCharges = 12;
+
+	UPROPERTY(Config, EditAnywhere, Category="Spawner Charge", meta=(ClampMin="1"))
+	int32 DefaultSpawnerMaxCharges = 12;
+
+	UPROPERTY(Config, EditAnywhere, Category="Spawner Charge", meta=(ClampMin="0"))
+	int32 DefaultSpawnerRechargeAmount = 2;
+
+	UPROPERTY(Config, EditAnywhere, Category="Spawner Charge", meta=(ClampMin="0.1", Units="s"))
+	float DefaultSpawnerRechargeInterval = 10.0f;
+
+	/** Noise reinforcements are pooled after this long without a combat target. */
+	UPROPERTY(Config, EditAnywhere, Category="Reinforcement Cleanup", meta=(ClampMin="0.0", Units="s"))
+	float ReinforcementCombatExitPoolDelay = 30.0f;
 };

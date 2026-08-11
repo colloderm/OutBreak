@@ -25,8 +25,12 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	void InitializeAsPooled(FName InPoolKey);
-	void ReserveForActivation(FName InPoolKey, FName InSectorId);
+	void InitializeAsPooled(FName InPoolKey, EEnemyPopulationRole InPopulationRole);
+	void ReserveForActivation(
+		FName InPoolKey,
+		FName InSectorId,
+		EEnemyPopulationRole InPopulationRole);
+	void AdoptAsSectorBase(FName InPoolKey, FName InSectorId);
 	void BeginSpawnPresentation(
 		const FTransform& SpawnTransform,
 		UAnimMontage* SpawnMontage,
@@ -43,6 +47,7 @@ public:
 	EEnemyPoolPhase GetPoolPhase() const { return SpawnState.Phase; }
 	FName GetPoolKey() const { return SpawnState.PoolKey; }
 	FName GetSectorId() const { return SpawnState.SectorId; }
+	EEnemyPopulationRole GetPopulationRole() const { return SpawnState.PopulationRole; }
 	int32 GetActivationId() const { return SpawnState.ActivationId; }
 	bool IsBudgeted() const;
 
@@ -52,6 +57,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(EEndPlayReason::Type EndPlayReason) override;
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction) override;
 
 private:
 	struct FPrimitiveCollisionSnapshot
@@ -63,13 +70,17 @@ private:
 		FTransform RelativeTransform = FTransform::Identity;
 		bool bGenerateOverlapEvents = false;
 		bool bSimulatePhysics = false;
+		bool bIsRootComponent = false;
 	};
 
 	void CaptureCollisionSnapshot();
 	void DisableOwnerCollision();
 	void RestoreCollisionSnapshot();
 	void SuspendOwner();
-	void ResumeOwner();
+	bool SnapOwnerToGround(FString& OutFailureReason);
+	void RestoreOwnerForActivation();
+	void ResumeOwnerAI();
+	void UpdateReinforcementCleanup();
 	void SetSpawnPhase(EEnemyPoolPhase NewPhase);
 	void ApplySpawnState(EEnemyPoolPhase PreviousPhase);
 	void PlayPresentationCosmetics();
@@ -97,4 +108,6 @@ private:
 	FTimerHandle PoolReturnTimerHandle;
 	int32 LastPresentedActivationId = 0;
 	bool bCollisionSnapshotCaptured = false;
+	bool bHasPendingNoiseCommand = false;
+	double LastCombatActivityTime = 0.0;
 };

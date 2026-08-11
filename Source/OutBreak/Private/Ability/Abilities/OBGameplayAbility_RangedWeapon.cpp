@@ -16,6 +16,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameplayPrediction.h"
+#include "Global/OutBreakGlobal.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
@@ -652,6 +653,17 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 
 	const int32 AmmoBeforeShot = Weapon->GetCurrentAmmo();
 	Weapon->ConsumeAmmo(1);
+
+	// Gameplay cues are presentation and can be skipped or predicted on a client.
+	// Report the gunshot from this authoritative ammo-commit path so AI response
+	// never depends on a cosmetic Blueprint executing on the server.
+	UOutBreakGlobal::ReportNoiseToAI(
+		Character,
+		MuzzleLoc,
+		Character,
+		NAME_None,
+		1.0f,
+		0.0f);
 
 	// --- 발사 큐: 총구 화염 + 사격음. 탄자 수와 무관하게 1회 ---
 	FGameplayCueParameters FireCueParams;

@@ -19,6 +19,23 @@ class OUTBREAK_API UOutBreakGlobal
 	GENERATED_BODY()
 
 public:
+	UFUNCTION(
+		BlueprintCallable,
+		Category = "OutBreak|Audio",
+		meta = (
+			DisplayName = "Report Noise To AI",
+			WorldContext = "WorldContextObject",
+			DefaultToSelf = "Instigator",
+			AdvancedDisplay = "NoiseTag,Loudness,MaxRange"
+			))
+	static void ReportNoiseToAI(
+		UObject* WorldContextObject,
+		const FVector& Location,
+		AActor* Instigator,
+		FName NoiseTag = NAME_None,
+		float Loudness = 1.0f,
+		float MaxRange = 0.0f);
+
 	/**
 	 * 지정한 위치에서 사운드를 재생하고 AI Hearing에 소음 이벤트를 보고합니다.
 	 */

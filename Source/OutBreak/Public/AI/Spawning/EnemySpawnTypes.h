@@ -15,6 +15,15 @@ enum class EEnemyPoolPhase : uint8
 	Dying,
 };
 
+/** Population ownership is independent from the current pool lifecycle phase. */
+UENUM(BlueprintType)
+enum class EEnemyPopulationRole : uint8
+{
+	Unassigned,
+	SectorBase,
+	NoiseReinforcement,
+};
+
 USTRUCT(BlueprintType)
 struct OUTBREAK_API FEnemySpawnRepState
 {
@@ -31,6 +40,9 @@ struct OUTBREAK_API FEnemySpawnRepState
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	FName SectorId = NAME_None;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	EEnemyPopulationRole PopulationRole = EEnemyPopulationRole::Unassigned;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	double PresentationStartServerTime = 0.0;

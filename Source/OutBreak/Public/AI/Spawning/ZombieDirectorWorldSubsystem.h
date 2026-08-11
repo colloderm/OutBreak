@@ -41,8 +41,12 @@ private:
 	{
 		FEnemyNoiseEvent NoiseEvent;
 		FName SectorId = NAME_None;
+		EEnemyPopulationRole PopulationRole = EEnemyPopulationRole::NoiseReinforcement;
 		int32 RemainingCount = 0;
 		double ExpireTime = 0.0;
+		bool bPersistent = false;
+		double LastFailureLogTime = -DBL_MAX;
+		FString LastFailureReason;
 	};
 
 	struct FRecentNoise
@@ -53,16 +57,56 @@ private:
 		double Time = 0.0;
 	};
 
+	struct FLatestSectorNoise
+	{
+		FVector Location = FVector::ZeroVector;
+		int64 EventId = 0;
+		double Timestamp = 0.0;
+	};
+
 	bool IsAuthorityWorld() const;
 	bool ShouldMergeNoise(const FEnemyNoiseEvent& NoiseEvent);
+	void DispatchLatestNoiseToReinforcements(FName SectorId, const FVector& NoiseLocation);
+	void EnsureBasePopulations(double Now);
+	void AdoptPlacedEnemiesAsSectorBase();
 	int32 RedirectExistingEnemies(const FEnemyNoiseEvent& NoiseEvent, int32 DesiredCount);
 	bool TryFulfillOne(FPendingSpawnRequest& Request);
-	AEnemyCharacterSpawner* SelectSpawner(const FPendingSpawnRequest& Request) const;
-	AEnemyCharacter* AcquireEnemy(AEnemyCharacterSpawner& Spawner);
+	AEnemyCharacterSpawner* SelectSpawner(
+		const FPendingSpawnRequest& Request,
+		FString* OutFailureReason = nullptr) const;
+	AEnemyCharacter* AcquireEnemy(
+		AEnemyCharacterSpawner& Spawner,
+		FName PoolBucketKey,
+		EEnemyPopulationRole PopulationRole,
+		const FTransform& SpawnTransform);
 	void WarmPoolForSpawner(AEnemyCharacterSpawner& Spawner);
-	AEnemyCharacter* CreateEnemy(AEnemyCharacterSpawner& Spawner, bool bForPool);
+	void WarmPoolBucket(
+		AEnemyCharacterSpawner& Spawner,
+		FName PoolBucketKey,
+		EEnemyPopulationRole PopulationRole,
+		int32 DesiredWarmCount);
+	AEnemyCharacter* CreateEnemy(
+		AEnemyCharacterSpawner& Spawner,
+		bool bForPool,
+		const FTransform& SpawnTransform,
+		FName PoolBucketKey,
+		EEnemyPopulationRole PopulationRole);
+	FName MakePoolBucketKey(
+		FName ArchetypePoolKey,
+		FName SectorId,
+		EEnemyPopulationRole PopulationRole) const;
+	FName ResolveSpawnerSectorId(const AEnemyCharacterSpawner& Spawner) const;
+	FName ResolveBasePoolBucketKey(FName SectorId) const;
 	int32 CountBudgetedEnemies() const;
+	int32 CountPooledEnemies() const;
 	int32 CountSectorEnemies(FName SectorId) const;
+	int32 CountSectorEnemies(
+		FName SectorId,
+		EEnemyPopulationRole PopulationRole) const;
+	int32 CountPendingSpawns(
+		FName SectorId,
+		EEnemyPopulationRole PopulationRole) const;
+	int32 ResolveSectorBaseTarget(FName SectorId) const;
 	int32 ResolveSectorHardCap(FName SectorId) const;
 	void CompactRegistries();
 
@@ -73,5 +117,7 @@ private:
 	TSet<FName> WarmedPoolKeys;
 	TArray<FPendingSpawnRequest> PendingRequests;
 	TArray<FRecentNoise> RecentNoises;
+	TMap<FName, FLatestSectorNoise> LatestSectorNoises;
 	int64 NextNoiseEventId = 1;
+	double LastBasePopulationCheckTime = -DBL_MAX;
 };

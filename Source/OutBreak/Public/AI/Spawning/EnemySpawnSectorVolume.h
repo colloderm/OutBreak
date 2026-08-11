@@ -18,6 +18,7 @@ public:
 	FName GetSectorId() const { return SectorId; }
 	int32 GetSoftCap() const { return SoftCap; }
 	int32 GetHardCap() const { return HardCap; }
+	int32 GetBaseZombieTarget() const { return BaseZombieTarget; }
 	float GetResponseRadiusScale() const { return ResponseRadiusScale; }
 
 protected:
@@ -36,6 +37,10 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Sector", meta=(AllowPrivateAccess="true", ClampMin="1"))
 	int32 HardCap = 24;
+
+	/** Resident population. Noise reinforcements are added on top of this count. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Sector", meta=(AllowPrivateAccess="true", ClampMin="0"))
+	int32 BaseZombieTarget = 6;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Sector", meta=(AllowPrivateAccess="true", ClampMin="0.1"))
 	float ResponseRadiusScale = 1.0f;

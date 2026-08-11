@@ -10,6 +10,60 @@
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundCue.h"
 
+void UOutBreakGlobal::ReportNoiseToAI(
+	UObject* WorldContextObject,
+	const FVector& Location,
+	AActor* Instigator,
+	const FName NoiseTag,
+	const float Loudness,
+	const float MaxRange)
+{
+	if (!IsValid(WorldContextObject) ||
+		!FMath::IsFinite(Location.X) ||
+		!FMath::IsFinite(Location.Y) ||
+		!FMath::IsFinite(Location.Z))
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("%s: invalid world context or location."),
+			TEXT(__FUNCTION__));
+		return;
+	}
+
+	UWorld* World = GEngine
+		? GEngine->GetWorldFromContextObject(
+			WorldContextObject,
+			EGetWorldErrorMode::LogAndReturnNull)
+		: nullptr;
+	if (!IsValid(World) || World->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+
+	const float EffectiveLoudness = FMath::Clamp(Loudness, 0.0f, 10.0f);
+	const float EffectiveMaxRange = FMath::Max(0.0f, MaxRange);
+	UAISense_Hearing::ReportNoiseEvent(
+		WorldContextObject,
+		Location,
+		EffectiveLoudness,
+		Instigator,
+		EffectiveMaxRange,
+		NoiseTag);
+
+	if (UZombieDirectorWorldSubsystem* Director =
+		World->GetSubsystem<UZombieDirectorWorldSubsystem>())
+	{
+		FEnemyNoiseEvent NoiseEvent;
+		NoiseEvent.Location = Location;
+		NoiseEvent.Instigator = Instigator;
+		NoiseEvent.NoiseTag = NoiseTag;
+		NoiseEvent.Loudness = EffectiveLoudness;
+		NoiseEvent.MaxRange = EffectiveMaxRange;
+		Director->ReportNoise(NoiseEvent);
+	}
+}
+
 void UOutBreakGlobal::PlaySoundAndReportNoise(
 	UObject* WorldContextObject,
 	USoundCue* SoundCue,
@@ -25,79 +79,46 @@ void UOutBreakGlobal::PlaySoundAndReportNoise(
 			Warning,
 			TEXT("%s: WorldContextObject is invalid."),
 			TEXT(__FUNCTION__));
-
 		return;
 	}
 
-	if (!IsValid(SoundCue))
+	float MaxNoiseRange = 0.0f;
+	if (IsValid(SoundCue))
+	{
+		const FSoundAttenuationSettings* AttenuationSettings =
+			SoundCue->GetAttenuationSettingsToApply();
+		if (AttenuationSettings != nullptr && AttenuationSettings->bAttenuate)
+		{
+			MaxNoiseRange = AttenuationSettings->GetMaxFalloffDistance();
+			MaxNoiseRange *= FMath::Max(0.0f, NoiseRangeScale);
+		}
+
+		UGameplayStatics::PlaySoundAtLocation(
+			WorldContextObject,
+			SoundCue,
+			Location,
+			FRotator::ZeroRotator,
+			1.0f,
+			1.0f,
+			0.0f,
+			nullptr);
+	}
+	else
 	{
 		UE_LOG(
 			LogTemp,
 			Warning,
-			TEXT("%s: SoundCue is invalid."),
+			TEXT("%s: SoundCue is invalid; reporting AI noise without audio."),
 			TEXT(__FUNCTION__));
-
-		return;
 	}
 
-	const FSoundAttenuationSettings* AttenuationSettings =
-		SoundCue->GetAttenuationSettingsToApply();
-
-	float MaxNoiseRange = 0.0f;
-
-	if (AttenuationSettings != nullptr &&
-		AttenuationSettings->bAttenuate)
-	{
-		MaxNoiseRange =
-			AttenuationSettings->GetMaxFalloffDistance();
-
-		MaxNoiseRange *=
-			FMath::Max(0.0f, NoiseRangeScale);
-	}
-
-	UGameplayStatics::PlaySoundAtLocation(
+	ReportNoiseToAI(
 		WorldContextObject,
-		SoundCue,
 		Location,
-		FRotator::ZeroRotator,
+		Instigator,
+		NoiseTag,
 		1.0f,
-		1.0f,
-		0.0f,
-		nullptr);
-
-	constexpr float NoiseLoudness = 1.0f;
-
-
-	UWorld* World = GEngine
-		? GEngine->GetWorldFromContextObject(
-			WorldContextObject,
-			EGetWorldErrorMode::LogAndReturnNull)
-		: nullptr;
-
-	// Hearing and Director orchestration are authoritative. This prevents a
-	// listen client/server pair from turning one gunshot into two spawn requests.
-	if (IsValid(World) && World->GetNetMode() != NM_Client)
-	{
-		UAISense_Hearing::ReportNoiseEvent(
-			WorldContextObject,
-			Location,
-			NoiseLoudness,
-			Instigator,
-			MaxNoiseRange,
-			NoiseTag);
-
-		if (UZombieDirectorWorldSubsystem* Director =
-			World->GetSubsystem<UZombieDirectorWorldSubsystem>())
-		{
-			FEnemyNoiseEvent NoiseEvent;
-			NoiseEvent.Location = Location;
-			NoiseEvent.Instigator = Instigator;
-			NoiseEvent.NoiseTag = NoiseTag;
-			NoiseEvent.Loudness = NoiseLoudness;
-			NoiseEvent.MaxRange = MaxNoiseRange;
-			Director->ReportNoise(NoiseEvent);
-		}
-	}
+		MaxNoiseRange);
 
 	UE_LOG(
 		LogTemp,
