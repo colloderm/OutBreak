@@ -4,6 +4,7 @@
 
 #include "Character/OBCharacterBase.h"
 #include "AbilitySystemComponent.h"
+#include "Ability/Tags/OBGameplayTags.h"
 
 UOBGameplayAbility::UOBGameplayAbility(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -18,6 +19,31 @@ UOBGameplayAbility::UOBGameplayAbility(const FObjectInitializer& ObjectInitializ
 AOBCharacterBase* UOBGameplayAbility::GetOBCharacterFromActorInfo() const
 {
 	return CurrentActorInfo ? Cast<AOBCharacterBase>(CurrentActorInfo->AvatarActor.Get()) : nullptr;
+}
+
+bool UOBGameplayAbility::CanActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayTagContainer* SourceTags,
+	const FGameplayTagContainer* TargetTags,
+	FGameplayTagContainer* OptionalRelevantTags) const
+{
+	if (!Super::CanActivateAbility(Handle, ActorInfo, SourceTags, TargetTags, OptionalRelevantTags))
+	{
+		return false;
+	}
+
+	// OnSpawn abilities are the project's passive policy. They must remain able
+	// to initialize if the avatar becomes ready while insertion transit is active.
+	if (ActivationPolicy == EOBAbilityActivationPolicy::OnSpawn)
+	{
+		return true;
+	}
+
+	const UAbilitySystemComponent* AbilitySystem =
+		ActorInfo ? ActorInfo->AbilitySystemComponent.Get() : nullptr;
+	return !AbilitySystem
+		|| !AbilitySystem->HasMatchingGameplayTag(OBGameplayTags::State_HelicopterTransit);
 }
 
 void UOBGameplayAbility::OnAvatarSet(const FGameplayAbilityActorInfo* ActorInfo, const FGameplayAbilitySpec& Spec)

@@ -35,6 +35,7 @@
 #include "Player/Data/OBPlayerStatData.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogOBCameraProvider, Log, All);
+DEFINE_LOG_CATEGORY_STATIC(LogOBSpawnGround, Log, All);
 
 FGenericTeamId AOBCharacterBase::GetGenericTeamId() const
 {
@@ -502,19 +503,37 @@ void AOBCharacterBase::FinishDeathFromDowned()
 void AOBCharacterBase::HoldUntilGrounded()
 {
 	if (!HasAuthority()) return;
+	GetWorldTimerManager().ClearTimer(GroundWaitTimer);
 
 	// 바닥이 이미 있으면 스냅만 하고 끝(에디터·비스트리밍 맵의 정상 경로).
-	if (TryLandOnGround()) return;
+	if (TryLandOnGround())
+	{
+		if (UCharacterMovementComponent* Move = GetCharacterMovement())
+		{
+			Move->StopMovementImmediately();
+			Move->SetMovementMode(MOVE_Walking);
+		}
+		UE_LOG(LogOBSpawnGround, Log,
+			TEXT("[SpawnGround] Immediate ground resolve Character=%s Location=%s"),
+			*GetName(), *GetActorLocation().ToCompactString());
+		return;
+	}
 
-	// 월드 파티션 셀이 아직 안 올라옴. 지금 떨어뜨리면 지형 밑으로 빠진다.
+	// Collision may be late because of world partition. Keep gravity/collision and
+	// player air control alive while polling instead of freezing input in MOVE_None.
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->StopMovementImmediately();
-		Move->SetMovementMode(MOVE_None);   // 복제되므로 클라도 같이 멈춘다
+		Move->SetMovementMode(MOVE_Falling);
 	}
 
 	GroundWaitElapsed = 0.f;
 	GetWorldTimerManager().SetTimer(GroundWaitTimer, this, &AOBCharacterBase::PollGround, 0.25f, true);
+	UE_LOG(LogOBSpawnGround, Warning,
+		TEXT("[SpawnGround] Ground trace pending Character=%s Location=%s TraceDistance=%.1f MovementMode=%d Timeout=%.1f"),
+		*GetName(), *GetActorLocation().ToCompactString(), GroundTraceDistance,
+		GetCharacterMovement() ? static_cast<int32>(GetCharacterMovement()->MovementMode) : -1,
+		MaxGroundWaitSeconds);
 }
 
 void AOBCharacterBase::ApplyCombatFocusPostProcess()
@@ -690,13 +709,33 @@ void AOBCharacterBase::PollGround()
 {
 	GroundWaitElapsed += 0.25f;
 
-	if (TryLandOnGround() || GroundWaitElapsed >= MaxGroundWaitSeconds)
+	if (TryLandOnGround())
 	{
 		GetWorldTimerManager().ClearTimer(GroundWaitTimer);
 		if (UCharacterMovementComponent* Move = GetCharacterMovement())
 		{
+			Move->StopMovementImmediately();
 			Move->SetMovementMode(MOVE_Walking);
 		}
+		UE_LOG(LogOBSpawnGround, Log,
+			TEXT("[SpawnGround] Deferred ground resolve Character=%s Elapsed=%.2f Location=%s"),
+			*GetName(), GroundWaitElapsed, *GetActorLocation().ToCompactString());
+		return;
+	}
+
+	if (GroundWaitElapsed >= MaxGroundWaitSeconds)
+	{
+		GetWorldTimerManager().ClearTimer(GroundWaitTimer);
+		UCharacterMovementComponent* Move = GetCharacterMovement();
+		if (Move && Move->MovementMode == MOVE_None)
+		{
+			Move->SetMovementMode(MOVE_Falling);
+		}
+		UE_LOG(LogOBSpawnGround, Error,
+			TEXT("[SpawnGround] Ground resolve timed out Character=%s Elapsed=%.2f Location=%s MovementMode=%d Velocity=%s"),
+			*GetName(), GroundWaitElapsed, *GetActorLocation().ToCompactString(),
+			Move ? static_cast<int32>(Move->MovementMode) : -1,
+			*GetVelocity().ToCompactString());
 	}
 }
 

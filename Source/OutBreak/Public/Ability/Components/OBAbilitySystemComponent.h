@@ -35,6 +35,16 @@ public:
 
 	// 누적 입력 초기화(메뉴 전환 등).
 	void ClearAbilityInput();
+
+	/**
+	 * Ends player-driven input cleanly before a modal gameplay state such as
+	 * helicopter transit or inventory UI.
+	 *
+	 * Tracked pressed/held/released specs receive the same release notification as
+	 * a physical key release. Active OB abilities that are not OnSpawn passives are
+	 * then cancelled, while OnSpawn/passive abilities are deliberately preserved.
+	 */
+	void FlushPlayerAbilityInput(const TCHAR* Reason);
 	
 protected:
 	// 이번 프레임 눌린 능력 핸들.

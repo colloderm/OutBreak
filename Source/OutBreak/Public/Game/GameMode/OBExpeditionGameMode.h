@@ -8,6 +8,7 @@
 #include "OBExpeditionGameMode.generated.h"
 
 class AOBPlayerStateBase;
+class APlayerController;
 class AOBExtractionZone;
 class UOBExpeditionMapCatalog;
 class AOBExpeditionSpawnZone;
@@ -89,6 +90,7 @@ public:
 	void UpdateSpectatorsForTeam(uint8 TeamId);
 	
 protected:
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void StartPlay() override;
 	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 	
@@ -110,6 +112,11 @@ protected:
 	void BeginInsertionPhase();
 	void RegisterPlayerForInsertion(APlayerController* NewPlayer);
 	bool SpawnAndSeatInsertionPawn(APlayerController* NewPlayer, AOBInsertionHelicopter* Helicopter);
+	bool ResolveInsertionRegistrationFailure(
+		APlayerController* NewPlayer,
+		uint8 TeamId,
+		const FString& FailureReason);
+	bool FindSafeInsertionFallbackGround(uint8 TeamId, FVector& OutGroundLocation) const;
 	AOBInsertionHelicopter* GetOrCreateInsertionHelicopter(uint8 TeamId);
 	AOBHelicopterRoute* GetOrAssignInsertionRoute(uint8 TeamId);
 	void CollectHelicopterRoutes();
@@ -131,7 +138,6 @@ protected:
 	void TryCompleteInsertion();
 	void CompleteInsertionAfterGracePeriod();
 	void AssignPersonalExtractsForTeam(uint8 TeamId, const FVector& InsertionOrigin);
-	void UpdateReplicatedInsertionState(uint8 TeamId, EOBInsertionPhase Phase);
 
 	UFUNCTION()
 	void HandleInsertionHelicopterPhaseChanged(AOBInsertionHelicopter* Helicopter, EOBInsertionPhase NewPhase);
@@ -209,8 +215,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Spawn")
 	float MinZoneSeparation = 100000.f;
 
-	/** Kept for Blueprint serialization compatibility; false is ignored at runtime. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion", meta = (DeprecatedProperty, DeprecationMessage = "Expedition entry always uses helicopter insertion."))
+	/**
+	 * Selects the authoritative entry path for this GameMode.
+	 * True: spawn and seat players in the insertion helicopter.
+	 * False: use the existing SpawnZone/PlayerStart Unreal restart path.
+	 * Configure this on BP_ExpeditionGameMode Class Defaults before the level starts.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion",
+		meta = (DisplayName = "Enable Helicopter Insertion"))
 	bool bEnableHelicopterInsertion = true;
 
 	/** Assign BP_OBInsertionHelicopter here. Native class remains a logic-only fallback. */

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Game/Expedition/OBExpeditionTypes.h"
+#include "Game/Expedition/OBHelicopterTypes.h"
 #include "Inventory/Data/InventoryData.h"
 #include "Item/Data/OBItemTypes.h"
 #include "OBPlayerController.generated.h"
@@ -25,7 +26,6 @@ struct FGameplayTag;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
-struct FInputKeyEventArgs;
 
 UCLASS()
 class OUTBREAK_API AOBPlayerController : public APlayerController
@@ -34,11 +34,20 @@ class OUTBREAK_API AOBPlayerController : public APlayerController
 public:
 	AOBPlayerController();
 
-	/** Called by the authoritative helicopter when this controller enters or leaves transit. */
-	void SetHelicopterTransitView(AActor* NewViewTarget, bool bLocked);
+	/** Single authoritative transition called by the server helicopter. */
+	void SetInsertionTransitState(
+		AOBInsertionHelicopter* Helicopter,
+		EOBPlayerInsertionTransitPhase Phase,
+		AActor* NewViewTarget);
 
 	UFUNCTION(BlueprintPure, Category = "Expedition|Helicopter")
 	bool IsHelicopterTransitLocked() const { return bHelicopterTransitLocked; }
+
+	UFUNCTION(BlueprintPure, Category = "Expedition|Helicopter")
+	EOBPlayerInsertionTransitPhase GetInsertionTransitPhase() const
+	{
+		return ReplicatedInsertionTransitState.Phase;
+	}
 
 	UFUNCTION(BlueprintCallable, Category = "Expedition|Insertion")
 	void RequestInsertionPoint(const FVector2D& WorldXY);
@@ -48,6 +57,9 @@ public:
 
 	/** View-trace fallback used while the insertion map owns Slate focus. */
 	void RequestInsertionPointFromFocusedWidget();
+
+	/** Central owner for map focus, cursor, and game/UI input mode. */
+	void ApplyWorldMapInputMode(UUserWidget* MapWidget, bool bOpen);
 	
 	//발사 시 시야 회전 반동 + 카메라 쉐이크 적용.
 	void ApplyWeaponRecoil(float PitchKick, float YawKick, float RecoverySpeed, TSubclassOf<UCameraShakeBase> CameraShake, float CameraShakeScale = 1.f);
@@ -99,7 +111,8 @@ protected:
 	//~ APlayerController interface
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
-	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
+	virtual void OnRep_Pawn() override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	//~ End interface
 	
 	// 클라: PlayerState가 복제되어 들어온 시점 → 사망상태 구독.
@@ -164,19 +177,29 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	int32 InputMappingPriority = 0;
 
-	/** Optional high-priority context containing only insertion UI actions. */
+	/** Optional high-priority context that remaps the existing MapAction and InteractAction only. */
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Insertion")
 	TObjectPtr<UInputMappingContext> InsertionMappingContext;
 
-	/** Optional dedicated map action in InsertionMappingContext. Existing MapAction remains a fallback. */
+	/**
+	 * Pawn-owned contexts that can consume the same keys before this controller.
+	 * They are suspended only while aboard and restored at their original priority.
+	 */
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Insertion")
-	TObjectPtr<UInputAction> InsertionMapAction;
+	TArray<TSoftObjectPtr<UInputMappingContext>> PawnMappingContextsToSuspendDuringInsertion;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input|Insertion")
 	int32 InsertionInputMappingPriority = 100;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion", meta = (ClampMin = "0.0"))
 	float InsertionViewBlendSeconds = 0.35f;
+
+	/** Waits for the Pawn actor channel to replicate detach/movement before input and camera are released. */
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Network", meta = (ClampMin = "0.01"))
+	float InsertionDeploymentReadyPollInterval = 0.05f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Network", meta = (ClampMin = "0.1"))
+	float MaxInsertionDeploymentReadyWaitSeconds = 3.f;
 
 	/** Pitch applied when the camera returns from the helicopter to the deployed character. */
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Camera", meta = (ClampMin = "-89.0", ClampMax = "89.0"))
@@ -195,10 +218,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Trace")
 	bool bDrawInsertionTargetTrace = true;
-
-	/** Receives E/M directly from PlayerController even when insertion Input Actions are not configured. */
-	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Debug")
-	bool bEnableRawInsertionKeyFallback = true;
 
 	/** Shows the insertion input/trace state on screen in addition to the Output Log. */
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition|Insertion|Debug")
@@ -297,23 +316,12 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_RequestInsertionPoint(FVector2D WorldXY);
 
-	UFUNCTION(Client, Reliable)
-	void Client_SetHelicopterTransitView(AActor* NewViewTarget, bool bLocked);
-
-	UFUNCTION(Client, Reliable)
-	void Client_BeginInsertionPresentation(
+	/** Client acknowledgement used to diagnose and validate remote insertion setup. */
+	UFUNCTION(Server, Reliable)
+	void Server_ReportInsertionClientReady(
 		AOBInsertionHelicopter* Helicopter,
-		float SelectionDeadlineServerTime,
-		bool bCanSelectTarget);
-
-	UFUNCTION(Client, Reliable)
-	void Client_UpdateInsertionPresentation(
-		EOBInsertionPhase Phase,
-		const FString& StatusMessage,
-		bool bForceMapOpen);
-
-	UFUNCTION(Client, Reliable)
-	void Client_EndInsertionPresentation(APawn* RestoredPawn);
+		EOBInsertionPhase ClientPhase,
+		bool bViewTargetReady);
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Expedition|Insertion", meta = (DisplayName = "On Insertion Presentation Started"))
 	void BP_OnInsertionPresentationStarted(
@@ -464,6 +472,8 @@ public:
 	void BindToGameStatePhase();   // GameState 준비 대기 후 페이즈 구독
 	UFUNCTION()
 	void HandleExpeditionPhaseChanged(EOBExpeditionPhase NewPhase);
+	UFUNCTION()
+	void HandleTeamInsertionStatesChanged();
 	void ShowResultScreen();
 	
 	// 서버가 탈출 시점에 찍은 가방을 소유 클라로 보낸다.
@@ -480,6 +490,30 @@ public:
 private:
 	void EnterInsertionInputMode(bool bCanSelectTarget);
 	void ExitInsertionInputMode();
+	void BeginInsertionPresentationLocal(
+		AOBInsertionHelicopter* Helicopter,
+		float SelectionDeadlineServerTime,
+		bool bCanSelectTarget,
+		const TCHAR* Source);
+	void ApplyInsertionPresentationUpdateLocal(
+		EOBInsertionPhase Phase,
+		const FString& StatusMessage,
+		bool bForceMapOpen,
+		const TCHAR* Source);
+	void ReconcileInsertionPresentationFromGameState();
+	void ScheduleInsertionClientReconcile();
+	void ApplyInsertionTransitStateLocal(const TCHAR* Source);
+	void ApplyInsertionAbilityGate(bool bLocked, bool bCancelActiveAbilities);
+	void SetPawnInputSuppressedForInsertion(bool bSuppress);
+	void SetPawnMappingContextsSuppressedForInsertion(bool bSuppress);
+	void EnsureDefaultInputMappingContext();
+	void CloseWorldMapForModal(const TCHAR* Reason);
+	bool HasActiveInsertionTransit() const;
+	bool IsInsertionDeploymentReady() const;
+	void PollInsertionDeploymentReady();
+
+	UFUNCTION()
+	void OnRep_InsertionTransitState();
 	void TryOpenInsertionMap();
 	void HandleInsertionMapToggle(const TCHAR* InputSource);
 	void HandleInsertionTraceRequest(const TCHAR* InputSource);
@@ -500,9 +534,19 @@ private:
 	bool bInsertionMappingContextAdded = false;
 	int32 InsertionMapOpenAttempts = 0;
 	float InsertionSelectionDeadlineServerTime = 0.f;
-	float LastInsertionMapInputRealTime = -1000.f;
-	float LastInsertionTraceInputRealTime = -1000.f;
 	float LastInsertionLookDebugRealTime = -1000.f;
+	EOBInsertionPhase LastAppliedInsertionPhase = static_cast<EOBInsertionPhase>(0);
+	int32 LastAppliedInsertionPresentationRevision = 0;
+	bool bInsertionReadyAckSent = false;
+	bool bInsertionDisabledPawnInput = false;
+	float InsertionDeploymentReadyWaitStartedRealTime = -1.f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_InsertionTransitState)
+	FOBPlayerInsertionTransitState ReplicatedInsertionTransitState;
 	TWeakObjectPtr<AOBInsertionHelicopter> InsertionHelicopter;
+	TWeakObjectPtr<APawn> InsertionInputSuppressedPawn;
+	TMap<const UInputMappingContext*, int32> InsertionSuspendedMappingContextPriorities;
 	FTimerHandle InsertionMapOpenRetryTimer;
+	FTimerHandle InsertionClientReconcileTimer;
+	FTimerHandle InsertionDeploymentReadyTimer;
 };

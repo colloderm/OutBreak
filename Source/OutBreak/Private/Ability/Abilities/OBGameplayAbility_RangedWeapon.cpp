@@ -29,6 +29,19 @@ namespace
 	{
 		return BoneName == TEXT("head") || BoneName == TEXT("neck_01");
 	}
+
+	bool HasFireBlockingState(
+		const AOBCharacterBase* Character,
+		const UAbilitySystemComponent* AbilitySystem)
+	{
+		return !Character
+			|| Character->IsDead()
+			|| Character->IsDowned()
+			|| (AbilitySystem
+				&& (AbilitySystem->HasMatchingGameplayTag(OBGameplayTags::State_HelicopterTransit)
+					|| AbilitySystem->HasMatchingGameplayTag(OBGameplayTags::State_Dead)
+					|| AbilitySystem->HasMatchingGameplayTag(OBGameplayTags::State_Downed)));
+	}
 }
 
 UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectInitializer& ObjectInitializer)
@@ -40,6 +53,9 @@ UOBGameplayAbility_RangedWeapon::UOBGameplayAbility_RangedWeapon(const FObjectIn
 	// 무기 전환 중에는 발사 차단.
 	ActivationBlockedTags.AddTag(OBGameplayTags::State_Weapon_Switching);
 	ActivationBlockedTags.AddTag(OBGameplayTags::State_UsingConsumable);
+	ActivationBlockedTags.AddTag(OBGameplayTags::State_HelicopterTransit);
+	ActivationBlockedTags.AddTag(OBGameplayTags::State_Dead);
+	ActivationBlockedTags.AddTag(OBGameplayTags::State_Downed);
 }
 
 void UOBGameplayAbility_RangedWeapon::ActivateAbility(
@@ -200,6 +216,21 @@ bool UOBGameplayAbility_RangedWeapon::FireOneShot()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return false;
 	}
+
+	AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
+	UAbilitySystemComponent* AbilitySystem = GetAbilitySystemComponentFromActorInfo();
+	if (HasFireBlockingState(Character, AbilitySystem))
+	{
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponFire] Local shot loop stopped by player state Character=%s Transit=%s Dead=%s Downed=%s"),
+			*GetNameSafe(Character),
+			AbilitySystem && AbilitySystem->HasMatchingGameplayTag(OBGameplayTags::State_HelicopterTransit)
+				? TEXT("true") : TEXT("false"),
+			Character && Character->IsDead() ? TEXT("true") : TEXT("false"),
+			Character && Character->IsDowned() ? TEXT("true") : TEXT("false"));
+		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
+		return false;
+	}
 	
 	AOBWeaponBase* Weapon = GetEquippedWeapon();
 
@@ -233,7 +264,6 @@ bool UOBGameplayAbility_RangedWeapon::FireOneShot()
 
 	if (CurrentActorInfo && CurrentActorInfo->IsLocallyControlled() && !bHasLocalAimTargetData)
 	{
-		AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
 		UE_LOG(LogOBWeaponAim, Error,
 			TEXT("[WeaponAim] Local shot cancelled: no evaluated player view Ability=%s Character=%s Controller=%s"),
 			*GetName(), *GetNameSafe(Character),
@@ -414,6 +444,29 @@ void UOBGameplayAbility_RangedWeapon::SubmitLocalAimTargetData(
 	}
 
 	FScopedPredictionWindow ScopedPrediction(ASC, true);
+
+	// The server receives this target data inside a scoped window carrying this
+	// exact per-shot prediction key. Predict the instantaneous fire cue in the
+	// same window so the server multicast is correctly de-duplicated only after
+	// the owning client has actually played its muzzle flash and fire sound.
+	//
+	// Previously only recoil/camera shake was predicted. GAS still suppressed the
+	// server FireCue on the owning client because the multicast carried this local
+	// key, which left remote shooters with camera shake but no muzzle presentation.
+	if (AOBWeaponBase* Weapon = GetEquippedWeapon())
+	{
+		FGameplayCueParameters FireCueParams;
+		FireCueParams.Location = Weapon->GetMuzzleLocation();
+		FireCueParams.Instigator = GetOBCharacterFromActorInfo();
+		FireCueParams.SourceObject = Weapon;
+		ASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Fire, FireCueParams);
+
+		UE_LOG(LogOBWeaponAim, Log,
+			TEXT("[WeaponFire] Local predicted fire cue Character=%s Weapon=%s Muzzle=%s PredictionKey=%s"),
+			*GetNameSafe(GetOBCharacterFromActorInfo()), *Weapon->GetName(),
+			*FireCueParams.Location.ToCompactString(), *ASC->ScopedPredictionKey.ToString());
+	}
+
 	ASC->CallServerSetReplicatedTargetData(
 		CurrentSpecHandle,
 		CurrentActivationInfo.GetActivationPredictionKey(),
@@ -515,6 +568,19 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	const FVector& ViewDirection)
 {
 	AOBCharacterBase* Character = GetOBCharacterFromActorInfo();
+	UAbilitySystemComponent* AbilitySystem = GetAbilitySystemComponentFromActorInfo();
+	if (HasFireBlockingState(Character, AbilitySystem))
+	{
+		UE_LOG(LogOBWeaponAim, Warning,
+			TEXT("[WeaponFire] Shot stopped by player state Character=%s Transit=%s Dead=%s Downed=%s"),
+			*GetNameSafe(Character),
+			AbilitySystem && AbilitySystem->HasMatchingGameplayTag(OBGameplayTags::State_HelicopterTransit)
+				? TEXT("true") : TEXT("false"),
+			Character && Character->IsDead() ? TEXT("true") : TEXT("false"),
+			Character && Character->IsDowned() ? TEXT("true") : TEXT("false"));
+		return false;
+	}
+
 	AOBWeaponBase* Weapon = GetEquippedWeapon();
 	if (!Character || !Weapon || ViewOrigin.ContainsNaN() || ViewDirection.ContainsNaN()
 		|| ViewDirection.IsNearlyZero())
@@ -654,9 +720,10 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	}
 
 	UE_LOG(LogOBWeaponAim, Log,
-		TEXT("[WeaponFire] Authoritative shot committed Character=%s Weapon=%s Ammo=%d->%d FireCue=%s Montage=%s"),
+		TEXT("[WeaponFire] Authoritative shot committed Character=%s Weapon=%s Ammo=%d->%d FireCue=%s Montage=%s PredictionKey=%s"),
 		*Character->GetName(), *Weapon->GetName(), AmmoBeforeShot, Weapon->GetCurrentAmmo(),
-		*OBGameplayTags::GameplayCue_Weapon_Fire.GetTag().ToString(), *GetNameSafe(AttackMontage));
+		*OBGameplayTags::GameplayCue_Weapon_Fire.GetTag().ToString(), *GetNameSafe(AttackMontage),
+		*SourceASC->ScopedPredictionKey.ToString());
 	
 	// --- 탄자 루프: 샷건은 1회 발사에 여러 발이 각자 퍼진다 ---
 	// ponytail: 탄자마다 임팩트 큐를 개별 멀티캐스트. 8발이면 8회 — 대역폭이 문제되면 큐 1회로 묶을 것.
@@ -702,6 +769,12 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 			ImpactCueParams.Location = Hit.ImpactPoint;      // 탄착 위치
 			ImpactCueParams.Normal = Hit.ImpactNormal;			// 표면 방향(이펙트 회전용)
 			ImpactCueParams.PhysicalMaterial = Hit.PhysMaterial;
+
+			// Impact is authoritative-only: the client cannot know the validated
+			// server hit when it predicts the trigger pull. Clear the target-data
+			// prediction key for this multicast so the owning client does not discard
+			// an impact cue it never predicted locally.
+			FScopedPredictionWindow ServerImpactCueScope(SourceASC, FPredictionKey(), false);
 			SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Impact, ImpactCueParams);
 		}
 	
