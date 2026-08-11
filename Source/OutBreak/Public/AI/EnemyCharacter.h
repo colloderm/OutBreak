@@ -94,6 +94,10 @@ public:
 	
 	// 서버: 마지막 피격 방향/부위. Dead()에서 래그돌 임펄스로 쓴다.
 	void NotifyHitForRagdoll(FName BoneName, const FVector& HitDirection);
+	
+	// StateTree는 서버에서만 돈다. 공격 몽타주를 클라에도 보낸다.
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayMontage(UAnimMontage* Montage, float PlayRate, FName StartSection);
 
 protected:
 	virtual void BeginPlay() override;

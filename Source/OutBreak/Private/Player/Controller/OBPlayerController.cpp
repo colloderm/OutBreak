@@ -1785,6 +1785,17 @@ void AOBPlayerController::ClientTeamWiped_Implementation()
 {
 	HideSpectatorHUD();
 	ShowDeathScreen();   // 여기서만 홈 복귀 버튼이 있는 화면이 뜬다
+	
+	// 내 팀이 전멸한 시점에 이 플레이어의 판은 끝났다. 다른 팀의 세션 종료를 기다릴 이유가 없으므로 개인 결과창을 같은 지연으로 띄운다.
+	if (ResultDelaySeconds > 0.f)
+	{
+		GetWorldTimerManager().SetTimer(
+			ResultDelayTimer, this, &AOBPlayerController::ShowResultScreen, ResultDelaySeconds, false);
+	}
+	else
+	{
+		ShowResultScreen();
+	}
 }
 
 void AOBPlayerController::ShowSpectatorHUD()
@@ -2056,8 +2067,9 @@ void AOBPlayerController::TravelToHome()
 
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] 홈 복귀: %s"), *HomeLevel.ToString());
 
-	// 데디 접속 종료 후 각 클라가 로컬 Home 로드(개별 복귀).
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, HomeLevel);
+	// ClientTravel은 이 연결 하나만 세션에서 떼어내 로컬 맵을 연다.
+	// OpenLevel은 리슨 서버에서 서버 트래블이 되어 접속자 전원을 끌고 간다.
+	ClientTravel(HomeLevel.GetLongPackageName(), TRAVEL_Absolute, /*bSeamless=*/false);
 }
 
 int32 AOBPlayerController::GetReturnCountdown() const
