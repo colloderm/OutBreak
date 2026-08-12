@@ -45,21 +45,27 @@ void AOBInteractableActor::BeginPlay()
 	Range->SetSphereRadius(InteractRadius);
 	Range->OnComponentBeginOverlap.AddDynamic(this, &AOBInteractableActor::OnRangeBeginOverlap);
 	Range->OnComponentEndOverlap.AddDynamic(this, &AOBInteractableActor::OnRangeEndOverlap);
+
+	// World Partition 맵에서는 플레이어가 이미 구체 안에 있는 상태로 셀이 스트림인될 수 있다.
+	// 그때는 BeginOverlap이 영원히 오지 않으므로 지금 겹친 폰을 직접 훑는다.
+	TArray<AActor*> Overlapping;
+	Range->GetOverlappingActors(Overlapping, APawn::StaticClass());
+	for (AActor* Actor : Overlapping)
+	{
+		OnRangeBeginOverlap(Range, Actor, nullptr, 0, false, FHitResult());
+	}
 }
 
 void AOBInteractableActor::OnRangeBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& Sweep)
 {
 	APawn* Pawn = Cast<APawn>(OtherActor);
-	if (!Pawn) return;
+	AOBPlayerController* PC = Pawn ? Cast<AOBPlayerController>(Pawn->GetController()) : nullptr;
 	
 	// 목록에 넣기만 한다. 겹친 상자 중 무엇을 고를지는 컨트롤러가 거리로 판단한다.
-	if (AOBPlayerController* PC = Cast<AOBPlayerController>(Pawn->GetController()))
+	if (PC && PC->IsLocalController())
 	{
-		if (PC->IsLocalController())
-		{
-			PC->AddNearbyInteractable(this);
-		}
+		PC->AddNearbyInteractable(this);
 	}
 }
 

@@ -22,7 +22,7 @@
 #include "Game/GameMode/OBLobbyGameMode.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "Interaction/OBInteractableActor.h"
-#include "Kismet/GameplayStatics.h"
+#include "Components/MeshComponent.h"
 #include "LoadOut/OBLoadoutSubsystem.h"
 #include "Party/OBPartySubsystem.h"
 #include "Weapon/Data/OBWeaponData.h"
@@ -2266,6 +2266,10 @@ void AOBPlayerController::RefreshInteractTarget()
 		Nearest = Candidate;
 	}
 
+	UE_LOG(LogTemp, Log,
+		TEXT("[InteractDebug] Refresh Candidates=%d Nearest=%s ViewLoc=%s"),
+		NearbyInteractables.Num(), *GetNameSafe(Nearest), *ViewLocation.ToCompactString());
+
 	SetCurrentInteractable(Nearest);
 }
 
@@ -2274,15 +2278,40 @@ bool AOBPlayerController::IsInteractableOccluded(const FVector& ViewLocation, co
 	const UWorld* World = GetWorld();
 	if (!World || !Candidate) return true;
 
-	// 충돌을 끈 시체 상자도 포함해야 한다(기본값은 충돌 켜진 컴포넌트만 센다).
-	const FBox Bounds = Candidate->GetComponentsBoundingBox(true);
+	// 타깃 코앞에서 막힌 건 지형·바닥을 스친 것이지 가려진 게 아니다.
+	constexpr float NearTargetTolerance = 50.f;
+
+	// 루트가 반경 200cm 트리거 스피어라 GetComponentsBoundingBox의 중심은 액터 원점,
+	// 즉 상자 바닥이다. 눈에 보이는 몸통을 겨누도록 메시 바운딩만 모은다.
+	// 스크린 스페이스 프롬프트 위젯도 이 방식이면 자동으로 빠진다.
+	FBox Bounds(ForceInit);
+	TArray<UMeshComponent*> Meshes;
+	Candidate->GetComponents<UMeshComponent>(Meshes);
+	for (const UMeshComponent* Mesh : Meshes)
+	{
+		if (Mesh && Mesh->IsRegistered())
+		{
+			Bounds += Mesh->Bounds.GetBox();
+		}
+	}
+	// 메시가 하나도 없는 경우를 위한 폴백.
+	if (!Bounds.IsValid)
+	{
+		Bounds = Candidate->GetComponentsBoundingBox(true);
+	}
 	const FVector Target = Bounds.IsValid ? Bounds.GetCenter() : Candidate->GetActorLocation();
 
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(OBInteractOcclusion), false, GetPawn());
 	Params.AddIgnoredActor(Candidate);   // 상자 자기 자신에 막히면 영원히 못 본다.
 
 	FHitResult Hit;
-	return World->LineTraceSingleByChannel(Hit, ViewLocation, Target, ECC_Visibility, Params);
+	if (!World->LineTraceSingleByChannel(Hit, ViewLocation, Target, ECC_Visibility, Params))
+	{
+		return false;
+	}
+
+	// 랜드스케이프에 살짝 파묻힌 상자는 타깃 3cm 앞에서 막힌다. 그건 가림이 아니다.
+	return FVector::DistSquared(Hit.ImpactPoint, Target) > FMath::Square(NearTargetTolerance);
 }
 
 namespace
