@@ -4,6 +4,7 @@
 #include "EngineUtils.h"
 #include "Game/Expedition/OBHelicopterExclusionVolume.h"
 #include "Game/Expedition/OBHelicopterInsertionAreaVolume.h"
+#include "Game/Expedition/OBHelicopterSpawnLog.h"
 #include "NavigationSystem.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogOBLandingZone, Log, All);
@@ -91,7 +92,7 @@ bool UOBLandingZoneScannerComponent::FindSafeLandingZone(
 
 	if (OutResult.bValid)
 	{
-		UE_LOG(LogOBLandingZone, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBLandingZone, Log,
 			TEXT("[InsertionTarget] Validation accepted Requested=%s Candidates=%d Reason=%s Ground=%s Hover=%s Score=%.1f"),
 			*RequestedLocation.ToCompactString(), OutResult.CandidatesEvaluated,
 			LexToString(OutResult.Failure), *FVector(OutResult.GroundLocation).ToCompactString(),
@@ -99,7 +100,7 @@ bool UOBLandingZoneScannerComponent::FindSafeLandingZone(
 	}
 	else
 	{
-		UE_LOG(LogOBLandingZone, Warning,
+		OB_HELICOPTER_SPAWN_LOG(LogOBLandingZone, Warning,
 			TEXT("[InsertionTarget] Validation failed Requested=%s Candidates=%d Reason=%s Ground=%s Hover=%s Score=%.1f"),
 			*RequestedLocation.ToCompactString(), OutResult.CandidatesEvaluated,
 			LexToString(OutResult.Failure), *FVector(OutResult.GroundLocation).ToCompactString(),

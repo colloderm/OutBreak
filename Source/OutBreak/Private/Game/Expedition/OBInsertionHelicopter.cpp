@@ -9,6 +9,7 @@
 #include "DrawDebugHelpers.h"
 #include "Game/Expedition/OBExtractionZone.h"
 #include "Game/Expedition/OBHelicopterRoute.h"
+#include "Game/Expedition/OBHelicopterSpawnLog.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
@@ -100,7 +101,7 @@ void AOBInsertionHelicopter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		|| EndPlayReason == EEndPlayReason::EndPlayInEditor;
 	if (HasAuthority() && !PassengerControllers.IsEmpty() && !bWorldTeardown)
 	{
-		UE_LOG(LogOBHelicopterInsertion, Error,
+		OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Error,
 			TEXT("[InsertionSafety] Helicopter EndPlay with seated passengers Helicopter=%s Team=%d Phase=%d Passengers=%d Reason=%d ValidatedGround=%s"),
 			*GetName(), TeamId, static_cast<int32>(InsertionPhase), PassengerControllers.Num(),
 			static_cast<int32>(EndPlayReason), ActiveLandingZone.bValid ? TEXT("true") : TEXT("false"));
@@ -122,7 +123,7 @@ void AOBInsertionHelicopter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	}
 	else if (!PassengerControllers.IsEmpty() && bWorldTeardown)
 	{
-		UE_LOG(LogOBHelicopterInsertion, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Log,
 			TEXT("[InsertionSafety] World teardown with seated passengers Helicopter=%s Team=%d Phase=%d Passengers=%d Reason=%d"),
 			*GetName(), TeamId, static_cast<int32>(InsertionPhase), PassengerControllers.Num(),
 			static_cast<int32>(EndPlayReason));
@@ -434,7 +435,7 @@ bool AOBInsertionHelicopter::SeatPassenger(AController* Controller)
 	PassengerSeatIndices.Add(FreeSeat);
 	AddReplicatedSeatedPassenger(Pawn, FreeSeat);
 	SetPassengerTransitState(Controller, EOBPlayerInsertionTransitPhase::Seated, this);
-	UE_LOG(LogOBHelicopterInsertion, Log,
+	OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Log,
 		TEXT("[Insertion] Passenger seated Helicopter=%s Team=%d Controller=%s Pawn=%s Seat=%d Count=%d"),
 		*GetName(), TeamId, *Controller->GetName(), *GetNameSafe(Pawn), FreeSeat, PassengerControllers.Num());
 	BP_OnPassengerSeated(Controller, FreeSeat);
@@ -448,7 +449,7 @@ void AOBInsertionHelicopter::ReleaseAllPassengers(const FVector& GroundCenter)
 		return;
 	}
 
-	UE_LOG(LogOBHelicopterInsertion, Warning,
+	OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Warning,
 		TEXT("[InsertionSafety] ReleaseAllPassengers Helicopter=%s Team=%d Phase=%d Count=%d Ground=%s"),
 		*GetName(), TeamId, static_cast<int32>(InsertionPhase), PassengerControllers.Num(),
 		*GroundCenter.ToCompactString());
@@ -497,7 +498,7 @@ void AOBInsertionHelicopter::SetInsertionPhase(EOBInsertionPhase NewPhase)
 	}
 	const EOBInsertionPhase PreviousPhase = InsertionPhase;
 	InsertionPhase = NewPhase;
-	UE_LOG(LogOBHelicopterInsertion, Log,
+	OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Log,
 		TEXT("[Insertion] Helicopter phase changed Helicopter=%s Team=%d Previous=%d New=%d Location=%s Passengers=%d"),
 		*GetName(), TeamId, static_cast<int32>(PreviousPhase), static_cast<int32>(NewPhase),
 		*GetActorLocation().ToCompactString(), PassengerControllers.Num());
@@ -619,7 +620,7 @@ void AOBInsertionHelicopter::BeginSteeringMotion(
 	SteeringPreviousGateDistance = FVector::Dist2D(CurrentLocation, SteeringApproachGate);
 	ForceNetUpdate();
 
-	UE_LOG(LogOBHelicopterInsertion, Display,
+	OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Display,
 		TEXT("[HelicopterSteering] Begin Helicopter=%s Start=%s Target=%s Gate=%s FinalLeg=%s InitialSpeed=%.0f CruiseSpeed=%.0f TurnRate=%.1f LookAhead=%.2f DurationTarget=%.1f"),
 		*GetName(), *CurrentLocation.ToCompactString(), *TargetLocation.ToCompactString(),
 		*SteeringApproachGate.ToCompactString(), bSteeringFinalLeg ? TEXT("true") : TEXT("false"),
@@ -688,7 +689,7 @@ void AOBInsertionHelicopter::TickSteeringMotion(float DeltaSeconds)
 		if (GateDistance2D <= PredictiveTransitionRadius || bPassedClosestGatePoint)
 		{
 			bSteeringFinalLeg = true;
-			UE_LOG(LogOBHelicopterInsertion, Display,
+			OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Display,
 				TEXT("[HelicopterSteering] Final leg entered Helicopter=%s Location=%s GateDistance=%.0f TransitionRadius=%.0f Elapsed=%.2f"),
 				*GetName(), *CurrentLocation.ToCompactString(), GateDistance2D,
 				PredictiveTransitionRadius, MotionElapsed);
@@ -824,7 +825,7 @@ void AOBInsertionHelicopter::TickSteeringMotion(float DeltaSeconds)
 	if (MotionElapsed - SteeringLastLogTime >= 1.f)
 	{
 		SteeringLastLogTime = MotionElapsed;
-		UE_LOG(LogOBHelicopterInsertion, Display,
+		OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Display,
 			TEXT("[HelicopterSteering] Tick Helicopter=%s FinalLeg=%s Location=%s Target=%s Speed=%.0f DesiredSpeed=%.0f Vertical=%.0f YawError=%.1f Turn=%.2f Pitch=%.2f Distance=%.0f Elapsed=%.1f"),
 			*GetName(), bSteeringFinalLeg ? TEXT("true") : TEXT("false"),
 			*CurrentLocation.ToCompactString(), *SteeringTarget.ToCompactString(),
@@ -846,13 +847,13 @@ void AOBInsertionHelicopter::TickSteeringMotion(float DeltaSeconds)
 	{
 		if (bTimedOut && !bArrived)
 		{
-			UE_LOG(LogOBHelicopterInsertion, Error,
+			OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Error,
 				TEXT("[HelicopterSteering] Hard timeout; snapping to target Helicopter=%s Distance=%.0f Elapsed=%.1f Timeout=%.1f"),
 				*GetName(), NewDistanceToTarget, MotionElapsed, HardTimeout);
 		}
 		else
 		{
-			UE_LOG(LogOBHelicopterInsertion, Display,
+			OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Display,
 				TEXT("[HelicopterSteering] Arrived Helicopter=%s Distance=%.0f Elapsed=%.2f FinalSpeed=%.0f"),
 				*GetName(), NewDistanceToTarget, MotionElapsed, SteeringVelocity.Size());
 		}
@@ -1065,7 +1066,7 @@ void AOBInsertionHelicopter::StartNextRappel()
 	Rappel.RopeIndex = RopeIndex;
 	SetReplicatedPassengerRappelling(Pawn, RopeIndex, Start, End);
 	SetPassengerTransitState(Controller, EOBPlayerInsertionTransitPhase::Rappelling, Pawn);
-	UE_LOG(LogOBHelicopterInsertion, Log,
+	OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Log,
 		TEXT("[Insertion] Rappel started Helicopter=%s Team=%d Controller=%s Pawn=%s Rope=%d Start=%s End=%s Duration=%.2f Queue=%d Active=%d"),
 		*GetName(), TeamId, *GetNameSafe(Controller), *GetNameSafe(Pawn), RopeIndex,
 		*Start.ToCompactString(), *End.ToCompactString(), Rappel.Duration, RappelQueue.Num(), ActiveRappels.Num());
@@ -1256,7 +1257,7 @@ bool AOBInsertionHelicopter::FinalizePassenger(
 	if (bDeploymentNotified)
 	{
 		const ACharacter* DeployedCharacter = IsValid(Pawn) ? Cast<ACharacter>(Pawn) : nullptr;
-		UE_LOG(LogOBHelicopterInsertion, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Log,
 			TEXT("[InsertionInput] Passenger deployed Controller=%s Pawn=%s Ground=%s MovementMode=%d Collision=%s Remaining=%d"),
 			*GetNameSafe(Controller), *GetNameSafe(Pawn),
 			DeploymentLocation ? *DeploymentLocation->ToCompactString() : TEXT("CurrentLocation"),
@@ -1438,7 +1439,7 @@ void AOBInsertionHelicopter::OnRep_PassengerStates()
 	}
 
 	PresentedPassengerStates = ReplicatedPassengerStates;
-	UE_LOG(LogOBHelicopterInsertion, Verbose,
+	OB_HELICOPTER_SPAWN_LOG(LogOBHelicopterInsertion, Verbose,
 		TEXT("[InsertionNet] Passenger state applied Client Helicopter=%s Team=%d Count=%d"),
 		*GetName(), TeamId, ReplicatedPassengerStates.Num());
 }

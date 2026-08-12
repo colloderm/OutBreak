@@ -1,4 +1,5 @@
 #include "Game/Expedition/OBHelicopterInsertionAreaVolume.h"
+#include "Game/Expedition/OBHelicopterSpawnLog.h"
 
 #include "Components/BrushComponent.h"
 #include "Core/OBCollisionChannels.h"
@@ -50,7 +51,7 @@ void AOBHelicopterInsertionAreaVolume::ConfigureLogicalVolumeCollision()
 
 	if (!HasAnyFlags(RF_ClassDefaultObject))
 	{
-		UE_LOG(LogOBInsertionAreaVolume, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionAreaVolume, Log,
 			TEXT("[InsertionArea] Logical collision enforced Volume=%s Collision=%s Weapon=%d CameraProbe=%d"),
 			*GetName(), *UEnum::GetValueAsString(VolumeBrushComponent->GetCollisionEnabled()),
 			static_cast<int32>(VolumeBrushComponent->GetCollisionResponseToChannel(OB_TraceChannel_Weapon)),

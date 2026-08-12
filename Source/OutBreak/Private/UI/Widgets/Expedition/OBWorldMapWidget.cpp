@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "UI/Widgets/Expedition/OBWorldMapWidget.h"
+#include "Game/Expedition/OBHelicopterSpawnLog.h"
 
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
@@ -47,7 +48,7 @@ FReply UOBWorldMapWidget::NativeOnPreviewKeyDown(
 			const FKey Key = InKeyEvent.GetKey();
 			if (Key == EKeys::M)
 			{
-				UE_LOG(LogOBInsertionMap, Display,
+				OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Display,
 					TEXT("[InsertionUI] Preview key received Key=M Widget=%s PC=%s"),
 					*GetName(), *PC->GetName());
 				PC->ToggleInsertionMapFromFocusedWidget();
@@ -55,7 +56,7 @@ FReply UOBWorldMapWidget::NativeOnPreviewKeyDown(
 			}
 			if (Key == EKeys::E)
 			{
-				UE_LOG(LogOBInsertionMap, Display,
+				OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Display,
 					TEXT("[InsertionUI] Preview key received Key=E Widget=%s PC=%s"),
 					*GetName(), *PC->GetName());
 				PC->RequestInsertionPointFromFocusedWidget();
@@ -103,7 +104,7 @@ void UOBWorldMapWidget::SetMapOpen(bool bOpen)
 		}
 	}
 
-	UE_LOG(LogOBInsertionMap, Log,
+	OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Log,
 		TEXT("[InsertionUI] Map visibility changed Widget=%s Open=%s SelectionMode=%s CanSelect=%s Owner=%s"),
 		*GetName(), bOpen ? TEXT("true") : TEXT("false"),
 		bInsertionSelectionMode ? TEXT("true") : TEXT("false"),
@@ -132,7 +133,7 @@ void UOBWorldMapWidget::SetInsertionSelectionMode(bool bEnabled, bool bCanSelect
 {
 	bInsertionSelectionMode = bEnabled;
 	bCanSelectInsertionTarget = bEnabled && bCanSelectTarget;
-	UE_LOG(LogOBInsertionMap, Log,
+	OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Log,
 		TEXT("[InsertionUI] Selection mode Widget=%s Enabled=%s CanSelect=%s"),
 		*GetName(), bInsertionSelectionMode ? TEXT("true") : TEXT("false"),
 		bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"));
@@ -146,13 +147,13 @@ void UOBWorldMapWidget::NotifyInsertionPointResult(
 {
 	if (bAccepted)
 	{
-		UE_LOG(LogOBInsertionMap, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Log,
 			TEXT("[InsertionUI] Selection result Accepted=true Resolved=%s Message=%s"),
 			*ResolvedLocation.ToCompactString(), *Message);
 	}
 	else
 	{
-		UE_LOG(LogOBInsertionMap, Warning,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Warning,
 			TEXT("[InsertionUI] Selection result Accepted=false Resolved=%s Message=%s"),
 			*ResolvedLocation.ToCompactString(), *Message);
 	}
@@ -398,7 +399,7 @@ bool UOBWorldMapWidget::TrySelectInsertionPoint(const FVector2D& ScreenPosition)
 	if (!bInsertionSelectionMode || !bCanSelectInsertionTarget || !Map || !GS || !PS || !PC
 		|| GS->GetPhase() != EOBExpeditionPhase::Insertion || !PS->IsPartyLeader() || !IMG_Map)
 	{
-		UE_LOG(LogOBInsertionMap, Warning,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Warning,
 			TEXT("[InsertionUI] Click rejected before coordinate conversion Mode=%s CanSelect=%s Map=%s GS=%s PS=%s PC=%s Phase=%d Leader=%s Image=%s"),
 			bInsertionSelectionMode ? TEXT("true") : TEXT("false"),
 			bCanSelectInsertionTarget ? TEXT("true") : TEXT("false"),
@@ -413,7 +414,7 @@ bool UOBWorldMapWidget::TrySelectInsertionPoint(const FVector2D& ScreenPosition)
 		&& State.Phase != EOBInsertionPhase::WaitingForTarget
 		&& State.Phase != EOBInsertionPhase::Orbiting)
 	{
-		UE_LOG(LogOBInsertionMap, Warning,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Warning,
 			TEXT("[InsertionUI] Click rejected because Team=%d insertion phase=%d"),
 			PS->GetTeamId(), static_cast<int32>(State.Phase));
 		return false;
@@ -423,7 +424,7 @@ bool UOBWorldMapWidget::TrySelectInsertionPoint(const FVector2D& ScreenPosition)
 	const FVector2D MapSize = MapGeometry.GetLocalSize();
 	if (MapSize.X <= 1.f || MapSize.Y <= 1.f)
 	{
-		UE_LOG(LogOBInsertionMap, Warning,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Warning,
 			TEXT("[InsertionUI] Click rejected because map geometry is invalid Size=%s"), *MapSize.ToString());
 		return false;
 	}
@@ -432,14 +433,14 @@ bool UOBWorldMapWidget::TrySelectInsertionPoint(const FVector2D& ScreenPosition)
 	const FVector2D UV(Local.X / MapSize.X, Local.Y / MapSize.Y);
 	if (UV.X < 0.f || UV.X > 1.f || UV.Y < 0.f || UV.Y > 1.f)
 	{
-		UE_LOG(LogOBInsertionMap, Verbose,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Verbose,
 			TEXT("[InsertionUI] Click outside map Screen=%s Local=%s UV=%s"),
 			*ScreenPosition.ToString(), *Local.ToString(), *UV.ToString());
 		return false;
 	}
 
 	const FVector2D WorldXY = Map->MapUVToWorldXY(UV);
-	UE_LOG(LogOBInsertionMap, Log,
+	OB_HELICOPTER_SPAWN_LOG(LogOBInsertionMap, Log,
 		TEXT("[InsertionUI] Click submitted Screen=%s Local=%s UV=%s WorldXY=%s Team=%d PC=%s"),
 		*ScreenPosition.ToString(), *Local.ToString(), *UV.ToString(), *WorldXY.ToString(),
 		PS->GetTeamId(), *PC->GetName());
