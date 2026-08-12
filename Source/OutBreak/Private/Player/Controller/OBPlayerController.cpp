@@ -2266,10 +2266,6 @@ void AOBPlayerController::RefreshInteractTarget()
 		Nearest = Candidate;
 	}
 
-	UE_LOG(LogTemp, Log,
-		TEXT("[InteractDebug] Refresh Candidates=%d Nearest=%s ViewLoc=%s"),
-		NearbyInteractables.Num(), *GetNameSafe(Nearest), *ViewLocation.ToCompactString());
-
 	SetCurrentInteractable(Nearest);
 }
 
