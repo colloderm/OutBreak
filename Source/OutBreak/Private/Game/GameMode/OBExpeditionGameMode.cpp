@@ -1990,15 +1990,31 @@ void AOBExpeditionGameMode::AssignPersonalExtractsFor(AController* C, const FVec
 		if (!M) continue;
 		
 		// 네비 위로 스냅(도달 가능 위치 보장)
-		FVector Loc = M->GetActorLocation();
+		const FVector MarkerLoc = M->GetActorLocation();
+		FVector Loc = MarkerLoc;
 		if (Nav)
 		{
 			FNavLocation Projected;
-			if (Nav->ProjectPointToNavigation(Loc, Projected, FVector(500.f)))
+			// XY까지 500을 열어두면 마커에서 최대 5m 옆으로 끌려간다.
+			// 필요한 건 높이 보정뿐이므로 수평 여유는 좁힌다.
+			if (Nav->ProjectPointToNavigation(Loc, Projected, FVector(100.f, 100.f, 500.f)))
 			{
 				Loc = Projected.Location;
 			}
 		}
+
+		const float SnapDelta = FVector::Dist(MarkerLoc, Loc);
+		UE_LOG(LogTemp, Log,
+			TEXT("[ExtractionDebug] Personal spawn Team=%d Marker=%s MarkerLoc=%s SpawnLoc=%s Delta=%.1fcm MarkerRot=%s"),
+			TeamId, *M->GetName(), *MarkerLoc.ToCompactString(), *Loc.ToCompactString(),
+			SnapDelta, *M->GetActorRotation().ToCompactString());
+		if (SnapDelta > 200.f)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[ExtractionDebug] %s 마커가 네비메시에서 %.1fcm 떨어져 있다. 마커를 네비가 깔린 평지 위로 옮길 것."),
+				*M->GetName(), SnapDelta);
+		}
+
 		const FTransform T(M->GetActorRotation(), Loc);
 		
 		// 지연 스폰 -> owner-only + 활성창 설정 후 FinishSpawning.

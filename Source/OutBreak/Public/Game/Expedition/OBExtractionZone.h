@@ -77,6 +77,8 @@ public:
 	void BP_OnPassengerBoarded(AController* Passenger);
 
 protected:
+	virtual void PostInitializeComponents() override;
+	
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
@@ -136,6 +138,16 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction")
 	EOBExtractionType ExtractType = EOBExtractionType::Public;
+	
+	/**
+	 * BP에 직렬화된 낡은 컴포넌트 값이 C++ 생성자 값을 덮어쓴다(현재 32cm).
+	 * 런타임에 다시 써서 직렬화 값과 무관하게 항상 이 값이 되게 한다.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction", meta = (ClampMin = "50.0", Units = "cm"))
+	float CallTriggerRadius = 300.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction", meta = (ClampMin = "50.0", Units = "cm"))
+	float BoardingTriggerRadius = 500.f;
 
 	/** Reuses the old property: now this is the hold time at the helicopter door. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction", meta = (ClampMin = "0.1"))
