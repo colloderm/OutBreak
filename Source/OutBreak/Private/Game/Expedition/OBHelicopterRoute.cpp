@@ -8,8 +8,10 @@ AOBHelicopterRoute::AOBHelicopterRoute()
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = false;
 	// Route authoring data is required before any player-driven streaming source exists.
+#if WITH_EDITORONLY_DATA
 	bIsSpatiallyLoaded = false;
-
+#endif
+	
 	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
 	SetRootComponent(SceneRoot);
 

@@ -971,9 +971,9 @@ void AOBCharacterBase::FinalizeSpawnLoadoutFallback()
 {
 	if (bSpawnLoadoutApplied) return;
 
-	UE_LOG(LogTemp, Warning,
-		TEXT("[Loadout] %s: 로드아웃 push가 %.1f초 안에 안 왔다 → PawnData 기본 무기로 진행."),
-		*GetName(), LoadoutWaitSeconds);
+	// UE_LOG(LogTemp, Warning,
+	// 	TEXT("[Loadout] %s: 로드아웃 push가 %.1f초 안에 안 왔다 → PawnData 기본 무기로 진행."),
+	// 	*GetName(), LoadoutWaitSeconds);
 
 	FinalizeSpawnLoadoutInternal(
 		PawnData ? PawnData->DefaultWeapons : TArray<TSubclassOf<AOBWeaponBase>>());
