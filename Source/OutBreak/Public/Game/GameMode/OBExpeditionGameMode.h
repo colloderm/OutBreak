@@ -8,7 +8,6 @@
 #include "OBExpeditionGameMode.generated.h"
 
 class AOBPlayerStateBase;
-class APlayerController;
 class AOBExtractionZone;
 class UOBExpeditionMapCatalog;
 class AOBExpeditionSpawnZone;
@@ -66,10 +65,7 @@ public:
 	/** Server entry point used by AOBPlayerController's insertion-map RPC. */
 	void RequestInsertionPoint(AOBPlayerController* RequestingPlayer, const FVector2D& WorldXY);
 
-	/**
-	 * Validates a client leadership claim against the server's one-leader-per-team
-	 * invariant. Expedition clients cannot directly write PlayerState leadership.
-	 */
+	/** Normalizes an untrusted client claim to one server-selected leader per team. */
 	void HandlePartyLeaderClaim(AOBPlayerController* RequestingPlayer, bool bRequestedLeader);
 
 	TSubclassOf<AOBInsertionHelicopter> GetDefaultExtractionHelicopterClass() const;
@@ -105,10 +101,6 @@ protected:
 	// 진입 플레이어 공통 초기화(신규 접속 + 심리스 트래블 양쪽에서 호출됨).
 	// - TeamId 부여 + ExpeditionStatus=Alive 리셋.
 	virtual void GenericPlayerInitialization(AController* C) override;
-	void EnforceSinglePartyLeader(
-		uint8 TeamId,
-		AOBPlayerStateBase* RequestingPlayerState,
-		bool bRequestedLeader);
 
 	//~ 세션 진행 ------------------------------------------------------------
 	
@@ -122,11 +114,6 @@ protected:
 	void BeginInsertionPhase();
 	void RegisterPlayerForInsertion(APlayerController* NewPlayer);
 	bool SpawnAndSeatInsertionPawn(APlayerController* NewPlayer, AOBInsertionHelicopter* Helicopter);
-	bool ResolveInsertionRegistrationFailure(
-		APlayerController* NewPlayer,
-		uint8 TeamId,
-		const FString& FailureReason);
-	bool FindSafeInsertionFallbackGround(uint8 TeamId, FVector& OutGroundLocation) const;
 	AOBInsertionHelicopter* GetOrCreateInsertionHelicopter(uint8 TeamId);
 	AOBHelicopterRoute* GetOrAssignInsertionRoute(uint8 TeamId);
 	void CollectHelicopterRoutes();
@@ -148,6 +135,7 @@ protected:
 	void TryCompleteInsertion();
 	void CompleteInsertionAfterGracePeriod();
 	void AssignPersonalExtractsForTeam(uint8 TeamId, const FVector& InsertionOrigin);
+	void UpdateReplicatedInsertionState(uint8 TeamId, EOBInsertionPhase Phase);
 
 	UFUNCTION()
 	void HandleInsertionHelicopterPhaseChanged(AOBInsertionHelicopter* Helicopter, EOBInsertionPhase NewPhase);
@@ -229,7 +217,6 @@ protected:
 	 * Selects the authoritative entry path for this GameMode.
 	 * True: spawn and seat players in the insertion helicopter.
 	 * False: use the existing SpawnZone/PlayerStart Unreal restart path.
-	 * Configure this on BP_ExpeditionGameMode Class Defaults before the level starts.
 	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Expedition|Insertion",
 		meta = (DisplayName = "Enable Helicopter Insertion"))
@@ -294,6 +281,7 @@ protected:
 	
 private:
 	void CheckTeamWipe(uint8 TeamId);          // 팀에 Alive 0명이면 다운자 전원 사망
+	void NormalizePartyLeaderForTeam(uint8 TeamId);
 
 private:	
 	FTimerHandle SessionTimerHandle;

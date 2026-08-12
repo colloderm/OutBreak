@@ -16,6 +16,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameplayPrediction.h"
+#include "Global/OutBreakGlobal.h"
 #include "Kismet/GameplayStatics.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
@@ -222,13 +223,6 @@ bool UOBGameplayAbility_RangedWeapon::FireOneShot()
 	UAbilitySystemComponent* AbilitySystem = GetAbilitySystemComponentFromActorInfo();
 	if (HasFireBlockingState(Character, AbilitySystem))
 	{
-		UE_LOG(LogOBWeaponAim, Warning,
-			TEXT("[WeaponFire] Local shot loop stopped by player state Character=%s Transit=%s Dead=%s Downed=%s"),
-			*GetNameSafe(Character),
-			AbilitySystem && AbilitySystem->HasMatchingGameplayTag(OBGameplayTags::State_HelicopterTransit)
-				? TEXT("true") : TEXT("false"),
-			Character && Character->IsDead() ? TEXT("true") : TEXT("false"),
-			Character && Character->IsDowned() ? TEXT("true") : TEXT("false"));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return false;
 	}
@@ -248,9 +242,6 @@ bool UOBGameplayAbility_RangedWeapon::FireOneShot()
 	if (HasAuthority(&CurrentActivationInfo)
 		&& Weapon->GetCurrentAmmo() <= PendingServerAimShots)
 	{
-		UE_LOG(LogOBWeaponAim, Verbose,
-			TEXT("[WeaponAim] Shot request stopped by reserved ammo Character=%s Ammo=%d Pending=%d"),
-			*GetNameSafe(GetOBCharacterFromActorInfo()), Weapon->GetCurrentAmmo(), PendingServerAimShots);
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return false;
 	}
@@ -265,10 +256,6 @@ bool UOBGameplayAbility_RangedWeapon::FireOneShot()
 
 	if (CurrentActorInfo && CurrentActorInfo->IsLocallyControlled() && !bHasLocalAimTargetData)
 	{
-		UE_LOG(LogOBWeaponAim, Error,
-			TEXT("[WeaponAim] Local shot cancelled: no evaluated player view Ability=%s Character=%s Controller=%s"),
-			*GetName(), *GetNameSafe(Character),
-			*GetNameSafe(Character ? Character->GetController() : nullptr));
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
 		return false;
 	}
@@ -421,11 +408,6 @@ bool UOBGameplayAbility_RangedWeapon::BuildLocalAimTargetData(
 		ViewOrigin + ViewRotation.Vector() * Range);
 	OutTargetData.Add(AimData);
 
-	UE_LOG(LogOBWeaponAim, Log,
-		TEXT("[WeaponAim] Local view captured Character=%s Controller=%s ViewTarget=%s Origin=%s Rotation=%s PawnOffset=%.1f Range=%.0f"),
-		*Character->GetName(), *PlayerController->GetName(),
-		*GetNameSafe(PlayerController->GetViewTarget()), *ViewOrigin.ToCompactString(),
-		*ViewRotation.ToCompactString(), FVector::Distance(ViewOrigin, Character->GetActorLocation()), Range);
 	return true;
 }
 
@@ -461,11 +443,6 @@ void UOBGameplayAbility_RangedWeapon::SubmitLocalAimTargetData(
 		FireCueParams.Instigator = GetOBCharacterFromActorInfo();
 		FireCueParams.SourceObject = Weapon;
 		ASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Fire, FireCueParams);
-
-		UE_LOG(LogOBWeaponAim, Log,
-			TEXT("[WeaponFire] Local predicted fire cue Character=%s Weapon=%s Muzzle=%s PredictionKey=%s"),
-			*GetNameSafe(GetOBCharacterFromActorInfo()), *Weapon->GetName(),
-			*FireCueParams.Location.ToCompactString(), *ASC->ScopedPredictionKey.ToString());
 	}
 
 	ASC->CallServerSetReplicatedTargetData(
@@ -499,9 +476,6 @@ void UOBGameplayAbility_RangedWeapon::HandleAimTargetData(
 
 	if (PendingServerAimShots <= 0)
 	{
-		UE_LOG(LogOBWeaponAim, Warning,
-			TEXT("[WeaponAim] Rejected target data without an authoritative shot Character=%s DataCount=%d"),
-			*GetNameSafe(GetOBCharacterFromActorInfo()), ReceivedData.Num());
 		return;
 	}
 	--PendingServerAimShots;
@@ -554,11 +528,6 @@ void UOBGameplayAbility_RangedWeapon::HandleAimTargetDataTimeout()
 		return;
 	}
 
-	UE_LOG(LogOBWeaponAim, Error,
-		TEXT("[WeaponAim] TargetData timeout; cancelling uncommitted server shots Character=%s Pending=%d Timeout=%.2fs"),
-		*GetNameSafe(GetOBCharacterFromActorInfo()), PendingServerAimShots,
-		FMath::Max(0.1f, AimTargetDataTimeoutSeconds));
-
 	// No ammo has been consumed for these pending requests, so cancellation does
 	// not require a refund and cannot leave a half-fired authoritative shot.
 	EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, true);
@@ -572,13 +541,6 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	UAbilitySystemComponent* AbilitySystem = GetAbilitySystemComponentFromActorInfo();
 	if (HasFireBlockingState(Character, AbilitySystem))
 	{
-		UE_LOG(LogOBWeaponAim, Warning,
-			TEXT("[WeaponFire] Shot stopped by player state Character=%s Transit=%s Dead=%s Downed=%s"),
-			*GetNameSafe(Character),
-			AbilitySystem && AbilitySystem->HasMatchingGameplayTag(OBGameplayTags::State_HelicopterTransit)
-				? TEXT("true") : TEXT("false"),
-			Character && Character->IsDead() ? TEXT("true") : TEXT("false"),
-			Character && Character->IsDowned() ? TEXT("true") : TEXT("false"));
 		return false;
 	}
 
@@ -586,10 +548,6 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	if (!Character || !Weapon || ViewOrigin.ContainsNaN() || ViewDirection.ContainsNaN()
 		|| ViewDirection.IsNearlyZero())
 	{
-		UE_LOG(LogOBWeaponAim, Warning,
-			TEXT("[WeaponAim] Rejected server shot with invalid source Character=%s Weapon=%s Origin=%s Direction=%s"),
-			*GetNameSafe(Character), *GetNameSafe(Weapon), *ViewOrigin.ToCompactString(),
-			*ViewDirection.ToCompactString());
 		return false;
 	}
 
@@ -597,9 +555,6 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	const FOBWeaponDefinitionRow* WeaponDefinition = Weapon->GetWeaponDefinition();
 	if (Stats.WeaponType != EOBWeaponType::Ranged || !WeaponDefinition)
 	{
-		UE_LOG(LogOBWeaponAim, Warning,
-			TEXT("[WeaponAim] Rejected server shot with unresolved ranged weapon Character=%s Weapon=%s"),
-			*Character->GetName(), *Weapon->GetName());
 		return false;
 	}
 
@@ -615,11 +570,6 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	if (CameraDistance > FMath::Max(100.f, MaxValidatedCameraDistance)
 		|| AimErrorDegrees > FMath::Clamp(MaxValidatedAimAngleDegrees, 0.f, 89.f))
 	{
-		UE_LOG(LogOBWeaponAim, Warning,
-			TEXT("[WeaponAim] Rejected client view Character=%s Origin=%s CameraDistance=%.1f/%.1f Direction=%s AimError=%.1f/%.1f ServerAim=%s"),
-			*Character->GetName(), *ViewOrigin.ToCompactString(), CameraDistance,
-			MaxValidatedCameraDistance, *NormalizedViewDirection.ToCompactString(), AimErrorDegrees,
-			MaxValidatedAimAngleDegrees, *ServerAimDirection.ToCompactString());
 		return false;
 	}
 
@@ -637,10 +587,6 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 		CameraValidationParams)
 		&& FVector::DistSquared(CameraObstruction.ImpactPoint, ViewOrigin) > FMath::Square(20.f))
 	{
-		UE_LOG(LogOBWeaponAim, Warning,
-			TEXT("[WeaponAim] Rejected camera origin behind obstruction Character=%s PawnView=%s Origin=%s Hit=%s Actor=%s"),
-			*Character->GetName(), *PawnViewOrigin.ToCompactString(), *ViewOrigin.ToCompactString(),
-			*CameraObstruction.ImpactPoint.ToCompactString(), *GetNameSafe(CameraObstruction.GetActor()));
 		return false;
 	}
 	
@@ -664,12 +610,6 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	{
 		AimPoint = MuzzleLoc + NormalizedViewDirection * Stats.Range;
 	}
-
-	UE_LOG(LogOBWeaponAim, Log,
-		TEXT("[WeaponAim] Server view accepted Character=%s Origin=%s PawnOffset=%.1f Direction=%s AimError=%.1f AimPoint=%s AimActor=%s Muzzle=%s"),
-		*Character->GetName(), *ViewOrigin.ToCompactString(), CameraDistance,
-		*NormalizedViewDirection.ToCompactString(), AimErrorDegrees, *AimPoint.ToCompactString(),
-		*GetNameSafe(AimHit.GetActor()), *MuzzleLoc.ToCompactString());
 	
 	const FVector AimDir = (AimPoint - MuzzleLoc).GetSafeNormal();
 	
@@ -695,14 +635,6 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 			OB_TraceChannel_Weapon,
 			AimParams);
 	const FVector TraceStart = MuzzleLoc;
-	if (bMuzzleObstructed)
-	{
-		UE_LOG(LogOBWeaponAim, Log,
-			TEXT("[WeaponAim] Muzzle path obstructed; committing immediate surface hit Character=%s WeaponOrigin=%s Muzzle=%s Hit=%s Actor=%s"),
-			*Character->GetName(), *WeaponOrigin.ToCompactString(), *MuzzleLoc.ToCompactString(),
-			*MuzzleObstruction.ImpactPoint.ToCompactString(),
-			*GetNameSafe(MuzzleObstruction.GetActor()));
-	}
 
 	// 사격 트레이스: Weapon 채널(캐릭터/벽 Block, 카메라 프로브와 분리).
 	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(OBWeaponTrace), /*bTraceComplex=*/true);
@@ -716,15 +648,22 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
 	if (!Weapon->HasAmmo() || !SourceASC)
 	{
-		UE_LOG(LogOBWeaponAim, Warning,
-			TEXT("[WeaponFire] Authoritative shot not committed Character=%s Weapon=%s Ammo=%d ASC=%s"),
-			*Character->GetName(), *Weapon->GetName(), Weapon->GetCurrentAmmo(),
-			*GetNameSafe(SourceASC));
 		return false;
 	}
 
 	const int32 AmmoBeforeShot = Weapon->GetCurrentAmmo();
 	Weapon->ConsumeAmmo(1);
+
+	// Gameplay cues are presentation and can be skipped or predicted on a client.
+	// Report the gunshot from this authoritative ammo-commit path so AI response
+	// never depends on a cosmetic Blueprint executing on the server.
+	UOutBreakGlobal::ReportNoiseToAI(
+		Character,
+		MuzzleLoc,
+		Character,
+		NAME_None,
+		1.0f,
+		0.0f);
 
 	// --- 발사 큐: 총구 화염 + 사격음. 탄자 수와 무관하게 1회 ---
 	FGameplayCueParameters FireCueParams;
@@ -739,12 +678,6 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 	{
 		Character->Multicast_PlayFireMontage(AttackMontage);
 	}
-
-	UE_LOG(LogOBWeaponAim, Log,
-		TEXT("[WeaponFire] Authoritative shot committed Character=%s Weapon=%s Ammo=%d->%d FireCue=%s Montage=%s PredictionKey=%s"),
-		*Character->GetName(), *Weapon->GetName(), AmmoBeforeShot, Weapon->GetCurrentAmmo(),
-		*OBGameplayTags::GameplayCue_Weapon_Fire.GetTag().ToString(), *GetNameSafe(AttackMontage),
-		*SourceASC->ScopedPredictionKey.ToString());
 	
 	// --- 탄자 루프: 샷건은 1회 발사에 여러 발이 각자 퍼진다 ---
 	// ponytail: 탄자마다 임팩트 큐를 개별 멀티캐스트. 8발이면 8회 — 대역폭이 문제되면 큐 1회로 묶을 것.

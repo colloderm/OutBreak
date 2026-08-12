@@ -70,20 +70,39 @@ EStateTreeRunStatus FRandomLocationGen::EnterState(
 
 	if (!IsValid(NavigationData))
 	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT(
-				"Generate Random Reachable Location: No matching NavigationData was found. Pawn=%s"),
-			*GetNameSafe(ControlledPawn));
+		// Blueprint capsule sizes can differ slightly from the configured nav
+		// agent. Use the world's default nav data as a tolerant fallback instead
+		// of making an otherwise valid zombie fail its StateTree immediately.
+		NavigationData = NavigationSystem->GetDefaultNavDataInstance(
+			FNavigationSystem::DontCreate);
+		if (!IsValid(NavigationData))
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT(
+					"Generate Random Reachable Location: No NavigationData was found. Pawn=%s"),
+				*GetNameSafe(ControlledPawn));
 
-		return EStateTreeRunStatus::Failed;
+			return EStateTreeRunStatus::Failed;
+		}
+	}
+
+	FVector QueryOrigin = Origin;
+	FNavLocation ProjectedOrigin;
+	if (NavigationSystem->ProjectPointToNavigation(
+		Origin,
+		ProjectedOrigin,
+		FVector(500.0f, 500.0f, 1200.0f),
+		NavigationData))
+	{
+		QueryOrigin = ProjectedOrigin.Location;
 	}
 
 	FNavLocation RandomNavLocation;
 	const bool bFoundLocation =
 		NavigationSystem->GetRandomReachablePointInRadius(
-			Origin,
+			QueryOrigin,
 			InstanceData.SearchRadius,
 			RandomNavLocation,
 			NavigationData);

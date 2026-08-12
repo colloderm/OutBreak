@@ -5,15 +5,19 @@
 #include "EngineUtils.h"
 #include "AI/Components/EnemyMemoryComponent.h"
 #include "AI/EnemyCharacter.h"
+#include "AI/Spawning/ZombieDirectorWorldSubsystem.h"
 #include "Ability/Tags/OBGameplayTags.h"
 #include "Character/OBCharacterBase.h"
 #include "Components/StateTreeAIComponent.h"
+#include "Navigation/PathFollowingComponent.h"
+#include "NavigationData.h"
 #include "Perception/AIPerceptionSystem.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISense_Sight.h"
 #include "Perception/AISenseConfig_Damage.h"
 #include "Perception/AISenseConfig_Hearing.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "NavigationSystem.h"
 #include "StateTreeEvents.h"
 
 AEnemyController::AEnemyController()
@@ -139,13 +143,13 @@ void AEnemyController::Dead(const float CleanupDelay)
 	}
 
 	bIsDead = true;
-	StopMovement();
-	StopStateTreeLogic(TEXT("Enemy died"));
+	SuspendForPool();
+}
 
-	if (IsValid(GetPawn()))
-	{
-		UnPossess();
-	}
+void AEnemyController::SuspendForPool()
+{
+	StopMovement();
+	StopStateTreeLogic(TEXT("Enemy suspended for pool"));
 
 	if (IsValid(AIPerceptionComponent))
 	{
@@ -159,14 +163,115 @@ void AEnemyController::Dead(const float CleanupDelay)
 	}
 
 	SetActorTickEnabled(false);
+}
 
-	if (CleanupDelay <= 0.0f)
+void AEnemyController::ResumeFromPool()
+{
+	bIsDead = false;
+	SetLifeSpan(0.0f);
+	SetActorTickEnabled(true);
+
+	if (IsValid(AIPerceptionComponent))
 	{
-		Destroy();
+		AIPerceptionComponent->ForgetAll();
+		AIPerceptionComponent->SetComponentTickEnabled(true);
+	}
+
+	if (IsValid(EnemyMemoryComponent))
+	{
+		EnemyMemoryComponent->ResetMemory();
+		EnemyMemoryComponent->SetComponentTickEnabled(true);
+	}
+
+	if (IsValid(StateTreeComponent) && IsValid(GetPawn()) &&
+		!StateTreeComponent->IsRunning())
+	{
+		StateTreeComponent->StartLogic();
+	}
+}
+
+void AEnemyController::InvestigateNoise(const FVector& NoiseLocation)
+{
+	if (bIsDead || !IsValid(GetPawn()) || !GetPawn()->HasAuthority())
+	{
 		return;
 	}
 
-	SetLifeSpan(CleanupDelay);
+	FVector MoveLocation = NoiseLocation;
+	const ANavigationData* MatchingNavData = nullptr;
+	const ANavigationData* DefaultNavData = nullptr;
+	if (UNavigationSystemV1* Navigation = UNavigationSystemV1::GetCurrent(GetWorld()))
+	{
+		MatchingNavData = Navigation->GetNavDataForProps(
+			GetNavAgentPropertiesRef(),
+			GetNavAgentLocation());
+		DefaultNavData = Navigation->GetDefaultNavDataInstance(
+			FNavigationSystem::DontCreate);
+		FNavLocation ProjectedLocation;
+		if (Navigation->ProjectPointToNavigation(
+			NoiseLocation,
+			ProjectedLocation,
+			FVector(300.0f, 300.0f, 500.0f)))
+		{
+			MoveLocation = ProjectedLocation.Location;
+		}
+	}
+
+	if (IsValid(EnemyMemoryComponent))
+	{
+		EnemyMemoryComponent->SetDirectedHearingStimulus(MoveLocation);
+	}
+
+	EPathFollowingRequestResult::Type MoveResult = MoveToLocation(
+		MoveLocation,
+		80.0f,
+		true,
+		true,
+		true,
+		false,
+		nullptr,
+		true);
+	bool bUsedDirectFallback = false;
+	if (MoveResult == EPathFollowingRequestResult::Failed)
+	{
+		// A dynamic navmesh can be unavailable briefly, and some valid noise
+		// locations can live in a disconnected island. Keep the collision-aware
+		// CharacterMovement active and issue a direct path-following request rather
+		// than silently dropping the investigate command.
+		MoveResult = MoveToLocation(
+			MoveLocation,
+			80.0f,
+			true,
+			false,
+			false,
+			false,
+			nullptr,
+			true);
+		bUsedDirectFallback = MoveResult != EPathFollowingRequestResult::Failed;
+	}
+
+	const TCHAR* ResultText = TEXT("Failed");
+	if (MoveResult == EPathFollowingRequestResult::RequestSuccessful)
+	{
+		ResultText = bUsedDirectFallback
+			? TEXT("RequestSuccessful.DirectFallback")
+			: TEXT("RequestSuccessful.NavPath");
+	}
+	else if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
+	{
+		ResultText = TEXT("AlreadyAtGoal");
+	}
+	UE_LOG(
+		LogZombieDirector,
+		Log,
+		TEXT("%s investigate move to %s: %s Agent(R=%.1f,H=%.1f) MatchingNav=%s DefaultNav=%s"),
+		*GetNameSafe(GetPawn()),
+		*MoveLocation.ToCompactString(),
+		ResultText,
+		GetNavAgentPropertiesRef().AgentRadius,
+		GetNavAgentPropertiesRef().AgentHeight,
+		*GetNameSafe(MatchingNavData),
+		*GetNameSafe(DefaultNavData));
 }
 
 void AEnemyController::BeginPlay()

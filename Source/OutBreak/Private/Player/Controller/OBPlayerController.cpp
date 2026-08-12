@@ -22,7 +22,7 @@
 #include "Game/GameMode/OBLobbyGameMode.h"
 #include "Game/GameState/OBExpeditionGameState.h"
 #include "Interaction/OBInteractableActor.h"
-#include "Kismet/GameplayStatics.h"
+#include "Components/MeshComponent.h"
 #include "LoadOut/OBLoadoutSubsystem.h"
 #include "Party/OBPartySubsystem.h"
 #include "Weapon/Data/OBWeaponData.h"
@@ -543,6 +543,41 @@ void AOBPlayerController::Server_ReportInsertionClientReady_Implementation(
 			Helicopter ? Helicopter->GetTeamId() : 0, static_cast<int32>(ClientPhase),
 			bViewTargetReady ? TEXT("true") : TEXT("false"));
 	}
+}
+
+void AOBPlayerController::Client_BeginInsertionPresentation_Implementation(
+	AOBInsertionHelicopter* Helicopter,
+	const float SelectionDeadlineServerTime,
+	const bool bCanSelectTarget)
+{
+	BeginInsertionPresentationLocal(
+		Helicopter,
+		SelectionDeadlineServerTime,
+		bCanSelectTarget,
+		TEXT("ClientRPC"));
+}
+
+void AOBPlayerController::Client_UpdateInsertionPresentation_Implementation(
+	const EOBInsertionPhase Phase,
+	const FString& StatusMessage,
+	const bool bForceMapOpen)
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (!bInsertionPresentationActive)
+	{
+		ScheduleInsertionClientReconcile();
+		return;
+	}
+
+	ApplyInsertionPresentationUpdateLocal(
+		Phase,
+		StatusMessage,
+		bForceMapOpen,
+		TEXT("ClientRPC"));
 }
 
 void AOBPlayerController::BeginInsertionPresentationLocal(
@@ -1785,6 +1820,17 @@ void AOBPlayerController::ClientTeamWiped_Implementation()
 {
 	HideSpectatorHUD();
 	ShowDeathScreen();   // 여기서만 홈 복귀 버튼이 있는 화면이 뜬다
+	
+	// 내 팀이 전멸한 시점에 이 플레이어의 판은 끝났다. 다른 팀의 세션 종료를 기다릴 이유가 없으므로 개인 결과창을 같은 지연으로 띄운다.
+	if (ResultDelaySeconds > 0.f)
+	{
+		GetWorldTimerManager().SetTimer(
+			ResultDelayTimer, this, &AOBPlayerController::ShowResultScreen, ResultDelaySeconds, false);
+	}
+	else
+	{
+		ShowResultScreen();
+	}
 }
 
 void AOBPlayerController::ShowSpectatorHUD()
@@ -2056,8 +2102,9 @@ void AOBPlayerController::TravelToHome()
 
 	UE_LOG(LogTemp, Log, TEXT("[Expedition] 홈 복귀: %s"), *HomeLevel.ToString());
 
-	// 데디 접속 종료 후 각 클라가 로컬 Home 로드(개별 복귀).
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, HomeLevel);
+	// ClientTravel은 이 연결 하나만 세션에서 떼어내 로컬 맵을 연다.
+	// OpenLevel은 리슨 서버에서 서버 트래블이 되어 접속자 전원을 끌고 간다.
+	ClientTravel(HomeLevel.GetLongPackageName(), TRAVEL_Absolute, /*bSeamless=*/false);
 }
 
 int32 AOBPlayerController::GetReturnCountdown() const
@@ -2254,6 +2301,10 @@ void AOBPlayerController::RefreshInteractTarget()
 		Nearest = Candidate;
 	}
 
+	UE_LOG(LogTemp, Log,
+		TEXT("[InteractDebug] Refresh Candidates=%d Nearest=%s ViewLoc=%s"),
+		NearbyInteractables.Num(), *GetNameSafe(Nearest), *ViewLocation.ToCompactString());
+
 	SetCurrentInteractable(Nearest);
 }
 
@@ -2262,15 +2313,40 @@ bool AOBPlayerController::IsInteractableOccluded(const FVector& ViewLocation, co
 	const UWorld* World = GetWorld();
 	if (!World || !Candidate) return true;
 
-	// 충돌을 끈 시체 상자도 포함해야 한다(기본값은 충돌 켜진 컴포넌트만 센다).
-	const FBox Bounds = Candidate->GetComponentsBoundingBox(true);
+	// 타깃 코앞에서 막힌 건 지형·바닥을 스친 것이지 가려진 게 아니다.
+	constexpr float NearTargetTolerance = 50.f;
+
+	// 루트가 반경 200cm 트리거 스피어라 GetComponentsBoundingBox의 중심은 액터 원점,
+	// 즉 상자 바닥이다. 눈에 보이는 몸통을 겨누도록 메시 바운딩만 모은다.
+	// 스크린 스페이스 프롬프트 위젯도 이 방식이면 자동으로 빠진다.
+	FBox Bounds(ForceInit);
+	TArray<UMeshComponent*> Meshes;
+	Candidate->GetComponents<UMeshComponent>(Meshes);
+	for (const UMeshComponent* Mesh : Meshes)
+	{
+		if (Mesh && Mesh->IsRegistered())
+		{
+			Bounds += Mesh->Bounds.GetBox();
+		}
+	}
+	// 메시가 하나도 없는 경우를 위한 폴백.
+	if (!Bounds.IsValid)
+	{
+		Bounds = Candidate->GetComponentsBoundingBox(true);
+	}
 	const FVector Target = Bounds.IsValid ? Bounds.GetCenter() : Candidate->GetActorLocation();
 
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(OBInteractOcclusion), false, GetPawn());
 	Params.AddIgnoredActor(Candidate);   // 상자 자기 자신에 막히면 영원히 못 본다.
 
 	FHitResult Hit;
-	return World->LineTraceSingleByChannel(Hit, ViewLocation, Target, ECC_Visibility, Params);
+	if (!World->LineTraceSingleByChannel(Hit, ViewLocation, Target, ECC_Visibility, Params))
+	{
+		return false;
+	}
+
+	// 랜드스케이프에 살짝 파묻힌 상자는 타깃 3cm 앞에서 막힌다. 그건 가림이 아니다.
+	return FVector::DistSquared(Hit.ImpactPoint, Target) > FMath::Square(NearTargetTolerance);
 }
 
 namespace

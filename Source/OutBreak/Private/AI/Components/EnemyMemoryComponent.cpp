@@ -142,6 +142,35 @@ bool UEnemyMemoryComponent::ConsumeStimulus(
 	return true;
 }
 
+void UEnemyMemoryComponent::SetDirectedHearingStimulus(
+	const FVector& NoiseLocation)
+{
+	if (!FMath::IsFinite(NoiseLocation.X) ||
+		!FMath::IsFinite(NoiseLocation.Y) ||
+		!FMath::IsFinite(NoiseLocation.Z))
+	{
+		return;
+	}
+
+	StimulusType = EEnemyStimulusType::Hearing;
+	LastHeardLocation = NoiseLocation;
+	LastStimulusLocation = NoiseLocation;
+	LastDamageDirection = FVector::ZeroVector;
+	LastStimulusTime = GetCurrentTimeSeconds();
+	BroadcastMemoryUpdated();
+}
+
+void UEnemyMemoryComponent::ResetMemory()
+{
+	TargetActor = nullptr;
+	LastKnownTargetLocation = FVector::ZeroVector;
+	bTargetVisible = false;
+	LastTargetSeenTime = 0.0;
+	LastStimulusTime = 0.0;
+	ClearStimulusMemory();
+	BroadcastMemoryUpdated();
+}
+
 bool UEnemyMemoryComponent::ShouldSwitchTargetTo(const AActor* Candidate) const
 {
 	const AActor* Current = TargetActor;
