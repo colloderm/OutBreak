@@ -61,6 +61,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Helicopter|Passengers")
 	void ReleaseAllPassengers(const FVector& GroundCenter);
+	
+	/**
+	 * 탈출 정산 시점 전용. FinalizePassenger와 달리 콜리전·이동을 되살리지 않는다.
+	 * 이미 숨겨진 폰을 그 자리에 고정해 헬기가 사라져도 추락하지 않게 한다.
+	 */
+	void ReleaseExtractedPassengers();
 
 	/** Removes one tracked passenger without treating a disconnect as a successful insertion. */
 	bool RemovePassenger(AController* Controller, bool bNotifyDeployment = false);

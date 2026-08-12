@@ -1110,9 +1110,50 @@ void AOBInsertionHelicopter::FinishInsertionDeparture()
 
 void AOBInsertionHelicopter::FinishExtractionDeparture()
 {
+	// 좌석에서 먼저 떼어낸다. 붙은 채로 두면 SetLifeSpan(3초) 뒤 헬기가 파괴될 때
+	// UWorld::DestroyActor가 자식을 KeepWorldTransform으로 떨궈 폰이 공중에 남는다.
+	ReleaseExtractedPassengers();
+
 	SetExtractionPhase(EOBExtractionCallPhase::Completed);
 	OnExtractionDepartureCompleted.Broadcast(this);
 	SetLifeSpan(3.f);
+}
+
+void AOBInsertionHelicopter::ReleaseExtractedPassengers()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	for (AController* Controller : PassengerControllers)
+	{
+		APawn* Pawn = IsValid(Controller) ? Controller->GetPawn() : nullptr;
+		if (!IsValid(Pawn))
+		{
+			continue;
+		}
+
+		Pawn->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+
+		if (ACharacter* Character = Cast<ACharacter>(Pawn))
+		{
+			// 탈출자는 FinalizePassenger 경로를 타면 안 된다. 그건 콜리전과 이동을
+			// 되살려서 숨겨진 폰을 다시 떨어뜨린다. 여기서는 세워두기만 한다.
+			UCharacterMovementComponent* Movement = Character->GetCharacterMovement();
+			Movement->StopMovementImmediately();
+			Movement->DisableMovement();
+			// DisableMovement만으로는 부족했다(추락 재현됨). 중력 자체를 없앤다.
+			Movement->GravityScale = 0.f;
+			Movement->SetComponentTickEnabled(false);
+		}
+	}
+
+	// 추적을 비워야 EndPlay나 ReleaseAllPassengers가 뒤늦게 이들을 건드리지 않는다.
+	PassengerControllers.Reset();
+	PassengerSeatIndices.Reset();
+	ReplicatedPassengerStates.Reset();
+	ForceNetUpdate();
 }
 
 void AOBInsertionHelicopter::SetPassengerTransitState(
