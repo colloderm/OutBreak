@@ -36,13 +36,50 @@ void UEnemyPhysicalComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	Health = FMath::Max(1.0f, MaxHealth);
-	
-	
-	
-	TargetMesh = GetEnemyCharacter()->GetMesh();
-	ProxyMesh = GetEnemyCharacter()->GetChildActorSkeletalMesh();
-	
-	const auto PhysicalReact = EnemyAsset->GetPhysicalReact();
+
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (!IsValid(OwnerCharacter) || !IsValid(EnemyAsset))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: Invalid enemy context. Owner=%s EnemyAsset=%s."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(OwnerCharacter),
+			*GetNameSafe(EnemyAsset));
+		SetComponentTickEnabled(false);
+		return;
+	}
+
+	TargetMesh = OwnerCharacter->GetMesh();
+	ProxyMesh = OwnerCharacter->GetChildActorSkeletalMesh();
+	if (!IsValid(TargetMesh))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: Target mesh is invalid on '%s'."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(OwnerCharacter));
+		SetComponentTickEnabled(false);
+		return;
+	}
+
+	const FEnemyPhysicalReact* PhysicalReact = EnemyAsset->GetPhysicalReact();
+	if (PhysicalReact == nullptr)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: PhysicalReact is unavailable in '%s'."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(EnemyAsset));
+		SetComponentTickEnabled(false);
+		return;
+	}
 	
 	if (IsValid(PhysicalReact->ReactCurveFloat))
 	{
@@ -71,7 +108,7 @@ void UEnemyPhysicalComponent::BeginPlay()
 		PhysicalReact->PM_Arm_L &&
 		PhysicalReact->PM_Leg_R &&
 		PhysicalReact->PM_Leg_L,
-		TEXT("%s::%s: VaultMontage is invalid."),
+		TEXT("%s::%s: One or more physical materials are invalid."),
 		*GetClass()->GetName(),
 		TEXT(__FUNCTION__)))
 	{

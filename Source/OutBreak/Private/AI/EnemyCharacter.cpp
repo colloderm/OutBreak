@@ -167,6 +167,18 @@ void AEnemyCharacter::BeginPlay()
 	Super::BeginPlay();
 	
 	InitializeAsset();
+	if (!IsValid(EnemyAsset))
+	{
+		UE_LOG(
+			LogModularAnimationProxy,
+			Error,
+			TEXT("%s::%s: BeginPlay aborted because EnemyAsset is not assigned (Class: %s)."),
+			*GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(GetClass()));
+		SetActorTickEnabled(false);
+		return;
+	}
 	
 	USkeletalMeshComponentBudgeted* BudgetedMesh =
 		Cast<USkeletalMeshComponentBudgeted>(GetMesh());

@@ -1,6 +1,7 @@
 #include "AI/Spawning/ZombieDirectorWorldSubsystem.h"
 
 #include "AI/Components/EnemySpawnableComponent.h"
+#include "AI/Data/EnemyAsset.h"
 #include "AI/EnemyCharacter.h"
 #include "AI/Spawning/EnemyCharacterSpawner.h"
 #include "AI/Spawning/EnemyDirectorSettings.h"
@@ -825,6 +826,19 @@ AEnemyCharacter* UZombieDirectorWorldSubsystem::CreateEnemy(
 	TSubclassOf<AEnemyCharacter> EnemyClass = Spawner.ResolveEnemyClass();
 	if (!EnemyClass)
 	{
+		return nullptr;
+	}
+
+	const AEnemyCharacter* EnemyDefaults =
+		EnemyClass->GetDefaultObject<AEnemyCharacter>();
+	if (!IsValid(EnemyDefaults) || !IsValid(EnemyDefaults->GetEnemyAsset()))
+	{
+		UE_LOG(
+			LogZombieDirector,
+			Error,
+			TEXT("CreateEnemy rejected class '%s' from spawner '%s': EnemyAsset is not assigned on the class defaults."),
+			*GetNameSafe(EnemyClass.Get()),
+			*GetNameSafe(&Spawner));
 		return nullptr;
 	}
 

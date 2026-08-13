@@ -21,9 +21,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/Content/Blueprint/Items/BP_Corpse.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Blueprint/Items/BP_Corpse.uasset" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/UI/Expedition/Loot/M_Highight.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Expedition/Loot/M_Highight.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -418,6 +416,8 @@
       <workItem from="1786322784052" duration="4607000" />
       <workItem from="1786335026005" duration="11527000" />
       <workItem from="1786407637881" duration="1948000" />
+      <workItem from="1786523782726" duration="670000" />
+      <workItem from="1786580546297" duration="1271000" />
     </task>
     <servers />
   </component>

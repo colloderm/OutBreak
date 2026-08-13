@@ -37,12 +37,25 @@ void UEnemyMovementComponent::BeginPlay()
 	
 	
 	AEnemyCharacter* OwnerCharacter = Cast<AEnemyCharacter>(GetOwner());
-	
-	EnemyAsset = OwnerCharacter->GetEnemyAsset();
-	
 	if (!IsValid(OwnerCharacter))
 	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: Owmer Pawn is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		UE_LOG(LogTemp, Error, TEXT("%s::%s: Owner Pawn is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		SetComponentTickEnabled(false);
+		return;
+	}
+
+	EnemyAsset = OwnerCharacter->GetEnemyAsset();
+	if (!IsValid(EnemyAsset))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: EnemyAsset is not assigned on '%s' (Class: %s)."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(OwnerCharacter),
+			*GetNameSafe(OwnerCharacter->GetClass()));
+		SetComponentTickEnabled(false);
 		return;
 	}
 	
