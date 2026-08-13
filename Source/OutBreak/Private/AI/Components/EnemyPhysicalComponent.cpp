@@ -1153,9 +1153,9 @@ void UEnemyPhysicalComponent::ActionLimb(const FName BoneName, const float Damag
 
 			// 복제 트리거. 클라는 OnRep_DestroyedLimbs에서 같은 연출을 재생한다.
 			DestroyedLimbs.AddUnique(BoneName);
-			if (AActor* Owner = GetOwner())
+			if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
 			{
-				Owner->ForceNetUpdate();
+				Enemy->ForceCriticalNetUpdate();
 			}
 
 			ApplyLimbDestruction(BoneName);

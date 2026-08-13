@@ -8,6 +8,8 @@
 #include "AI/Spawning/EnemySpawnSectorVolume.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 
 DEFINE_LOG_CATEGORY(LogZombieDirector);
@@ -87,6 +89,7 @@ void UZombieDirectorWorldSubsystem::Deinitialize()
 	PendingRequests.Reset();
 	RecentNoises.Reset();
 	LatestSectorNoises.Reset();
+	LastReplicationLODUpdateTime = -DBL_MAX;
 	Super::Deinitialize();
 }
 
@@ -101,6 +104,7 @@ void UZombieDirectorWorldSubsystem::Tick(float DeltaTime)
 	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
 	int32 SpawnBudget = FMath::Max(1, Settings->SpawnBurstPerFrame);
 	const double Now = GetWorld()->GetTimeSeconds();
+	UpdateEnemyReplicationLOD(Now);
 	EnsureBasePopulations(Now);
 
 	for (int32 Index = PendingRequests.Num() - 1; Index >= 0 && SpawnBudget > 0; --Index)
@@ -181,6 +185,170 @@ void UZombieDirectorWorldSubsystem::Tick(float DeltaTime)
 	{
 		return Now - Noise.Time > FMath::Max(1.0f, Settings->MergeWindow * 4.0f);
 	});
+}
+
+void UZombieDirectorWorldSubsystem::UpdateEnemyReplicationLOD(const double Now)
+{
+	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
+	const double UpdateInterval = FMath::Clamp(
+		static_cast<double>(Settings->ReplicationLODUpdateInterval),
+		0.05,
+		5.0);
+	if (Now - LastReplicationLODUpdateTime < UpdateInterval)
+	{
+		return;
+	}
+	LastReplicationLODUpdateTime = Now;
+
+	TArray<int32, TInlineAllocator<8>> SortedLODIndices;
+	SortedLODIndices.Reserve(Settings->ReplicationLODLevels.Num());
+	for (int32 Index = 0; Index < Settings->ReplicationLODLevels.Num(); ++Index)
+	{
+		if (Settings->ReplicationLODLevels[Index].MaxDistance > 0.0f)
+		{
+			SortedLODIndices.Add(Index);
+		}
+	}
+	SortedLODIndices.Sort([Settings](const int32 Left, const int32 Right)
+	{
+		return Settings->ReplicationLODLevels[Left].MaxDistance <
+			Settings->ReplicationLODLevels[Right].MaxDistance;
+	});
+
+	if (!Settings->bEnableReplicationLOD || SortedLODIndices.IsEmpty())
+	{
+		for (const TWeakObjectPtr<UEnemySpawnableComponent>& WeakSpawnable : Enemies)
+		{
+			UEnemySpawnableComponent* Spawnable = WeakSpawnable.Get();
+			if (!IsValid(Spawnable) ||
+				Spawnable->GetPoolPhase() == EEnemyPoolPhase::InactivePooled ||
+				Spawnable->GetPoolPhase() == EEnemyPoolPhase::Reserved)
+			{
+				continue;
+			}
+
+			if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Spawnable->GetOwner()))
+			{
+				Enemy->ResetNetworkReplicationLOD();
+			}
+		}
+		return;
+	}
+
+	TArray<FVector, TInlineAllocator<8>> PlayerLocations;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PlayerController = It->Get();
+		const APawn* PlayerPawn = IsValid(PlayerController)
+			? PlayerController->GetPawn()
+			: nullptr;
+		if (IsValid(PlayerPawn) && !PlayerPawn->IsActorBeingDestroyed())
+		{
+			PlayerLocations.Add(PlayerPawn->GetActorLocation());
+		}
+	}
+
+	const int32 LastLODIndex = SortedLODIndices.Last();
+	const FEnemyReplicationLODLevel& LastLOD =
+		Settings->ReplicationLODLevels[LastLODIndex];
+	const float CullDistance = FMath::Max(100.0f, LastLOD.MaxDistance);
+	const float Hysteresis = FMath::Max(0.0f, Settings->ReplicationLODHysteresis);
+
+	for (const TWeakObjectPtr<UEnemySpawnableComponent>& WeakSpawnable : Enemies)
+	{
+		UEnemySpawnableComponent* Spawnable = WeakSpawnable.Get();
+		if (!IsValid(Spawnable) ||
+			Spawnable->GetPoolPhase() == EEnemyPoolPhase::InactivePooled ||
+			Spawnable->GetPoolPhase() == EEnemyPoolPhase::Reserved)
+		{
+			continue;
+		}
+
+		AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Spawnable->GetOwner());
+		if (!IsValid(Enemy))
+		{
+			continue;
+		}
+
+		float ClosestDistanceSquared = TNumericLimits<float>::Max();
+		for (const FVector& PlayerLocation : PlayerLocations)
+		{
+			ClosestDistanceSquared = FMath::Min(
+				ClosestDistanceSquared,
+				FVector::DistSquared(Enemy->GetActorLocation(), PlayerLocation));
+		}
+		const float ClosestDistance = PlayerLocations.IsEmpty()
+			? TNumericLimits<float>::Max()
+			: FMath::Sqrt(ClosestDistanceSquared);
+
+		int32 ResolvedLODIndex = INDEX_NONE;
+		for (const int32 CandidateIndex : SortedLODIndices)
+		{
+			if (ClosestDistance <= FMath::Max(
+				100.0f,
+				Settings->ReplicationLODLevels[CandidateIndex].MaxDistance))
+			{
+				ResolvedLODIndex = CandidateIndex;
+				break;
+			}
+		}
+
+		const int32 CurrentLODIndex = Enemy->GetCurrentReplicationLODIndex();
+		if (Enemy->IsNetworkLODDormant() && ResolvedLODIndex != INDEX_NONE)
+		{
+			// Wake inside the last band minus hysteresis, preventing repeated
+			// DormantAll/Awake transitions at the cull boundary.
+			if (ClosestDistance > FMath::Max(0.0f, CullDistance - Hysteresis))
+			{
+				ResolvedLODIndex = INDEX_NONE;
+			}
+		}
+		else if (CurrentLODIndex != INDEX_NONE &&
+			Settings->ReplicationLODLevels.IsValidIndex(CurrentLODIndex) &&
+			ResolvedLODIndex != CurrentLODIndex)
+		{
+			const float CurrentMaxDistance = FMath::Max(
+				100.0f,
+				Settings->ReplicationLODLevels[CurrentLODIndex].MaxDistance);
+			if (ResolvedLODIndex == INDEX_NONE)
+			{
+				if (ClosestDistance <= CurrentMaxDistance + Hysteresis)
+				{
+					ResolvedLODIndex = CurrentLODIndex;
+				}
+			}
+			else
+			{
+				const float ResolvedMaxDistance = FMath::Max(
+					100.0f,
+					Settings->ReplicationLODLevels[ResolvedLODIndex].MaxDistance);
+				if (ResolvedMaxDistance > CurrentMaxDistance &&
+					ClosestDistance <= CurrentMaxDistance + Hysteresis)
+				{
+					ResolvedLODIndex = CurrentLODIndex;
+				}
+				else if (ResolvedMaxDistance < CurrentMaxDistance &&
+					ClosestDistance >= FMath::Max(0.0f, ResolvedMaxDistance - Hysteresis))
+				{
+					ResolvedLODIndex = CurrentLODIndex;
+				}
+			}
+		}
+
+		const bool bShouldBeDormant =
+			ResolvedLODIndex == INDEX_NONE && Settings->bUseDormancyBeyondLastLOD;
+		const int32 AppliedLODIndex = ResolvedLODIndex == INDEX_NONE
+			? LastLODIndex
+			: ResolvedLODIndex;
+		const FEnemyReplicationLODLevel& AppliedLOD =
+			Settings->ReplicationLODLevels[AppliedLODIndex];
+		Enemy->ApplyNetworkReplicationLOD(
+			bShouldBeDormant ? INDEX_NONE : AppliedLODIndex,
+			AppliedLOD.NetUpdateFrequency,
+			AppliedLOD.MinNetUpdateFrequency,
+			CullDistance,
+			bShouldBeDormant);
+	}
 }
 
 TStatId UZombieDirectorWorldSubsystem::GetStatId() const
