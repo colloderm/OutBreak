@@ -264,6 +264,14 @@ void UOBWorldMapWidget::Refresh()
 		// 이미지 위쪽 = 월드 +X이므로 Yaw를 그대로 회전각으로 쓴다.
 		PlaceMarker(Index, SelfIcon, MyUV, SelfColor, MyPawn->GetActorRotation().Yaw);
 	}
+	
+	for (int32 StaleIndex = Index; StaleIndex < MarkerPool.Num(); ++StaleIndex)
+	{
+		if (UImage* Stale = MarkerPool[StaleIndex].Get())
+		{
+			Stale->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
 }
 
 void UOBWorldMapWidget::PlaceMarker(int32& InOutIndex, UTexture2D* Icon, const FVector2D& UV, const FLinearColor& Tint, float AngleDegrees)

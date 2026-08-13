@@ -660,6 +660,55 @@ void AOBInsertionHelicopter::TickMotion(float DeltaSeconds)
 	}
 }
 
+float AOBInsertionHelicopter::ComputeObstacleFloorZ(const FVector& From, const FVector& Direction, const float Reach,
+	float& OutDistanceToObstacle) const
+{
+	OutDistanceToObstacle = Reach;
+
+	const UWorld* World = GetWorld();
+	if (!bAvoidObstacles || !World || Reach <= 0.f || Direction.IsNearlyZero())
+	{
+		return -TNumericLimits<float>::Max();
+	}
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(OBHelicopterObstacle), /*bTraceComplex=*/false, this);
+	const int32 Probes = FMath::Clamp(ObstacleProbeCount, 1, 12);
+
+	// 점으로만 찍으면 표본 간격보다 좁은 건물이 사이로 빠진다.
+	// 간격의 절반짜리 구로 훑어 빈틈을 없앤다.
+	const float Spacing = Reach / Probes;
+	const FCollisionShape Probe = FCollisionShape::MakeSphere(FMath::Max(50.f, Spacing * 0.5f));
+
+	float FloorZ = -TNumericLimits<float>::Max();
+	for (int32 Index = 1; Index <= Probes; ++Index)
+	{
+		const float SampleDistance = Spacing * Index;
+		const FVector Sample = From + Direction * SampleDistance;
+
+		// 위에서 아래로 훑어야 지붕이든 지형이든 '윗면'을 잡는다.
+		FHitResult Hit;
+		if (World->SweepSingleByChannel(
+			Hit,
+			Sample + FVector(0.f, 0.f, 30000.f),
+			Sample - FVector(0.f, 0.f, 30000.f),
+			FQuat::Identity,
+			ECC_Visibility,
+			Probe,
+			Params))
+		{
+			const float Candidate = Hit.ImpactPoint.Z + ObstacleClearance;
+			if (Candidate > FloorZ)
+			{
+				FloorZ = Candidate;
+				// 가장 높은 제약을 만든 지점까지의 거리. 이 안에 다 올라가야 한다.
+				OutDistanceToObstacle = SampleDistance;
+			}
+		}
+	}
+
+	return FloorZ;
+}
+
 void AOBInsertionHelicopter::TickSteeringMotion(float DeltaSeconds)
 {
 	if (DeltaSeconds <= UE_SMALL_NUMBER)
@@ -721,9 +770,11 @@ void AOBInsertionHelicopter::TickSteeringMotion(float DeltaSeconds)
 	const float MaxYawStep = FMath::Max(1.f, SteeringMaxTurnRateDegrees) * DeltaSeconds;
 	const float AppliedYawDelta = FMath::Clamp(UnclampedYawDelta, -MaxYawStep, MaxYawStep);
 	const float NewYaw = FRotator::NormalizeAxis(CurrentYaw + AppliedYawDelta);
-	const float TurnInput = MaxYawStep > UE_SMALL_NUMBER
-		? FMath::Clamp(AppliedYawDelta / MaxYawStep, -1.f, 1.f)
-		: 0.f;
+	// AppliedYawDelta는 이미 MaxYawStep(약 0.5도/프레임)으로 잘려 있다. 그걸 다시
+	// MaxYawStep으로 나누면 각오차가 0.5도만 넘어도 ±1로 포화되고, 오차가 0 근처에서
+	// 부호를 바꿀 때마다 뱅크가 ±최대치로 튄다. 이게 떨림의 원인이다.
+	// 실제 각오차로 정규화하면 프레임률과 무관하게 완만히 눕는다.
+	const float TurnInput = FMath::Clamp(UnclampedYawDelta / FMath::Max(1.f, SteeringBankReferenceAngle), -1.f, 1.f);
 
 	float DesiredHorizontalSpeed = SteeringCruiseSpeed;
 	if (bSteeringFinalLeg)
@@ -758,8 +809,39 @@ void AOBInsertionHelicopter::TickSteeringMotion(float DeltaSeconds)
 	const float EstimatedArrivalSeconds = FMath::Max(
 		0.5f,
 		DistanceToSteeringTarget2D / FMath::Max(300.f, NewHorizontalSpeed));
+	// 전방 경로의 윗면을 확인해 하강을 막는다. 최종 진입 구간에서는 해제한다 —
+	// 그 지점은 랜딩존 스캐너가 이미 검증했고, 막으면 착륙 고도까지 못 내려간다.
+	float DesiredZ = SteeringTarget.Z;
+	// 하강은 목표 도착 시간에 맞춰 완만하게. 상승은 그러면 안 된다.
+	float VerticalSeconds = EstimatedArrivalSeconds;
+	
+	if (!bSteeringFinalLeg)
+	{
+		const FVector ProbeDirection = FRotator(0.f, NewYaw, 0.f).Vector();
+		const float Reach = FMath::Min(ObstacleLookAheadDistance, DistanceToSteeringTarget2D);
+
+		// 최종 진입에서는 착륙해야 하므로 목표에 가까울수록 여유 고도를 0으로 줄인다.
+		const float ClearanceScale = bSteeringFinalLeg
+			? FMath::Clamp(DistanceToFinalTarget / FMath::Max(1.f, SteeringFinalLegDistance), 0.f, 1.f)
+			: 1.f;
+		
+		float ObstacleDistance = Reach;
+		const float FloorZ = ComputeObstacleFloorZ(CurrentLocation, ProbeDirection, Reach, ObstacleDistance);
+		if (FloorZ > -TNumericLimits<float>::Max())
+		{
+			const float ScaledFloor = FloorZ - ObstacleClearance * (1.f - ClearanceScale);
+			if (ScaledFloor > DesiredZ)
+			{
+				DesiredZ = FloorZ;
+				// 목표까지 1km 남았어도 건물은 2초 뒤에 온다. 목표 기준으로 나누면
+				// 상승 속도가 100cm/s 같은 값이 나와 그대로 관통한다.
+				VerticalSeconds = FMath::Max(0.35f, ObstacleDistance / FMath::Max(300.f, NewHorizontalSpeed));
+			}
+		}
+	}
+
 	const float DesiredVerticalSpeed = FMath::Clamp(
-		(SteeringTarget.Z - CurrentLocation.Z) / EstimatedArrivalSeconds,
+		(DesiredZ - CurrentLocation.Z) / VerticalSeconds,
 		-FMath::Max(10.f, SteeringMaxVerticalSpeed),
 		FMath::Max(10.f, SteeringMaxVerticalSpeed));
 	const float NewVerticalSpeed = FMath::FInterpConstantTo(
@@ -857,7 +939,10 @@ void AOBInsertionHelicopter::TickSteeringMotion(float DeltaSeconds)
 				*GetName(), NewDistanceToTarget, MotionElapsed, SteeringVelocity.Size());
 		}
 
-		SetActorTransform(MotionTargetTransform, false, nullptr, ETeleportType::None);
+		// 위치만 맞추고 기수는 날아온 방향 그대로 둔다. 헬기가 승객의 시야 대상이라
+		// 목표 회전으로 스냅하면 카메라가 통째로 휙 돌아간다.
+		SetActorLocationAndRotation(MotionTargetTransform.GetLocation(), FRotator(0.f, GetActorRotation().Yaw, 0.f), 
+			false, nullptr, ETeleportType::None);
 		const uint8 CompletedTask = MotionCompletionTask;
 		bMotionActive = false;
 		bSteeringMotion = false;
@@ -931,8 +1016,13 @@ void AOBInsertionHelicopter::CompleteInsertionScan()
 	{
 		return;
 	}
-	BeginTransformMotion(ActiveLandingZone.HoverTransform, HoverTransitionSeconds,
-		OBHelicopterTasks::InsertionHover);
+	
+	// 호버 지점의 저작 회전으로 맞추면 도착 직후 카메라가 또 돌아간다.
+	// 위치만 쓰고 기수는 접근하며 잡힌 그대로 유지한다.
+	FTransform HoverTransform = ActiveLandingZone.HoverTransform;
+	HoverTransform.SetRotation(FRotator(0.f, GetActorRotation().Yaw, 0.f).Quaternion());
+
+	BeginTransformMotion(HoverTransform, HoverTransitionSeconds, OBHelicopterTasks::InsertionHover);
 }
 
 void AOBInsertionHelicopter::StartInsertionRappel()
