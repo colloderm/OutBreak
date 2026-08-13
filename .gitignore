@@ -94,6 +94,11 @@ Content/Infected.zip
 Content/Infected/Textures
 Content/PostABundle/*
 !Content/PostABundle/Materials
+!Content/PostABundle/Models/
+Content/PostABundle/Models/*
+!Content/PostABundle/Models/Nature/
+Content/PostABundle/Models/Nature/*
+!Content/PostABundle/Models/Nature/Procedural/
 Content/__ExternalActors__/PostABundle
 Content/__ExternalObjects__/PostABundle
 Content/Abandoned_Mall
