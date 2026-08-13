@@ -8,6 +8,7 @@
 
 class USoundCue;
 class UCurveFloat;
+class UAnimMontage;
 class UPhysicalMaterial;
 class UStaticMesh;
 class USoundCue;
@@ -38,7 +39,7 @@ struct FEnemyPhysicalReact
 	TObjectPtr<UCurveFloat> ReactCurveFloat;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	float ReactScale;
+	float ReactScale = 0.0f;
 	
 	/* Physical Material */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
@@ -89,6 +90,41 @@ struct FEnemyPhysicalReact
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	float BlendWeight_Anim_Physics = 0.5;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Hit React",
+		meta = (ClampMin = "0.01"))
+	float HitReactPlayRate = 1.0f;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Hit React",
+		meta = (
+			ClampMin = "0.0",
+			ClampMax = "3.0",
+			Units = "s",
+			DisplayName = "Fallback Lock Duration",
+			ToolTip = "Used only when a hit montage cannot drive completion."))
+	float HitReactMovementLockDuration = 0.45f;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Hit React",
+		meta = (ClampMin = "0.0", ClampMax = "1.0", Units = "s"))
+	float HitReactMontageBlendOutTime = 0.08f;
+
+	UPROPERTY(
+		EditAnywhere,
+		BlueprintReadOnly,
+		Category = "Hit React",
+		meta = (
+			DisplayName = "Restart On Repeated Hit",
+			ToolTip = "Replace the active reaction with the new region montage. The action lock then follows the replacement montage."))
+	bool bRefreshLockOnRepeatedHit = true;
 	
 	
 };

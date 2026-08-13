@@ -30,6 +30,7 @@
 #include "Item/Loot/OBLootContainer.h"
 #include "Item/Data/OBItemDefinition.h"
 #include "Game/GameState/OBExpeditionGameState.h"
+#include "Game/Expedition/OBHelicopterSpawnLog.h"
 #include "Player/Controller/OBPlayerController.h"
 #include "Data/OBGameDataSubsystem.h"
 #include "Player/Data/OBPlayerStatData.h"
@@ -521,7 +522,7 @@ void AOBCharacterBase::HoldUntilGrounded()
 			Move->StopMovementImmediately();
 			Move->SetMovementMode(MOVE_Walking);
 		}
-		UE_LOG(LogOBSpawnGround, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBSpawnGround, Log,
 			TEXT("[SpawnGround] Immediate ground resolve Character=%s Location=%s"),
 			*GetName(), *GetActorLocation().ToCompactString());
 		return;
@@ -537,7 +538,7 @@ void AOBCharacterBase::HoldUntilGrounded()
 
 	GroundWaitElapsed = 0.f;
 	GetWorldTimerManager().SetTimer(GroundWaitTimer, this, &AOBCharacterBase::PollGround, 0.25f, true);
-	UE_LOG(LogOBSpawnGround, Warning,
+	OB_HELICOPTER_SPAWN_LOG(LogOBSpawnGround, Warning,
 		TEXT("[SpawnGround] Ground trace pending Character=%s Location=%s TraceDistance=%.1f MovementMode=%d Timeout=%.1f"),
 		*GetName(), *GetActorLocation().ToCompactString(), GroundTraceDistance,
 		GetCharacterMovement() ? static_cast<int32>(GetCharacterMovement()->MovementMode) : -1,
@@ -725,7 +726,7 @@ void AOBCharacterBase::PollGround()
 			Move->StopMovementImmediately();
 			Move->SetMovementMode(MOVE_Walking);
 		}
-		UE_LOG(LogOBSpawnGround, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBSpawnGround, Log,
 			TEXT("[SpawnGround] Deferred ground resolve Character=%s Elapsed=%.2f Location=%s"),
 			*GetName(), GroundWaitElapsed, *GetActorLocation().ToCompactString());
 		return;
@@ -739,7 +740,7 @@ void AOBCharacterBase::PollGround()
 		{
 			Move->SetMovementMode(MOVE_Falling);
 		}
-		UE_LOG(LogOBSpawnGround, Error,
+		OB_HELICOPTER_SPAWN_LOG(LogOBSpawnGround, Error,
 			TEXT("[SpawnGround] Ground resolve timed out Character=%s Elapsed=%.2f Location=%s MovementMode=%d Velocity=%s"),
 			*GetName(), GroundWaitElapsed, *GetActorLocation().ToCompactString(),
 			Move ? static_cast<int32>(Move->MovementMode) : -1,

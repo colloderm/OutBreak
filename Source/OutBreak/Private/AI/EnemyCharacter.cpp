@@ -142,6 +142,7 @@ void AEnemyCharacter::InitializeComponents()
 	BudgetedMesh->SetCanEverAffectNavigation(false);
 	
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
+	StatusComponent = CreateDefaultSubobject<UEnemyStatusComponent>(TEXT("StatusComponent"));
 	PhysicalComponent = CreateDefaultSubobject<UEnemyPhysicalComponent>(TEXT("PhysicalComponent"));
 	SpawnableComponent = CreateDefaultSubobject<UEnemySpawnableComponent>(TEXT("SpawnableComponent"));
 	
@@ -167,6 +168,18 @@ void AEnemyCharacter::BeginPlay()
 	Super::BeginPlay();
 	
 	InitializeAsset();
+	if (!IsValid(EnemyAsset))
+	{
+		UE_LOG(
+			LogModularAnimationProxy,
+			Error,
+			TEXT("%s::%s: BeginPlay aborted because EnemyAsset is not assigned (Class: %s)."),
+			*GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(GetClass()));
+		SetActorTickEnabled(false);
+		return;
+	}
 	
 	USkeletalMeshComponentBudgeted* BudgetedMesh =
 		Cast<USkeletalMeshComponentBudgeted>(GetMesh());
@@ -254,7 +267,10 @@ float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 				HitLocation = HitResult.ImpactPoint;
 			}
 
-			PhysicalComponent->ActionPhysical(HitResult, ActualDamage);
+			PhysicalComponent->ActionPhysical(
+				HitResult,
+				ActualDamage,
+				PointDamageEvent.ShotDirection);
 		}
 		else
 		{
@@ -347,7 +363,37 @@ AEnemyCharacter::GetChildActorSkeletalMesh()
 
 void AEnemyCharacter::StopCharacterMovement()
 {
-	GetMovementComponent()->StopMovementImmediately();
+	if (AEnemyController* EnemyController =
+		Cast<AEnemyController>(GetController()))
+	{
+		EnemyController->StopMovement();
+	}
+
+	if (UPawnMovementComponent* MovementComponent = GetMovementComponent())
+	{
+		MovementComponent->StopMovementImmediately();
+	}
+}
+
+EEnemyActionState AEnemyCharacter::GetActionState() const
+{
+	return IsValid(StatusComponent)
+		? StatusComponent->GetActionState()
+		: (bIsDead
+			? EEnemyActionState::Dead
+			: EEnemyActionState::Active);
+}
+
+bool AEnemyCharacter::CanMove() const
+{
+	return !bIsDead &&
+		(!IsValid(StatusComponent) || StatusComponent->CanMove());
+}
+
+bool AEnemyCharacter::CanAct() const
+{
+	return !bIsDead &&
+		(!IsValid(StatusComponent) || StatusComponent->CanAct());
 }
 
 void AEnemyCharacter::GetLifetimeReplicatedProps(
@@ -396,6 +442,11 @@ void AEnemyCharacter::PlayDeathCosmetics()
 
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
+		if (UAnimInstance* AnimInstance = MeshComp->GetAnimInstance())
+		{
+			AnimInstance->StopAllMontages(0.0f);
+		}
+
 		MeshComp->SetSimulatePhysics(true);
 
 		// 맞은 방향으로 쓰러진다. 방향이 없으면(환경 피해 등) 그냥 무너진다.
@@ -425,6 +476,10 @@ void AEnemyCharacter::Dead()
 	}
 
 	bIsDead = true;
+	if (IsValid(StatusComponent))
+	{
+		StatusComponent->SetDead();
+	}
 
 	// 서버 로컬 연출(리슨 서버 화면·데디의 물리 상태).
 	PlayDeathCosmetics();
@@ -471,6 +526,10 @@ void AEnemyCharacter::ResetForPoolActivation()
 	bIsDead = false;
 	LastHitDirection = FVector::ZeroVector;
 	LastHitBoneName = NAME_None;
+	if (HasAuthority() && IsValid(StatusComponent))
+	{
+		StatusComponent->ResetForPool();
+	}
 
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{

@@ -2,6 +2,7 @@
 
 
 #include "UI/HUD/OBHUD.h"
+#include "Game/Expedition/OBHelicopterSpawnLog.h"
 
 #include "UI/ViewModels/OBHealthViewModel.h"
 #include "Character/OBCharacterBase.h"
@@ -168,14 +169,14 @@ void AOBHUD::ToggleWorldMap()
 	if (UOBWorldMapWidget* MapWidget = EnsureWorldMapWidget())
 	{
 		const bool bOpen = !MapWidget->IsMapOpen();
-		UE_LOG(LogOBInsertionUI, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionUI, Log,
 			TEXT("[InsertionUI] ToggleWorldMap HUD=%s Widget=%s Open=%s"),
 			*GetName(), *MapWidget->GetName(), bOpen ? TEXT("true") : TEXT("false"));
 		MapWidget->SetMapOpen(bOpen);
 	}
 	else
 	{
-		UE_LOG(LogOBInsertionUI, Error,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionUI, Error,
 			TEXT("[InsertionUI] ToggleWorldMap failed HUD=%s Owner=%s WidgetClass=%s"),
 			*GetName(), *GetNameSafe(GetOwningPlayerController()), *GetNameSafe(WorldMapWidgetClass));
 	}
@@ -191,7 +192,7 @@ UOBWorldMapWidget* AOBHUD::EnsureWorldMapWidget()
 	APlayerController* PC = GetOwningPlayerController();
 	if (!PC || !WorldMapWidgetClass)
 	{
-		UE_LOG(LogOBInsertionUI, Error,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionUI, Error,
 			TEXT("[InsertionUI] WorldMap ensure failed HUD=%s Owner=%s WidgetClass=%s"),
 			*GetName(), *GetNameSafe(PC), *GetNameSafe(WorldMapWidgetClass));
 		return nullptr;
@@ -200,14 +201,14 @@ UOBWorldMapWidget* AOBHUD::EnsureWorldMapWidget()
 	WorldMapWidget = CreateWidget<UOBWorldMapWidget>(PC, WorldMapWidgetClass);
 	if (!WorldMapWidget)
 	{
-		UE_LOG(LogOBInsertionUI, Error,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionUI, Error,
 			TEXT("[InsertionUI] WorldMap CreateWidget failed HUD=%s Owner=%s WidgetClass=%s"),
 			*GetName(), *GetNameSafe(PC), *GetNameSafe(WorldMapWidgetClass));
 		return nullptr;
 	}
 
 	WorldMapWidget->AddToViewport(50);
-	UE_LOG(LogOBInsertionUI, Log,
+	OB_HELICOPTER_SPAWN_LOG(LogOBInsertionUI, Log,
 		TEXT("[InsertionUI] WorldMap ensured HUD=%s Widget=%s WidgetClass=%s"),
 		*GetName(), *WorldMapWidget->GetName(), *GetNameSafe(WorldMapWidgetClass));
 	return WorldMapWidget;
@@ -223,7 +224,7 @@ bool AOBHUD::OpenInsertionMap(bool bCanSelectTarget)
 
 	MapWidget->SetInsertionSelectionMode(true, bCanSelectTarget);
 	MapWidget->SetMapOpen(true);
-	UE_LOG(LogOBInsertionUI, Log,
+	OB_HELICOPTER_SPAWN_LOG(LogOBInsertionUI, Log,
 		TEXT("[InsertionUI] Insertion map opened HUD=%s CanSelect=%s"),
 		*GetName(), bCanSelectTarget ? TEXT("true") : TEXT("false"));
 	return true;
@@ -236,7 +237,7 @@ void AOBHUD::CloseInsertionMap()
 		const bool bWasOpen = MapWidget->IsMapOpen();
 		MapWidget->SetMapOpen(false);
 		MapWidget->SetInsertionSelectionMode(false, false);
-		UE_LOG(LogOBInsertionUI, Log,
+		OB_HELICOPTER_SPAWN_LOG(LogOBInsertionUI, Log,
 			TEXT("[InsertionUI] Insertion map closed HUD=%s WasOpen=%s"),
 			*GetName(), bWasOpen ? TEXT("true") : TEXT("false"));
 	}

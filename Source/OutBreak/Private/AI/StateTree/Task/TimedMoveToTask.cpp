@@ -1,6 +1,7 @@
 #include "AI/StateTree/Task/TimedMoveToTask.h"
 
 #include "AIController.h"
+#include "AI/EnemyCharacter.h"
 #include "GameFramework/Pawn.h"
 #include "Navigation/PathFollowingComponent.h"
 #include "NavFilters/NavigationQueryFilter.h"
@@ -19,6 +20,14 @@ EStateTreeRunStatus FSTTTimedMoveToTask::EnterState(
 	if (!IsValid(AIController))
 	{
 		return EStateTreeRunStatus::Failed;
+	}
+
+	if (const AEnemyCharacter* EnemyCharacter =
+		Cast<AEnemyCharacter>(InstanceData.ControlledPawn.Get());
+		IsValid(EnemyCharacter) && !EnemyCharacter->CanMove())
+	{
+		AIController->StopMovement();
+		return EStateTreeRunStatus::Running;
 	}
 
 	if (InstanceData.MoveDuration <= 0.0f)
@@ -79,6 +88,17 @@ EStateTreeRunStatus FSTTTimedMoveToTask::Tick(
 {
 	FInstanceDataType& InstanceData = Context.GetInstanceData(*this);
 	AAIController* AIController = ResolveController(InstanceData);
+	if (const AEnemyCharacter* EnemyCharacter =
+		Cast<AEnemyCharacter>(InstanceData.ControlledPawn.Get());
+		IsValid(EnemyCharacter) && !EnemyCharacter->CanMove())
+	{
+		if (IsValid(AIController))
+		{
+			AIController->StopMovement();
+		}
+		return EStateTreeRunStatus::Running;
+	}
+
 	if (!IsValid(AIController) || !InstanceData.bMoveRequested)
 	{
 		return EStateTreeRunStatus::Failed;
