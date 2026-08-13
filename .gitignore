@@ -92,7 +92,8 @@ Content/Infected/Materials
 Content/Infected/Systems
 Content/Infected.zip
 Content/Infected/Textures
-Content/PostABundle
+Content/PostABundle/*
+!Content/PostABundle/Materials
 Content/__ExternalActors__/PostABundle
 Content/__ExternalObjects__/PostABundle
 Content/Abandoned_Mall
