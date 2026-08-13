@@ -49,6 +49,11 @@ public:
 	
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
+
+	// 서브시스템 변경 통지 → 다음 틱에 전체 재구성.
+	void HandleLoadoutChanged();
+	void RefreshAll();
 	
 	UFUNCTION()
 	void HandleWeaponClicked(TSubclassOf<AOBWeaponBase> WeaponClass);
@@ -65,4 +70,8 @@ protected:
 	
 	UFUNCTION()
 	void HandleCardClicked(EOBWeaponSlot WeaponSlot);
+
+private:
+	// 한 프레임에 여러 번 통지가 와도 재구성은 1회. SetTimer가 같은 핸들을 덮는다.
+	FTimerHandle RefreshTimer;
 };

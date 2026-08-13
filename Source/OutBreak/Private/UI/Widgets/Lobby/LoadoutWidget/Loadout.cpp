@@ -12,6 +12,8 @@
 #include "Weapon/Data/OBWeaponData.h"
 #include "Weapon/Data/OBWeaponCatalog.h"
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 #include "Data/OBGameDataSubsystem.h"
 #include "Item/OBItemRegistry.h"
 
@@ -22,12 +24,47 @@ void ULoadout::NativeConstruct()
 	if (UOBLoadoutSubsystem* LS = GetLoadout())
 	{
 		LS->GrantStarterIfEmpty(WeaponCatalog);   // 무일푼 복구
+
+		// 상점 구매/판매·정산처럼 이 위젯 밖에서 바뀐 것도 반영해야 한다.
+		LS->OnLoadoutChanged.RemoveAll(this);
+		LS->OnLoadoutChanged.AddUObject(this, &ULoadout::HandleLoadoutChanged);
 	}
 	
 	BindCardClicks();
 	RebuildStash();
 	RebuildSlots();
 	ShowDefaultStats(); // 열 때 장착된 무기 스탯을 기본 표시
+}
+
+void ULoadout::NativeDestruct()
+{
+	if (UOBLoadoutSubsystem* LS = GetLoadout())
+	{
+		LS->OnLoadoutChanged.RemoveAll(this);
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(RefreshTimer);
+	}
+	Super::NativeDestruct();
+}
+
+void ULoadout::HandleLoadoutChanged()
+{
+	// 통지 시점이 WeaponElement의 클릭 델리게이트 브로드캐스트 도중일 수 있다.
+	// 그 자리에서 ClearChildren()을 하면 방금 클릭된 엘리먼트를 파괴하게 된다.
+	// 다음 틱으로 밀면 안전하고, 한 프레임에 여러 번 와도 한 번만 다시 그린다.
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			RefreshTimer, this, &ULoadout::RefreshAll, 0.f, false);
+	}
+}
+
+void ULoadout::RefreshAll()
+{
+	RebuildStash();
+	RebuildSlots();
 }
 
 UOBLoadoutSubsystem* ULoadout::GetLoadout() const
@@ -143,9 +180,7 @@ void ULoadout::HandleWeaponClicked(TSubclassOf<AOBWeaponBase> WeaponClass)
 	if (!LS || !WeaponClass) return;
 
 	ShowStats(WeaponClass);          // 클릭 무기 스탯 표시
-	LS->EquipFromStash(WeaponClass); // 창고→슬롯(이전 슬롯 무기는 창고로)
-	RebuildStash();
-	RebuildSlots();
+	LS->EquipFromStash(WeaponClass); // 성공하면 OnLoadoutChanged가 다시 그린다
 }
 
 void ULoadout::ShowStats(TSubclassOf<AOBWeaponBase> WeaponClass)
