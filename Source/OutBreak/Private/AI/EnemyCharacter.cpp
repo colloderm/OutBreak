@@ -19,6 +19,7 @@
 #include "AI/Components/EnemyStatusComponent.h"
 #include "AI/Components/EnemyPhysicalComponent.h"
 #include "AI/Components/EnemySpawnableComponent.h"
+#include "AI/Spawning/EnemyDirectorSettings.h"
 #include "Animation/AnimInstance.h"
 #include "Perception/AISense_Damage.h"
 #include "Sound/SoundCue.h"
@@ -166,6 +167,11 @@ void AEnemyCharacter::InitializeAsset()
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	DefaultNetUpdateFrequency = GetNetUpdateFrequency();
+	DefaultMinNetUpdateFrequency = GetMinNetUpdateFrequency();
+	DefaultNetCullDistanceSquared = GetNetCullDistanceSquared();
+	bCapturedNetworkReplicationDefaults = true;
 	
 	InitializeAsset();
 	if (!IsValid(EnemyAsset))
@@ -224,6 +230,138 @@ void AEnemyCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	
+}
+
+float AEnemyCharacter::GetNetPriority(
+	const FVector& ViewPos,
+	const FVector& ViewDir,
+	AActor* Viewer,
+	AActor* ViewTarget,
+	UActorChannel* InChannel,
+	const float Time,
+	const bool bLowBandwidth)
+{
+	const float BasePriority = Super::GetNetPriority(
+		ViewPos,
+		ViewDir,
+		Viewer,
+		ViewTarget,
+		InChannel,
+		Time,
+		bLowBandwidth);
+
+	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
+	if (!Settings->bEnableReplicationLOD || Settings->ReplicationLODLevels.IsEmpty())
+	{
+		return BasePriority;
+	}
+
+	const float DistanceSquared = FVector::DistSquared(GetActorLocation(), ViewPos);
+	const FEnemyReplicationLODLevel* BestLevel = nullptr;
+	float BestMaxDistance = TNumericLimits<float>::Max();
+	for (const FEnemyReplicationLODLevel& Level : Settings->ReplicationLODLevels)
+	{
+		const float MaxDistance = FMath::Max(100.0f, Level.MaxDistance);
+		if (MaxDistance < BestMaxDistance &&
+			DistanceSquared <= FMath::Square(MaxDistance))
+		{
+			BestLevel = &Level;
+			BestMaxDistance = MaxDistance;
+		}
+	}
+
+	// Actors outside the final band are normally culled. Keep a very small
+	// priority for exceptional relevancy paths (ownership, replay, and so on).
+	const float PriorityScale = BestLevel
+		? FMath::Clamp(BestLevel->NetPriorityScale, 0.01f, 1.0f)
+		: 0.01f;
+	return BasePriority * PriorityScale;
+}
+
+void AEnemyCharacter::ApplyNetworkReplicationLOD(
+	const int32 LODIndex,
+	const float UpdateFrequency,
+	const float MinimumUpdateFrequency,
+	const float CullDistance,
+	const bool bShouldBeDormant)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (!bCapturedNetworkReplicationDefaults)
+	{
+		DefaultNetUpdateFrequency = GetNetUpdateFrequency();
+		DefaultMinNetUpdateFrequency = GetMinNetUpdateFrequency();
+		DefaultNetCullDistanceSquared = GetNetCullDistanceSquared();
+		bCapturedNetworkReplicationDefaults = true;
+	}
+
+	CurrentReplicationLODIndex = LODIndex;
+	const float SafeUpdateFrequency = FMath::Max(0.1f, UpdateFrequency);
+	const float SafeMinimumFrequency = FMath::Clamp(
+		MinimumUpdateFrequency,
+		0.1f,
+		SafeUpdateFrequency);
+	SetNetUpdateFrequency(SafeUpdateFrequency);
+	SetMinNetUpdateFrequency(SafeMinimumFrequency);
+	SetNetCullDistanceSquared(FMath::Square(FMath::Max(100.0f, CullDistance)));
+
+	if (bShouldBeDormant)
+	{
+		if (!bNetworkLODDormant || NetDormancy != DORM_DormantAll)
+		{
+			// Schedule one last transform/state update before taking the actor out
+			// of the replication gather path.
+			ForceNetUpdate();
+			SetNetDormancy(DORM_DormantAll);
+		}
+		bNetworkLODDormant = true;
+		return;
+	}
+
+	if (NetDormancy != DORM_Awake)
+	{
+		SetNetDormancy(DORM_Awake);
+		ForceNetUpdate();
+	}
+	bNetworkLODDormant = false;
+}
+
+void AEnemyCharacter::ResetNetworkReplicationLOD()
+{
+	if (!HasAuthority() || !bCapturedNetworkReplicationDefaults)
+	{
+		return;
+	}
+
+	SetNetUpdateFrequency(DefaultNetUpdateFrequency);
+	SetMinNetUpdateFrequency(DefaultMinNetUpdateFrequency);
+	SetNetCullDistanceSquared(DefaultNetCullDistanceSquared);
+	if (bNetworkLODDormant)
+	{
+		SetNetDormancy(DORM_Awake);
+		ForceNetUpdate();
+	}
+
+	CurrentReplicationLODIndex = INDEX_NONE;
+	bNetworkLODDormant = false;
+}
+
+void AEnemyCharacter::ForceCriticalNetUpdate()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (NetDormancy != DORM_Awake)
+	{
+		SetNetDormancy(DORM_Awake);
+	}
+	bNetworkLODDormant = false;
+	ForceNetUpdate();
 }
 
 void AEnemyCharacter::EndPlay(
@@ -504,6 +642,10 @@ void AEnemyCharacter::Dead()
 			FTransform(FRotator::ZeroRotator, DropLoc), DeathLootRow);
 	}
 
+	// Death, hit direction, action state, and the final movement transform must
+	// not wait for a low-frequency LOD slot.
+	ForceCriticalNetUpdate();
+
 	if (IsValid(SpawnableComponent))
 	{
 		SpawnableComponent->ScheduleReturnToPool(DeathCleanupDelay);
@@ -561,7 +703,7 @@ void AEnemyCharacter::ResetForPoolActivation()
 		}
 	}
 
-	ForceNetUpdate();
+	ForceCriticalNetUpdate();
 }
 
 void AEnemyCharacter::PrepareForPoolStorage()

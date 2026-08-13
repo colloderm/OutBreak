@@ -199,9 +199,9 @@ void UEnemyStatusComponent::SetActionStateInternal(
 	}
 
 	ActionState = NewState;
-	if (AActor* Owner = GetOwner())
+	if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
 	{
-		Owner->ForceNetUpdate();
+		Enemy->ForceCriticalNetUpdate();
 	}
 }
 

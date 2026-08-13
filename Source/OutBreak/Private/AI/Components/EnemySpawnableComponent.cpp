@@ -137,7 +137,7 @@ void UEnemySpawnableComponent::AdoptAsSectorBase(
 	SpawnState.PoolKey = InPoolKey;
 	SpawnState.SectorId = InSectorId;
 	SpawnState.PopulationRole = EEnemyPopulationRole::SectorBase;
-	Enemy->ForceNetUpdate();
+	Enemy->ForceCriticalNetUpdate();
 }
 
 void UEnemySpawnableComponent::BeginSpawnPresentation(
@@ -168,7 +168,7 @@ void UEnemySpawnableComponent::BeginSpawnPresentation(
 	DisableOwnerCollision();
 	SuspendOwner();
 	SetSpawnPhase(EEnemyPoolPhase::Emerging);
-	Enemy->ForceNetUpdate();
+	Enemy->ForceCriticalNetUpdate();
 
 	const int32 ExpectedActivationId = SpawnState.ActivationId;
 	if (SpawnState.PresentationDuration <= KINDA_SMALL_NUMBER)
@@ -680,7 +680,7 @@ void UEnemySpawnableComponent::FinishSpawnPresentationServer(
 	RestoreOwnerForActivation();
 	SetSpawnPhase(EEnemyPoolPhase::Active);
 	ResumeOwnerAI();
-	Enemy->ForceNetUpdate();
+	Enemy->ForceCriticalNetUpdate();
 	if (bHasPendingNoiseCommand)
 	{
 		CommandInvestigateNoise(PendingNoiseLocation);

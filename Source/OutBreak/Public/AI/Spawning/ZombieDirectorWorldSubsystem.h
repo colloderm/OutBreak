@@ -109,6 +109,7 @@ private:
 	int32 ResolveSectorBaseTarget(FName SectorId) const;
 	int32 ResolveSectorHardCap(FName SectorId) const;
 	void CompactRegistries();
+	void UpdateEnemyReplicationLOD(double Now);
 
 	TArray<TWeakObjectPtr<AEnemyCharacterSpawner>> Spawners;
 	TArray<TWeakObjectPtr<AEnemySpawnSectorVolume>> Sectors;
@@ -120,4 +121,5 @@ private:
 	TMap<FName, FLatestSectorNoise> LatestSectorNoises;
 	int64 NextNoiseEventId = 1;
 	double LastBasePopulationCheckTime = -DBL_MAX;
+	double LastReplicationLODUpdateTime = -DBL_MAX;
 };

@@ -24,6 +24,7 @@ class UEnemyPhysicalComponent;
 class UEnemySpawnableComponent;
 class UStateTreeAIComponent;
 class UAudioComponent;
+class UActorChannel;
 
 
 DECLARE_LOG_CATEGORY_EXTERN(
@@ -103,6 +104,25 @@ public:
 	bool CanAct() const;
 
 	void StopCharacterMovement();
+
+	/** Applies the authoritative distance LOD selected by the Enemy Director. */
+	void ApplyNetworkReplicationLOD(
+		int32 LODIndex,
+		float UpdateFrequency,
+		float MinimumUpdateFrequency,
+		float CullDistance,
+		bool bShouldBeDormant);
+
+	/** Restores the Blueprint/class replication defaults when network LOD is disabled. */
+	void ResetNetworkReplicationLOD();
+
+	/** Wakes dormancy and schedules an immediate update for important action/state changes. */
+	void ForceCriticalNetUpdate();
+
+	int32 GetCurrentReplicationLODIndex() const { return CurrentReplicationLODIndex; }
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Network Replication")
+	bool IsNetworkLODDormant() const { return bNetworkLODDormant; }
 	
 	void Dead();
 	bool IsDead() const { return bIsDead; }
@@ -120,6 +140,14 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
+	virtual float GetNetPriority(
+		const FVector& ViewPos,
+		const FVector& ViewDir,
+		AActor* Viewer,
+		AActor* ViewTarget,
+		UActorChannel* InChannel,
+		float Time,
+		bool bLowBandwidth) override;
 
 	virtual void EndPlay(
 		const EEndPlayReason::Type EndPlayReason) override;
@@ -236,6 +264,27 @@ private:
 	float LastAppliedAnimationSignificance = 1.0f;
 
 	bool bLastAppliedTickEvenIfNotRendered = false;
+
+	UPROPERTY(
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Transient,
+		Category = "Enemy|Network Replication",
+		meta = (AllowPrivateAccess = "true"))
+	int32 CurrentReplicationLODIndex = INDEX_NONE;
+
+	UPROPERTY(
+		VisibleInstanceOnly,
+		BlueprintReadOnly,
+		Transient,
+		Category = "Enemy|Network Replication",
+		meta = (AllowPrivateAccess = "true"))
+	bool bNetworkLODDormant = false;
+
+	float DefaultNetUpdateFrequency = 100.0f;
+	float DefaultMinNetUpdateFrequency = 2.0f;
+	float DefaultNetCullDistanceSquared = 0.0f;
+	bool bCapturedNetworkReplicationDefaults = false;
 
 	void ApplyAnimationBudgetSettings();
 
