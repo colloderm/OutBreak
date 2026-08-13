@@ -19,7 +19,7 @@ public:
 	// Sets default values for this component's properties
 	UEnemyBaseActorComponent();
 	
-	AEnemyCharacter* GetEnemyCharacter();
+	AEnemyCharacter* GetEnemyCharacter() const;
 
 protected:
 	// Called when the game starts

@@ -125,6 +125,12 @@ void UEnemyMovementComponent::TickComponent(float DeltaTime, ELevelTick TickType
 void UEnemyMovementComponent::StartNavLinkTraversal(const FVector& Destination, UPathFollowingComponent* PathFollowing,
                                                     UEnemyGenNavLinksProxy* EnemyGenNavLinksProxy, FVector Start, FVector End, ETraversalLinkType LinkType)
 {
+	if (IsValid(Character) && !Character->CanMove())
+	{
+		StopMovementImmediately();
+		return;
+	}
+
 	if (!IsValid(PathFollowing) ||
 		!IsValid(EnemyGenNavLinksProxy))
 	{
@@ -276,6 +282,15 @@ void UEnemyMovementComponent::RequestDirectMove(
 	const FVector& MoveVelocity,
 	const bool bForceMaxSpeed)
 {
+	const AEnemyCharacter* OwnerCharacter = IsValid(Character)
+		? Character.Get()
+		: Cast<AEnemyCharacter>(GetOwner());
+	if (IsValid(OwnerCharacter) && !OwnerCharacter->CanMove())
+	{
+		StopMovementImmediately();
+		return;
+	}
+
 	if (bIsTraversingNavLink)
 	{
 		UE_LOG(
@@ -299,6 +314,15 @@ void UEnemyMovementComponent::RequestDirectMove(
 
 void UEnemyMovementComponent::RequestPathMove(const FVector& MoveInput)
 {
+	const AEnemyCharacter* OwnerCharacter = IsValid(Character)
+		? Character.Get()
+		: Cast<AEnemyCharacter>(GetOwner());
+	if (IsValid(OwnerCharacter) && !OwnerCharacter->CanMove())
+	{
+		StopMovementImmediately();
+		return;
+	}
+
 	if (bIsTraversingNavLink)
 	{
 		UE_LOG(

@@ -18,7 +18,7 @@ UEnemyBaseActorComponent::UEnemyBaseActorComponent()
 	// ...
 }
 
-AEnemyCharacter* UEnemyBaseActorComponent::GetEnemyCharacter() { return EnemyCharacter; }
+AEnemyCharacter* UEnemyBaseActorComponent::GetEnemyCharacter() const { return EnemyCharacter; }
 
 
 // Called when the game starts

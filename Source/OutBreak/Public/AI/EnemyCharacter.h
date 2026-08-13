@@ -87,7 +87,21 @@ public:
 	}
 
 	USkeletalMeshComponent* GetChildActorSkeletalMesh();
-	
+
+	UEnemyStatusComponent* GetEnemyStatusComponent() const
+	{
+		return StatusComponent;
+	}
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Status")
+	EEnemyActionState GetActionState() const;
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Status")
+	bool CanMove() const;
+
+	UFUNCTION(BlueprintPure, Category = "Enemy|Status")
+	bool CanAct() const;
+
 	void StopCharacterMovement();
 	
 	void Dead();

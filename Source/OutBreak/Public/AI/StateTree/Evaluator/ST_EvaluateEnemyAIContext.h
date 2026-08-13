@@ -96,6 +96,10 @@ struct OUTBREAK_API FSTEvaluateEnemyAIContextInstanceData
 	UPROPERTY(VisibleAnywhere, Category = "Output")
 	EEnemyMissingArmState MissingArmState =
 		EEnemyMissingArmState::None;
+
+	UPROPERTY(VisibleAnywhere, Category = "Output")
+	EEnemyActionState ActionState =
+		EEnemyActionState::Active;
 };
 
 USTRUCT(
