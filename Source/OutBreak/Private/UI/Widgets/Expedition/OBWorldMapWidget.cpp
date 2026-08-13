@@ -15,6 +15,7 @@
 #include "Player/Controller/OBPlayerController.h"
 #include "TimerManager.h"
 #include "Components/Overlay.h"
+#include "Game/Expedition/OBInsertionHelicopter.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogOBInsertionMap, Log, All);
 
@@ -212,6 +213,11 @@ void UOBWorldMapWidget::Refresh()
 
 	if (MyPS)
 	{
+		for (const FVector_NetQuantize& Loc : MyPS->GetPersonalExtractLocations())
+		{
+			PlaceMarker(Index, PersonalExtractIcon, Map->WorldToMapUV(Loc), PersonalExtractColor);
+		}
+
 		for (const FVector_NetQuantize& Loc : MyPS->GetTeammateMapLocations())
 		{
 			const FVector2D UV = Map->WorldToMapUV(Loc);
@@ -222,7 +228,9 @@ void UOBWorldMapWidget::Refresh()
 		if (GS)
 		{
 			FOBTeamInsertionState InsertionState;
-			if (GS->GetTeamInsertionState(MyPS->GetTeamId(), InsertionState))
+			// 헬기가 사라지면 강하 지점도 의미가 없다. bHasResolvedLocation은
+			// 한 번 켜지면 안 꺼지므로 헬기 유효성으로 수명을 맞춘다.
+			if (GS->GetTeamInsertionState(MyPS->GetTeamId(), InsertionState) && IsValid(InsertionState.Helicopter))
 			{
 				if (InsertionState.bHasResolvedLocation)
 				{
@@ -256,6 +264,14 @@ void UOBWorldMapWidget::Refresh()
 
 		// 이미지 위쪽 = 월드 +X이므로 Yaw를 그대로 회전각으로 쓴다.
 		PlaceMarker(Index, SelfIcon, MyUV, SelfColor, MyPawn->GetActorRotation().Yaw);
+	}
+	
+	for (int32 StaleIndex = Index; StaleIndex < MarkerPool.Num(); ++StaleIndex)
+	{
+		if (UImage* Stale = MarkerPool[StaleIndex].Get())
+		{
+			Stale->SetVisibility(ESlateVisibility::Collapsed);
+		}
 	}
 }
 

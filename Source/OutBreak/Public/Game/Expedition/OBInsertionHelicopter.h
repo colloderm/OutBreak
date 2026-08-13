@@ -61,6 +61,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Helicopter|Passengers")
 	void ReleaseAllPassengers(const FVector& GroundCenter);
+	
+	/**
+	 * 탈출 정산 시점 전용. FinalizePassenger와 달리 콜리전·이동을 되살리지 않는다.
+	 * 이미 숨겨진 폰을 그 자리에 고정해 헬기가 사라져도 추락하지 않게 한다.
+	 */
+	void ReleaseExtractedPassengers();
 
 	/** Removes one tracked passenger without treating a disconnect as a successful insertion. */
 	bool RemovePassenger(AController* Controller, bool bNotifyDeployment = false);
@@ -155,6 +161,11 @@ protected:
 	void BeginSteeringMotion(const FTransform& Target, float DesiredDuration, uint8 CompletionTask);
 	void TickMotion(float DeltaSeconds);
 	void TickSteeringMotion(float DeltaSeconds);
+	/**
+	 * 전방 경로에서 요구되는 최소 고도. 장애물이 없으면 아주 작은 값을 돌려준다.
+	 * @param OutDistanceToObstacle 제약을 만든 지점까지의 수평 거리. 상승 속도 계산에 쓴다.
+	 */
+	float ComputeObstacleFloorZ(const FVector& From, const FVector& Direction, float Reach, float& OutDistanceToObstacle) const;
 	void TickOrbit(float DeltaSeconds);
 	void HandleMotionCompleted(uint8 CompletionTask);
 	void CompleteInsertionScan();
@@ -313,6 +324,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0.0", ClampMax = "45.0"))
 	float SteeringMaxBankAngle = 18.f;
+	
+	/** 뱅크 각 계산의 기준 각오차. 이 각도에서 최대 뱅크가 된다. 작을수록 예민하다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "1.0", ClampMax = "180.0"))
+	float SteeringBankReferenceAngle = 60.f;
 
 	/** Maximum nose-up/down attitude produced by longitudinal and vertical steering. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering", meta = (ClampMin = "0.0", ClampMax = "45.0"))
@@ -333,6 +348,20 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Steering|Debug")
 	bool bDrawSteeringDebug = false;
+	
+	/** 비행 경로 전방의 지형·건물 윗면을 확인해 그 위로 넘어간다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Obstacle")
+	bool bAvoidObstacles = true;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Obstacle", meta = (ClampMin = "500", Units = "cm"))
+	float ObstacleLookAheadDistance = 12000.f;
+
+	/** 장애물 윗면에서 이만큼 더 띄운다. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Obstacle", meta = (ClampMin = "100", Units = "cm"))
+	float ObstacleClearance = 2000.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Flight|Obstacle", meta = (ClampMin = "1", ClampMax = "12"))
+	int32 ObstacleProbeCount = 6;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Insertion")
 	FVector ScanningHoldOffset = FVector(-3500.f, 0.f, 600.f);
