@@ -55,6 +55,10 @@ protected:
 	// 폭발 반경(cm).
 	UPROPERTY(EditDefaultsOnly, Category = "Grenade", Meta = (ClampMin = "0.0"))
 	float ExplosionRadius = 400.f;
+	
+	// 폭발 임펄스. 0이면 밀어내지 않는다(기존 동작).
+	UPROPERTY(EditDefaultsOnly, Category = "Grenade", Meta = (ClampMin = "0.0"))
+	float ExplosionImpulseStrength = 0.f;
 
 	// 발사자 ASC(데미지 소스).
 	TWeakObjectPtr<UAbilitySystemComponent> SourceASC;
