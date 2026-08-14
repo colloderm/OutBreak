@@ -120,6 +120,7 @@ public:
 	void ForceCriticalNetUpdate();
 
 	int32 GetCurrentReplicationLODIndex() const { return CurrentReplicationLODIndex; }
+	double GetLastCriticalNetUpdateTime() const { return LastCriticalNetUpdateTime; }
 
 	UFUNCTION(BlueprintPure, Category = "Enemy|Network Replication")
 	bool IsNetworkLODDormant() const { return bNetworkLODDormant; }
@@ -148,6 +149,10 @@ protected:
 		UActorChannel* InChannel,
 		float Time,
 		bool bLowBandwidth) override;
+	virtual bool IsNetRelevantFor(
+		const AActor* RealViewer,
+		const AActor* ViewTarget,
+		const FVector& SrcLocation) const override;
 
 	virtual void EndPlay(
 		const EEndPlayReason::Type EndPlayReason) override;
@@ -285,6 +290,7 @@ private:
 	float DefaultMinNetUpdateFrequency = 2.0f;
 	float DefaultNetCullDistanceSquared = 0.0f;
 	bool bCapturedNetworkReplicationDefaults = false;
+	double LastCriticalNetUpdateTime = -DBL_MAX;
 
 	void ApplyAnimationBudgetSettings();
 
