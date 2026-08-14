@@ -20,6 +20,7 @@
 #include "AI/Components/EnemyPhysicalComponent.h"
 #include "AI/Components/EnemySpawnableComponent.h"
 #include "AI/Spawning/EnemyDirectorSettings.h"
+#include "AI/Spawning/ZombieDirectorWorldSubsystem.h"
 #include "Animation/AnimInstance.h"
 #include "Perception/AISense_Damage.h"
 #include "Sound/SoundCue.h"
@@ -278,6 +279,45 @@ float AEnemyCharacter::GetNetPriority(
 	return BasePriority * PriorityScale;
 }
 
+bool AEnemyCharacter::IsNetRelevantFor(
+	const AActor* RealViewer,
+	const AActor* ViewTarget,
+	const FVector& SrcLocation) const
+{
+	if (!Super::IsNetRelevantFor(RealViewer, ViewTarget, SrcLocation))
+	{
+		return false;
+	}
+
+	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
+	if (!Settings->bEnableReplicationLOD ||
+		!Settings->bEnablePerPlayerInterestBudget)
+	{
+		return true;
+	}
+
+	if (const UWorld* World = GetWorld())
+	{
+		if (const UZombieDirectorWorldSubsystem* Director =
+			World->GetSubsystem<UZombieDirectorWorldSubsystem>())
+		{
+			bool bHasViewerBudget = false;
+			const bool bRelevant = Director->IsEnemyRelevantForViewer(
+				this,
+				RealViewer,
+				bHasViewerBudget);
+			if (bHasViewerBudget)
+			{
+				return bRelevant;
+			}
+		}
+	}
+
+	// Preserve Unreal's normal relevancy during world startup or teardown when
+	// no viewer budget has been built yet.
+	return true;
+}
+
 void AEnemyCharacter::ApplyNetworkReplicationLOD(
 	const int32 LODIndex,
 	const float UpdateFrequency,
@@ -354,6 +394,16 @@ void AEnemyCharacter::ForceCriticalNetUpdate()
 	if (!HasAuthority())
 	{
 		return;
+	}
+
+	if (const UWorld* World = GetWorld())
+	{
+		LastCriticalNetUpdateTime = World->GetTimeSeconds();
+		if (UZombieDirectorWorldSubsystem* Director =
+			World->GetSubsystem<UZombieDirectorWorldSubsystem>())
+		{
+			Director->NotifyEnemyCriticalNetUpdate(this);
+		}
 	}
 
 	if (NetDormancy != DORM_Awake)

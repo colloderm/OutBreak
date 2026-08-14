@@ -139,5 +139,77 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Network Replication")
 	bool bUseDormancyBeyondLastLOD = true;
 
+	/** Limits each connection to the highest-value zombies instead of relying on distance alone. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget")
+	bool bEnablePerPlayerInterestBudget = true;
+
+	/** Hard normal-state cap for zombie actor channels relevant to one player. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="1"))
+	int32 MaxRelevantZombiesPerPlayer = 48;
+
+	/** Lower cap reached under connection saturation. Immediate threats still rank first. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="1"))
+	int32 MinRelevantZombiesPerPlayer = 12;
+
+	/** Global server cap for the sum of zombie-to-player relevancy pairs. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="1"))
+	int32 MaxTotalZombieViewerPairs = 160;
+
+	/** Per player, only this many top-ranked zombies may use their distance-selected (highest) LOD. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="1"))
+	int32 HighDetailZombiesPerPlayer = 8;
+
+	/** Per player, zombies after this rank are forced to the lowest-frequency LOD. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="1"))
+	int32 MediumDetailZombiesPerPlayer = 24;
+
+	/** Zombies outside the view focus are considered only inside this radius unless they are a threat. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="100.0", Units="cm"))
+	float PeripheralReplicationDistance = 5000.0f;
+
+	/** Dot product threshold for the player's forward focus cone. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="-1.0", ClampMax="1.0"))
+	float ViewFocusDotThreshold = 0.2f;
+
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="0.0"))
+	float ViewFocusScoreBonus = 1.25f;
+
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="0.0"))
+	float CombatTargetScoreBonus = 4.0f;
+
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="0.0"))
+	float RecentCriticalScoreBonus = 3.0f;
+
+	/** Reduces actor-channel churn when candidates have similar scores. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="0.0"))
+	float SelectionRetentionScoreBonus = 0.35f;
+
+	/** Death, attacks, limb loss, spawn, and action changes remain priority candidates for this long. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="0.0", Units="s"))
+	float CriticalRelevancyDuration = 2.0f;
+
+	/** Small temporary overflow used so an immediate threat can open a channel before the next budget pass. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Interest Budget", meta=(ClampMin="0", ClampMax="16"))
+	int32 CriticalInterestOverflowPerPlayer = 4;
+
+	/** Shrinks per-player zombie budgets when the corresponding connection approaches saturation. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Congestion Control")
+	bool bEnableAdaptiveBandwidthBudget = true;
+
+	/** Begin reducing the zombie budget above this fraction of negotiated connection bandwidth. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Congestion Control", meta=(ClampMin="0.1", ClampMax="0.95"))
+	float TargetConnectionUtilization = 0.70f;
+
+	/** Immediately drive toward the minimum budget above this utilization. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Congestion Control", meta=(ClampMin="0.2", ClampMax="1.0"))
+	float EmergencyConnectionUtilization = 0.90f;
+
+	/** Congestion reacts quickly but recovers slowly to avoid oscillation. */
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Congestion Control", meta=(ClampMin="0.1"))
+	float CongestionAttackPerSecond = 3.0f;
+
+	UPROPERTY(Config, EditAnywhere, Category="Network Replication|Congestion Control", meta=(ClampMin="0.01"))
+	float CongestionRecoveryPerSecond = 0.20f;
+
 	virtual FName GetCategoryName() const override { return TEXT("Game"); }
 };
