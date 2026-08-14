@@ -91,7 +91,6 @@ private:
 
 	bool IsAuthorityWorld() const;
 	bool ShouldMergeNoise(const FEnemyNoiseEvent& NoiseEvent);
-	void DispatchLatestNoiseToReinforcements(FName SectorId, const FVector& NoiseLocation);
 	void EnsureBasePopulations(double Now);
 	void AdoptPlacedEnemiesAsSectorBase();
 	int32 RedirectExistingEnemies(const FEnemyNoiseEvent& NoiseEvent, int32 DesiredCount);

@@ -70,7 +70,7 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Population", meta=(ClampMin="0.1", Units="s"))
 	float BasePopulationCheckInterval = 0.5f;
 
-	/** Additional pooled reinforcements requested by each noise event. */
+	/** Total responders targeted by one coalesced noise event; active enemies are reused first. */
 	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0"))
 	int32 DefaultResponders = 6;
 
@@ -80,14 +80,22 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0.0", Units="cm"))
 	float DefaultNoiseRange = 10000.0f;
 
+	/** Same-instigator/tag events inside this rolling window are handled as one burst. */
 	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0.0", Units="s"))
-	float MergeWindow = 0.2f;
+	float MergeWindow = 0.35f;
 
 	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0.0", Units="cm"))
 	float MergeRadius = 500.0f;
 
 	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0.1", Units="s"))
 	float SpawnRequestTimeout = 3.0f;
+
+	/**
+	 * Packaged worlds can register spawners before their runtime NavMesh is ready.
+	 * Requests that specifically fail navigation projection remain queued for this grace period.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0.0", Units="s"))
+	float SpawnNavigationReadyGracePeriod = 15.0f;
 
 	UPROPERTY(Config, EditAnywhere, Category="Pool", meta=(ClampMin="0"))
 	int32 DefaultWarmPoolCount = 8;

@@ -141,7 +141,14 @@ void UZombieDirectorWorldSubsystem::Tick(float DeltaTime)
 			PendingRequests.RemoveAtSwap(Index);
 			continue;
 		}
-		if (!Request.bPersistent && Request.ExpireTime <= Now)
+		const bool bWaitingForNavigation = Request.LastFailureReason.Contains(
+			TEXT("navigation"),
+			ESearchCase::IgnoreCase);
+		const double NavigationGraceDeadline = Request.NoiseEvent.Timestamp +
+			FMath::Max(0.0f, Settings->SpawnNavigationReadyGracePeriod);
+		const bool bNavigationGraceActive =
+			bWaitingForNavigation && Now < NavigationGraceDeadline;
+		if (!Request.bPersistent && Request.ExpireTime <= Now && !bNavigationGraceActive)
 		{
 			UE_LOG(
 				LogZombieDirector,
@@ -833,7 +840,6 @@ void UZombieDirectorWorldSubsystem::ReportNoise(const FEnemyNoiseEvent& InNoiseE
 	}
 
 	FEnemyNoiseEvent NoiseEvent = InNoiseEvent;
-	NoiseEvent.EventId = NoiseEvent.EventId == 0 ? NextNoiseEventId++ : NoiseEvent.EventId;
 	NoiseEvent.Timestamp = GetWorld()->GetTimeSeconds();
 	NoiseEvent.Loudness = FMath::Clamp(NoiseEvent.Loudness, 0.0f, 10.0f);
 	if (NoiseEvent.MaxRange <= 0.0f)
@@ -841,13 +847,8 @@ void UZombieDirectorWorldSubsystem::ReportNoise(const FEnemyNoiseEvent& InNoiseE
 		NoiseEvent.MaxRange = GetDefault<UEnemyDirectorSettings>()->DefaultNoiseRange;
 	}
 
-	const FName SectorId = ResolveSectorId(NoiseEvent.Location);
-	FLatestSectorNoise& LatestNoise = LatestSectorNoises.FindOrAdd(SectorId);
-	LatestNoise.Location = NoiseEvent.Location;
-	LatestNoise.EventId = NoiseEvent.EventId;
-	LatestNoise.Timestamp = NoiseEvent.Timestamp;
-	DispatchLatestNoiseToReinforcements(SectorId, NoiseEvent.Location);
-
+	// Coalesce first. No perception wake-up, StateTree event, path query, or
+	// reinforcement update is allowed to escape from a duplicate burst event.
 	if (ShouldMergeNoise(NoiseEvent))
 	{
 		UE_LOG(
@@ -859,13 +860,20 @@ void UZombieDirectorWorldSubsystem::ReportNoise(const FEnemyNoiseEvent& InNoiseE
 		return;
 	}
 
+	NoiseEvent.EventId = NoiseEvent.EventId == 0 ? NextNoiseEventId++ : NoiseEvent.EventId;
+	const FName SectorId = ResolveSectorId(NoiseEvent.Location);
+	FLatestSectorNoise& LatestNoise = LatestSectorNoises.FindOrAdd(SectorId);
+	LatestNoise.Location = NoiseEvent.Location;
+	LatestNoise.EventId = NoiseEvent.EventId;
+	LatestNoise.Timestamp = NoiseEvent.Timestamp;
+
 	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
 	const int32 DesiredCount = FMath::Clamp(
 		FMath::RoundToInt(Settings->DefaultResponders * FMath::Max(0.25f, NoiseEvent.Loudness)),
 		0,
 		Settings->MaxRespondersPerNoise);
 	const int32 ExistingCount = RedirectExistingEnemies(NoiseEvent, DesiredCount);
-	const int32 ReinforcementCount = DesiredCount;
+	const int32 ReinforcementCount = FMath::Max(0, DesiredCount - ExistingCount);
 
 	if (ReinforcementCount > 0)
 	{
@@ -882,7 +890,9 @@ void UZombieDirectorWorldSubsystem::ReportNoise(const FEnemyNoiseEvent& InNoiseE
 		Request.NoiseEvent = NoiseEvent;
 		Request.SectorId = SectorId;
 		Request.PopulationRole = EEnemyPopulationRole::NoiseReinforcement;
-		Request.RemainingCount += ReinforcementCount;
+		// A burst maintains one response target; repeated accepted requests do
+		// not add an unbounded backlog while the previous response is pending.
+		Request.RemainingCount = FMath::Max(Request.RemainingCount, ReinforcementCount);
 		Request.ExpireTime = NoiseEvent.Timestamp + Settings->SpawnRequestTimeout;
 		Request.LastFailureReason.Reset();
 	}
@@ -941,25 +951,6 @@ bool UZombieDirectorWorldSubsystem::ShouldMergeNoise(const FEnemyNoiseEvent& Noi
 	Recent.Time = NoiseEvent.Timestamp;
 	return false;
 }
-
-void UZombieDirectorWorldSubsystem::DispatchLatestNoiseToReinforcements(
-	const FName SectorId,
-	const FVector& NoiseLocation)
-{
-	for (const TWeakObjectPtr<UEnemySpawnableComponent>& WeakEnemy : Enemies)
-	{
-		UEnemySpawnableComponent* Component = WeakEnemy.Get();
-		if (!IsValid(Component) ||
-			Component->GetPopulationRole() != EEnemyPopulationRole::NoiseReinforcement ||
-			Component->GetSectorId() != SectorId)
-		{
-			continue;
-		}
-
-		Component->CommandInvestigateNoise(NoiseLocation);
-	}
-}
-
 void UZombieDirectorWorldSubsystem::EnsureBasePopulations(const double Now)
 {
 	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
