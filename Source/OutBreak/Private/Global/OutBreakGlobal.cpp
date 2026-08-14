@@ -43,14 +43,6 @@ void UOutBreakGlobal::ReportNoiseToAI(
 
 	const float EffectiveLoudness = FMath::Clamp(Loudness, 0.0f, 10.0f);
 	const float EffectiveMaxRange = FMath::Max(0.0f, MaxRange);
-	UAISense_Hearing::ReportNoiseEvent(
-		WorldContextObject,
-		Location,
-		EffectiveLoudness,
-		Instigator,
-		EffectiveMaxRange,
-		NoiseTag);
-
 	if (UZombieDirectorWorldSubsystem* Director =
 		World->GetSubsystem<UZombieDirectorWorldSubsystem>())
 	{
@@ -61,7 +53,19 @@ void UOutBreakGlobal::ReportNoiseToAI(
 		NoiseEvent.Loudness = EffectiveLoudness;
 		NoiseEvent.MaxRange = EffectiveMaxRange;
 		Director->ReportNoise(NoiseEvent);
+		return;
 	}
+
+	// Worlds without the zombie director retain the generic hearing path. When
+	// the director exists it owns coalescing and dispatch so the same stimulus
+	// cannot wake AI through both perception and a directed move request.
+	UAISense_Hearing::ReportNoiseEvent(
+		WorldContextObject,
+		Location,
+		EffectiveLoudness,
+		Instigator,
+		EffectiveMaxRange,
+		NoiseTag);
 }
 
 void UOutBreakGlobal::PlaySoundAndReportNoise(

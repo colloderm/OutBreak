@@ -98,7 +98,8 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
 	float MinPlayerDistance = 1200.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation", meta=(AllowPrivateAccess="true"))
+	/** Legacy asset compatibility. Enemy character placement now always requires NavMesh. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement|Legacy", meta=(AllowPrivateAccess="true", DisplayName="Legacy Require Navigation (Always On)"))
 	bool bRequireNavigation = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
@@ -110,14 +111,28 @@ private:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
 	float CollisionSearchRadius = 900.0f;
 
+	/** Number of concentric rings sampled inside CollisionSearchRadius. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="1", ClampMax="12"))
+	int32 PlacementSearchRings = 5;
+
+	/** Candidate count per ring. Adjacent rings are angle-staggered for better coverage. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="4", ClampMax="32"))
+	int32 PlacementSamplesPerRing = 12;
+
+	/** Extra horizontal gap between a new zombie capsule and an existing zombie capsule. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
+	float MinEnemySpawnSeparation = 20.0f;
+
+	/** Legacy compatibility value. Vertical lifting is intentionally no longer used for spawn placement. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement|Legacy", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm", DisplayName="Legacy Max Vertical Adjustment (Unused)"))
 	float MaxVerticalSpawnAdjustment = 800.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
 	float SpawnCapsuleClearance = 8.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement", meta=(AllowPrivateAccess="true"))
-	bool bAllowNavigationFallback = true;
+	/** Legacy asset compatibility. Off-NavMesh fallback is intentionally disabled. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation|Placement|Legacy", meta=(AllowPrivateAccess="true", DisplayName="Legacy Navigation Fallback (Ignored)"))
+	bool bAllowNavigationFallback = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Validation", meta=(AllowPrivateAccess="true"))
 	bool bEnabled = true;
