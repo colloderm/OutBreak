@@ -12,6 +12,7 @@ class ULoadoutSelectionList;
 class ULoadoutSelectionView;
 class UOBLoadoutSubsystem;
 class AOBWeaponBase;
+class UTexture2D;
 
 UCLASS()
 class OUTBREAK_API ULoadout : public UOBInteractionWidget
@@ -60,6 +61,11 @@ protected:
 
 	void RebuildStash();
 	void RebuildSlots();
+
+	// 표시 정보의 단일 진입점. 상점과 같은 우선순위(ItemTable → WeaponData 폴백)를 쓴다.
+	// 이걸 어기면 카드에는 WeaponData 이름, 하단 스탯창에는 ItemTable 이름이 동시에 뜬다.
+	bool GetWeaponDisplay(TSubclassOf<AOBWeaponBase> WeaponClass,
+		FText& OutName, FText& OutCategory, FText& OutDesc, UTexture2D*& OutIcon) const;
 	void ShowStats(TSubclassOf<AOBWeaponBase> WeaponClass);
 	
 	UOBLoadoutSubsystem* GetLoadout() const;
@@ -72,6 +78,6 @@ protected:
 	void HandleCardClicked(EOBWeaponSlot WeaponSlot);
 
 private:
-	// 한 프레임에 여러 번 통지가 와도 재구성은 1회. SetTimer가 같은 핸들을 덮는다.
-	FTimerHandle RefreshTimer;
+	// 한 프레임에 여러 번 통지가 와도 재구성은 1회.
+	bool bRefreshPending = false;
 };

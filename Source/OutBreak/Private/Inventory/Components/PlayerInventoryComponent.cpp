@@ -1463,12 +1463,17 @@ bool UPlayerInventoryComponent::UseQuickSlotInternal(
 	FInventoryData ResolvedItem;
 	if (!ResolveQuickSlotItem(QuickSlotIndex, ResolvedItem))
 	{
+		// 가방에 있는 것만으로는 안 된다. 퀵슬롯에 배정돼 있어야 키가 먹는다.
+		UE_LOG(LogTemp, Warning,
+			TEXT("[QuickSlot] %d번 슬롯에 배정된 아이템이 없다."), QuickSlotIndex);
 		return false;
 	}
 
 	const FOBItemDefinitionRow* ItemRow = ResolvedItem.GetDefinition();
 	if (!ItemRow || !ItemRow->ItemTag.IsValid())
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[QuickSlot] %s 의 ItemTable 행이 없다."), *ResolvedItem.ItemTag.ToString());
 		return false;
 	}
 
@@ -1476,13 +1481,22 @@ bool UPlayerInventoryComponent::UseQuickSlotInternal(
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetOwner());
 	if (!ASC)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[QuickSlot] 소유 폰에 ASC가 없다."));
 		return false;
 	}
 
 	// DT_Items may explicitly select the behavior for this item type.
 	if (ItemRow->UseAbility)
 	{
-		return ASC->TryActivateAbilityByClass(ItemRow->UseAbility);
+		const bool bActivated = ASC->TryActivateAbilityByClass(ItemRow->UseAbility);
+		if (!bActivated)
+		{
+			// 어빌리티가 ASC에 부여되지 않았거나, 코스트/쿨다운/차단태그에 걸렸다.
+			UE_LOG(LogTemp, Warning,
+				TEXT("[QuickSlot] %s → %s 발동 실패(미부여 또는 차단태그)."),
+				*ItemRow->ItemTag.ToString(), *GetNameSafe(ItemRow->UseAbility));
+		}
+		return bActivated;
 	}
 
 	// Otherwise locate a granted consumable ability by its metadata ItemTag.
@@ -1499,6 +1513,11 @@ bool UPlayerInventoryComponent::UseQuickSlotInternal(
 		}
 	}
 
+	// 여기까지 오면 이 아이템을 쓸 수단이 아예 없다. 둘 중 하나를 채워야 한다.
+	UE_LOG(LogTemp, Warning,
+		TEXT("[QuickSlot] %s 에 대응하는 사용 어빌리티가 없다. "
+			 "DT_Items의 UseAbility를 채우거나, 부여된 Consumable 어빌리티의 ItemTag를 이 태그로 맞출 것."),
+		*ResolvedItem.ItemTag.ToString());
 	return false;
 }
 

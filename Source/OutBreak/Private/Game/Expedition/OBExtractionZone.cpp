@@ -227,7 +227,7 @@ void AOBExtractionZone::Tick(float DeltaSeconds)
 		}
 		break;
 	case EOBExtractionCallPhase::Waiting:
-		if (Now >= CallState.ArrivalServerTime - InboundLeadTime)
+		if (Now >= CallState.ArrivalServerTime - GetEffectiveInboundLeadTime())
 		{
 			SpawnExtractionHelicopter();
 		}
@@ -365,6 +365,11 @@ void AOBExtractionZone::StartExtractionCall(AController* CallingController)
 		FlareLaunchAnchor ? *FlareLaunchAnchor->GetComponentLocation().ToCompactString() : TEXT("Missing"));
 	BP_OnFlareLaunched(ActiveFlare);
 	SetActorTickEnabled(true);
+}
+
+float AOBExtractionZone::GetEffectiveInboundLeadTime() const
+{
+	return FMath::Clamp(InboundLeadTime, 0.1f, FMath::Max(0.1f, HelicopterCallDelay));
 }
 
 void AOBExtractionZone::SpawnExtractionHelicopter()

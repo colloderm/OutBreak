@@ -29,8 +29,28 @@ void UOBGameplayAbility_Consumable::ActivateAbility(const FGameplayAbilitySpecHa
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 	
 	UPlayerInventoryComponent* Inv = GetInventory();
-	if (!Inv || Inv->GetItemCount(ItemTag) <= 0 || !CommitAbility(Handle, ActorInfo, ActivationInfo))
+
+	// 세 가지 실패를 한 줄에 뭉쳐두면 "키를 눌러도 아무 일도 안 난다"만 남는다.
+	// 특히 ItemTag 불일치(예: 소지품은 Item.MedKit인데 이 어빌리티는 Item.Bandage)는
+	// 발동 자체는 성공한 뒤 여기서 조용히 끝나서 원인을 찾기 어렵다.
+	if (!Inv)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[Consumable] %s: 인벤토리 컴포넌트를 못 찾았다."), *GetName());
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+	if (Inv->GetItemCount(ItemTag) <= 0)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Consumable] %s: 소지 수량 0 (어빌리티 ItemTag=%s). "
+				 "실제 소지 아이템 태그와 이 어빌리티의 ItemTag가 다른지 확인할 것."),
+			*GetName(), *ItemTag.ToString());
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Consumable] %s: CommitAbility 실패(코스트/쿨다운)."), *GetName());
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
