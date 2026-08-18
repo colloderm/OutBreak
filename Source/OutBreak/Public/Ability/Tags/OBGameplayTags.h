@@ -39,6 +39,9 @@ namespace OBGameplayTags
 	// 연출(발사 - 총구 화염/사격음, 피격 - 탄착 이펙트/사운드 등).
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Fire);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_Impact);
+	// 탄흔 데칼. Impact의 자식이 아니라 형제로 둔다 —
+	// 자식이면 큐 매니저의 부모 태그 매칭 때문에 기존 Impact BP와 라우팅이 섞인다.
+	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Weapon_ImpactDecal);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Melee_Swing);
 	OUTBREAK_API UE_DECLARE_GAMEPLAY_TAG_EXTERN(GameplayCue_Melee_Impact);
 	

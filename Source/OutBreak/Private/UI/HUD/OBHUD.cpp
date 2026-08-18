@@ -13,6 +13,7 @@
 #include "Inventory/Components/PlayerInventoryComponent.h"
 #include "UI/HUD/OBConsumableWidget.h"
 #include "UI/Widgets/Expedition/OBWorldMapWidget.h"
+#include "Player/Controller/OBPlayerController.h"
 #include "View/MVVMView.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogOBInsertionUI, Log, All);
@@ -49,6 +50,48 @@ void AOBHUD::BeginPlay()
 	
 	// 전체 지도. 상시 생성해 두고 숨긴다(M키가 토글).
 	EnsureWorldMapWidget();
+
+	// 이 시점에 이미 헬기 트랜짓이 걸려 있으면(상태가 먼저 도착한 경우) 처음부터 감춘다.
+	// 늦게 도착하면 PC가 잠금 적용 시 다시 호출하므로 결과는 같다.
+	if (const AOBPlayerController* OBPC = Cast<AOBPlayerController>(PC))
+	{
+		bGameplayHUDVisible = !OBPC->IsHelicopterTransitLocked();
+	}
+	ApplyGameplayHUDVisibility();
+}
+
+void AOBHUD::SetGameplayHUDVisible(const bool bVisible)
+{
+	bGameplayHUDVisible = bVisible;
+	ApplyGameplayHUDVisibility();
+}
+
+void AOBHUD::ApplyGameplayHUDVisibility()
+{
+	// RemoveFromParent()를 쓰면 안 된다. UUserWidget::NativeDestruct가 불려서
+	// 위젯이 걸어 둔 구독이 끊긴다 — OBConsumableWidget은 거기서 OnInventoryChanged를
+	// 해제하고, 다시 넣어도 NativeConstruct가 재구독하지 않아 수량이 0으로 굳는다.
+	// 파괴/재생성이 없는 SetVisibility가 맞다. 깜빡임도 그래서 생겼다.
+	const ESlateVisibility Target = bGameplayHUDVisible
+		? ESlateVisibility::SelfHitTestInvisible
+		: ESlateVisibility::Collapsed;
+
+	UUserWidget* const Widgets[] =
+	{
+		HealthWidget.Get(),
+		AmmoWidget.Get(),
+		ConsumableWidget.Get(),
+		SessionTimerWidget.Get(),
+		CrosshairWidget.Get()
+	};
+
+	for (UUserWidget* Widget : Widgets)
+	{
+		if (IsValid(Widget))
+		{
+			Widget->SetVisibility(Target);
+		}
+	}
 }
 
 void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)
@@ -58,6 +101,10 @@ void AOBHUD::HandlePawnChanged(APawn* OldPawn, APawn* NewPawn)
 		TryInitHealthWidget(Character);
 		BindAmmoToCharacter(Character);
 		BindConsumablesToCharacter(Character);
+
+		// 위젯들은 지연 생성된다. 삽입 중에 폰을 잡으면 방금 만든 것들이
+		// 뷰포트에 그대로 남으므로 현재 상태를 다시 적용한다.
+		ApplyGameplayHUDVisibility();
 	}
 }
 
@@ -102,6 +149,9 @@ void AOBHUD::InitHealthWidget(AOBCharacterBase* Character)
 	{
 		View->SetViewModel(FName("OBHealthViewModel"), HealthViewModel);
 	}
+
+	// ASC가 늦게 준비되면 이 함수가 HandlePawnChanged 밖에서 불린다.
+	ApplyGameplayHUDVisibility();
 }
 
 void AOBHUD::BindAmmoToCharacter(AOBCharacterBase* Character)

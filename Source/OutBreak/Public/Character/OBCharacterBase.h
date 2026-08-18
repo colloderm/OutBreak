@@ -21,6 +21,7 @@ class UOBAbilitySet;
 class UAbilitySystemComponent;
 class UOBAttributeSetBase;
 class UOBEquipmentComponent;
+class UOBFootstepComponent;
 class USpringArmComponent;
 class UCameraComponent;
 
@@ -223,6 +224,11 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	TObjectPtr<UPlayerInventoryComponent> PlayerInventoryComponent;
+
+	// 발소리 재생기. AnimNotify가 FindComponentByClass로 찾아 호출한다.
+	// 서브오브젝트 이름 TEXT("FootstepComponent")는 BP 직렬화 키다. 절대 바꾸지 말 것.
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
+	TObjectPtr<UOBFootstepComponent> FootstepComponent;
 	
 	// 사망 시 남길 시체 컨테이너. 비우면 시체를 남기지 않는다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Loot")

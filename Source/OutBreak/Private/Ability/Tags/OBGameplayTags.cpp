@@ -25,6 +25,7 @@ namespace OBGameplayTags
 	
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_Fire,		"GameplayCue.Weapon.Fire");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_Impact,	"GameplayCue.Weapon.Impact");
+	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Weapon_ImpactDecal, "GameplayCue.Weapon.ImpactDecal");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Melee_Swing,		"GameplayCue.Melee.Swing");
 	UE_DEFINE_GAMEPLAY_TAG(GameplayCue_Melee_Impact,	"GameplayCue.Melee.Impact");
 	

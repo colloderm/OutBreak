@@ -12,6 +12,7 @@
 #include "Player/State/OBPlayerStateBase.h"
 #include "Ability/Attributes/OBAttributeSetBase.h"
 #include "Inventory/Components/PlayerInventoryComponent.h"
+#include "Character/Components/OBFootstepComponent.h"
 #include "Character/Data/OBPawnData.h"
 #include "Equipment/Components/OBEquipmentComponent.h"
 #include "Ability/Data/OBAbilitySet.h"
@@ -67,6 +68,9 @@ AOBCharacterBase::AOBCharacterBase(const FObjectInitializer& ObjectInitializer)
 	EquipmentComponent = CreateDefaultSubobject<UOBEquipmentComponent>(TEXT("EquipmentComponent"));
 	
 	PlayerInventoryComponent = CreateDefaultSubobject<UPlayerInventoryComponent>(TEXT("PlayerInventoryComponent"));
+
+	// 발소리. 이름 문자열은 BP 직렬화 키라 한 번 정하면 못 바꾼다.
+	FootstepComponent = CreateDefaultSubobject<UOBFootstepComponent>(TEXT("FootstepComponent"));
 
 	bUseControllerRotationYaw = false;
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())

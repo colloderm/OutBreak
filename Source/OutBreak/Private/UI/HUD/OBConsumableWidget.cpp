@@ -12,12 +12,20 @@ void UOBConsumableWidget::SetInventory(UPlayerInventoryComponent* InInventory)
 {
 	if (Inventory.IsValid() && ChangedHandle.IsValid())
 		Inventory->OnInventoryChanged.Remove(ChangedHandle);
+	ChangedHandle.Reset();
 
 	Inventory = InInventory;
-	if (Inventory.IsValid())
-		ChangedHandle = Inventory->OnInventoryChanged.AddUObject(this, &UOBConsumableWidget::Refresh);
+	BindInventoryChanged();
 
 	Refresh();
+}
+
+void UOBConsumableWidget::BindInventoryChanged()
+{
+	if (Inventory.IsValid() && !ChangedHandle.IsValid())
+	{
+		ChangedHandle = Inventory->OnInventoryChanged.AddUObject(this, &UOBConsumableWidget::Refresh);
+	}
 }
 
 void UOBConsumableWidget::Refresh()
@@ -37,6 +45,11 @@ void UOBConsumableWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	ApplyIcons();
+
+	// NativeDestruct가 구독을 끊는다. 뷰포트에서 뺐다 다시 넣는 경로(HUD 감춤/복귀,
+	// 리스폰 등)에서 여기가 다시 붙이지 않으면 수량이 영영 갱신되지 않는다.
+	BindInventoryChanged();
+	Refresh();
 }
 
 void UOBConsumableWidget::ApplyIcons()
@@ -68,6 +81,9 @@ void UOBConsumableWidget::NativeDestruct()
 {
 	if (Inventory.IsValid() && ChangedHandle.IsValid())
 		Inventory->OnInventoryChanged.Remove(ChangedHandle);
-	
+
+	// 리셋하지 않으면 핸들이 유효한 채로 남아 BindInventoryChanged의 가드가 재구독을 막는다.
+	ChangedHandle.Reset();
+
 	Super::NativeDestruct();
 }
