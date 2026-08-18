@@ -1423,6 +1423,23 @@ void AOBPlayerController::SetupInputComponent()
 	}
 }
 
+void AOBPlayerController::UpdateRotation(const float DeltaTime)
+{
+	if (!bHelicopterTransitLocked)
+	{
+		Super::UpdateRotation(DeltaTime);
+		return;
+	}
+
+	// APlayerCameraManager normally clamps control pitch to roughly +/-90 degrees.
+	// The helicopter camera is a free-look view target, so consume the accumulated
+	// look input directly and allow continuous yaw and pitch rotation.
+	FRotator ViewRotation = GetControlRotation() + RotationInput;
+	RotationInput = FRotator::ZeroRotator;
+	ViewRotation.Normalize();
+	SetControlRotation(ViewRotation);
+}
+
 bool AOBPlayerController::IsInventoryInputBlocked() const
 {
 	AOBCharacterBase* CharacterBase = Cast<AOBCharacterBase>(GetPawn());

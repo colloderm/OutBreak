@@ -121,6 +121,10 @@
 		{
 			"Name": "ChaosVehiclesPlugin",
 			"Enabled": true
+		},
+		{
+			"Name": "SubtitlesAndClosedCaptions",
+			"Enabled": true
 		}
 	]
 }

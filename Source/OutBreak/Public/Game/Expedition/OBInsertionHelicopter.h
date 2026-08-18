@@ -240,15 +240,6 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Camera")
 	bool bEnablePassengerFreeLook = true;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Camera", meta = (ClampMin = "0.0", ClampMax = "180.0"))
-	float PassengerFreeLookYawLimit = 150.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Camera", meta = (ClampMin = "-89.0", ClampMax = "89.0"))
-	float PassengerFreeLookMinPitch = -75.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Helicopter|Camera", meta = (ClampMin = "-89.0", ClampMax = "89.0"))
-	float PassengerFreeLookMaxPitch = 55.f;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> LeftRappelAnchor;
 

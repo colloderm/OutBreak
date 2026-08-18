@@ -228,20 +228,10 @@ void AOBInsertionHelicopter::CalcCamera(float DeltaTime, FMinimalViewInfo& OutRe
 		return;
 	}
 
-	const FRotator BaseRotation = CabinCamera->GetComponentRotation();
-	const FRotator RelativeRotation = (ViewingController->GetControlRotation() - BaseRotation).GetNormalized();
-	const float Pitch = FMath::Clamp(
-		RelativeRotation.Pitch,
-		FMath::Min(PassengerFreeLookMinPitch, PassengerFreeLookMaxPitch),
-		FMath::Max(PassengerFreeLookMinPitch, PassengerFreeLookMaxPitch));
-	const float Yaw = FMath::Clamp(
-		RelativeRotation.Yaw,
-		-FMath::Abs(PassengerFreeLookYawLimit),
-		FMath::Abs(PassengerFreeLookYawLimit));
-	OutResult.Rotation = FRotator(
-		BaseRotation.Pitch + Pitch,
-		BaseRotation.Yaw + Yaw,
-		BaseRotation.Roll).GetNormalized();
+	// The controller owns an unrestricted world-space free-look rotation while
+	// seated. Clamping a normalized relative yaw here made the view jump from
+	// the positive limit to the negative limit when crossing the rear axis.
+	OutResult.Rotation = ViewingController->GetControlRotation().GetNormalized();
 }
 
 FRotator AOBInsertionHelicopter::GetCabinViewRotation() const

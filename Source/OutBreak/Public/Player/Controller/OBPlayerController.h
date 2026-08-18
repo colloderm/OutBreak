@@ -114,6 +114,7 @@ private:
 protected:
 	//~ APlayerController interface
 	virtual void SetupInputComponent() override;
+	virtual void UpdateRotation(float DeltaTime) override;
 	virtual void BeginPlay() override;
 	virtual void OnRep_Pawn() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
