@@ -115,6 +115,8 @@ protected:
 	void OpenBoardingWindow();
 	void ProcessBoarding(float DeltaSeconds);
 	void BoardPassenger(AController* Controller);
+	bool AreAllCallingTeamMembersBoarded() const;
+	void UpdateEarlyDepartureCountdown();
 	void StartDeparture();
 	void FinishExtractionFlight();
 	void AbortExtraction(const FString& Reason);
@@ -162,6 +164,7 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction")
 	FGameplayTag RequiredItemTag;
 
+	/** Optional per-zone override. Project Settings supplies the default flare class. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Extraction|Classes")
 	TSubclassOf<AOBSignalFlare> SignalFlareClass;
 
@@ -221,5 +224,7 @@ private:
 
 	FTimerHandle ActiveCheckTimer;
 	float CooldownEndsServerTime = 0.f;
+	float StandardBoardingEndsServerTime = 0.f;
 	bool bLastActiveState = false;
+	bool bEarlyDepartureScheduled = false;
 };

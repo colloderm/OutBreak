@@ -4,6 +4,7 @@
 #include "Components/SphereComponent.h"
 #include "Game/Expedition/OBExtractionSite.h"
 #include "Game/Expedition/OBHelicopterRoute.h"
+#include "Game/Expedition/OBHelicopterSystemSettings.h"
 #include "Game/Expedition/OBInsertionHelicopter.h"
 #include "Game/Expedition/OBSignalFlare.h"
 #include "Game/GameMode/OBExpeditionGameMode.h"
@@ -87,7 +88,6 @@ AOBExtractionZone::AOBExtractionZone()
 	FlareLaunchAnchor->SetupAttachment(Trigger);
 	FlareLaunchAnchor->SetRelativeLocation(FVector(0.f, 0.f, 100.f));
 
-	SignalFlareClass = AOBSignalFlare::StaticClass();
 }
 
 void AOBExtractionZone::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -234,6 +234,7 @@ void AOBExtractionZone::Tick(float DeltaSeconds)
 		break;
 	case EOBExtractionCallPhase::Boarding:
 		ProcessBoarding(DeltaSeconds);
+		UpdateEarlyDepartureCountdown();
 		if (Now >= CallState.BoardingEndsServerTime)
 		{
 			StartDeparture();
@@ -348,16 +349,37 @@ void AOBExtractionZone::StartExtractionCall(AController* CallingController)
 	CallState.Phase = EOBExtractionCallPhase::FlareLaunched;
 	ForceNetUpdate();
 	BP_OnCallPhaseChanged(CallState.Phase);
+	TSubclassOf<AOBSignalFlare> ResolvedFlareClass = SignalFlareClass;
+	// Native class is the legacy default; let the project-wide BP replace it too.
+	if (!ResolvedFlareClass || ResolvedFlareClass == AOBSignalFlare::StaticClass())
+	{
+		if (const UOBHelicopterSystemSettings* Settings = GetDefault<UOBHelicopterSystemSettings>();
+			Settings && !Settings->ExtractionSignalFlareClass.IsNull())
+		{
+			ResolvedFlareClass = Settings->ExtractionSignalFlareClass.LoadSynchronous();
+			if (!ResolvedFlareClass)
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("[ExtractionDebug] Failed to load the project signal flare class. Zone=%s Class=%s"),
+					*GetName(), *Settings->ExtractionSignalFlareClass.ToString());
+			}
+		}
+	}
+	if (!ResolvedFlareClass)
+	{
+		ResolvedFlareClass = AOBSignalFlare::StaticClass();
+	}
+
 	UE_LOG(LogTemp, Log,
 		TEXT("[ExtractionDebug] Call started. Zone=%s CallingTeam=%d FlareClass=%s HelicopterDelay=%.1f ArrivalServerTime=%.2f"),
-		*GetName(), CallState.CallingTeamId, *GetNameSafe(SignalFlareClass),
+		*GetName(), CallState.CallingTeamId, *GetNameSafe(ResolvedFlareClass),
 		HelicopterCallDelay, CallState.ArrivalServerTime);
 
-	if (SignalFlareClass)
+	if (ResolvedFlareClass)
 	{
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		ActiveFlare = GetWorld()->SpawnActor<AOBSignalFlare>(SignalFlareClass,
+		ActiveFlare = GetWorld()->SpawnActor<AOBSignalFlare>(ResolvedFlareClass,
 			FlareLaunchAnchor->GetComponentTransform(), Params);
 	}
 	UE_LOG(LogTemp, Log, TEXT("[ExtractionDebug] Flare spawn result. Zone=%s Flare=%s Anchor=%s"),
@@ -448,7 +470,9 @@ void AOBExtractionZone::OpenBoardingWindow()
 	{
 		return;
 	}
-	CallState.BoardingEndsServerTime = GetServerTime() + BoardingWindowSeconds;
+	StandardBoardingEndsServerTime = GetServerTime() + BoardingWindowSeconds;
+	CallState.BoardingEndsServerTime = StandardBoardingEndsServerTime;
+	bEarlyDepartureScheduled = false;
 	SetCallPhase(EOBExtractionCallPhase::Boarding);
 	BoardingTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 
@@ -519,6 +543,85 @@ void AOBExtractionZone::BoardPassenger(AController* Controller)
 	BP_OnPassengerBoarded(Controller);
 }
 
+bool AOBExtractionZone::AreAllCallingTeamMembersBoarded() const
+{
+	if (CallState.CallingTeamId == 0 || BoardedControllers.IsEmpty())
+	{
+		return false;
+	}
+
+	const AOBExpeditionGameState* GS = GetExpeditionGameState();
+	if (!GS)
+	{
+		return false;
+	}
+
+	int32 ActiveTeamMemberCount = 0;
+	for (APlayerState* PlayerState : GS->PlayerArray)
+	{
+		const AOBPlayerStateBase* TeamMember = Cast<AOBPlayerStateBase>(PlayerState);
+		if (!TeamMember || TeamMember->GetTeamId() != CallState.CallingTeamId)
+		{
+			continue;
+		}
+
+		const EOBPlayerExpeditionStatus Status = TeamMember->GetExpeditionStatus();
+		if (Status != EOBPlayerExpeditionStatus::Alive && Status != EOBPlayerExpeditionStatus::Downed)
+		{
+			continue;
+		}
+
+		AController* TeamController = TeamMember->GetOwningController();
+		if (!IsValid(TeamController))
+		{
+			// A disconnected player's inactive PlayerState must not hold the helicopter forever.
+			continue;
+		}
+
+		++ActiveTeamMemberCount;
+		if (!BoardedControllers.Contains(TeamController))
+		{
+			return false;
+		}
+	}
+
+	return ActiveTeamMemberCount > 0;
+}
+
+void AOBExtractionZone::UpdateEarlyDepartureCountdown()
+{
+	const bool bAllTeamMembersBoarded = AreAllCallingTeamMembersBoarded();
+	if (bAllTeamMembersBoarded == bEarlyDepartureScheduled)
+	{
+		return;
+	}
+
+	if (bAllTeamMembersBoarded)
+	{
+		const UOBHelicopterSystemSettings* Settings = GetDefault<UOBHelicopterSystemSettings>();
+		const float ConfiguredDelay = Settings ? Settings->AllTeamBoardedDepartureDelay : 3.f;
+		const float DepartureDelay = FMath::Clamp(ConfiguredDelay, 2.f, 3.f);
+		CallState.BoardingEndsServerTime = FMath::Min(
+			StandardBoardingEndsServerTime,
+			GetServerTime() + DepartureDelay);
+		bEarlyDepartureScheduled = true;
+		ForceNetUpdate();
+		UE_LOG(LogTemp, Log,
+			TEXT("[Extraction] All calling-team members boarded. Zone=%s Team=%d Boarded=%d DepartingIn=%.1fs"),
+			*GetName(), CallState.CallingTeamId, BoardedControllers.Num(),
+			FMath::Max(0.f, CallState.BoardingEndsServerTime - GetServerTime()));
+		return;
+	}
+
+	// A late join or a revived teammate can invalidate the shortened countdown.
+	CallState.BoardingEndsServerTime = StandardBoardingEndsServerTime;
+	bEarlyDepartureScheduled = false;
+	ForceNetUpdate();
+	UE_LOG(LogTemp, Log,
+		TEXT("[Extraction] Early departure cancelled because the calling team is no longer fully boarded. Zone=%s Team=%d"),
+		*GetName(), CallState.CallingTeamId);
+}
+
 void AOBExtractionZone::StartDeparture()
 {
 	if (!HasAuthority() || CallState.Phase == EOBExtractionCallPhase::Departing)
@@ -535,6 +638,7 @@ void AOBExtractionZone::StartDeparture()
 		}
 	}
 	BoardingProgress.Reset();
+	bEarlyDepartureScheduled = false;
 	SetCallPhase(EOBExtractionCallPhase::Departing);
 
 	if (CallState.Helicopter)
@@ -587,6 +691,8 @@ void AOBExtractionZone::AbortExtraction(const FString& Reason)
 	}
 	BoardedControllers.Reset();
 	BoardingProgress.Reset();
+	StandardBoardingEndsServerTime = 0.f;
+	bEarlyDepartureScheduled = false;
 	BoardingTrigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SetCallPhase(EOBExtractionCallPhase::Aborted);
 	CooldownEndsServerTime = GetServerTime() + 2.f;
@@ -598,6 +704,8 @@ void AOBExtractionZone::ResetForReuse()
 	ActiveFlare = nullptr;
 	BoardedControllers.Reset();
 	BoardingProgress.Reset();
+	StandardBoardingEndsServerTime = 0.f;
+	bEarlyDepartureScheduled = false;
 	BoardingTrigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	ForceNetUpdate();
 	BP_OnCallPhaseChanged(CallState.Phase);

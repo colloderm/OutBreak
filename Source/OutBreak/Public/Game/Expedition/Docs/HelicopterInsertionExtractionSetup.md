@@ -49,7 +49,19 @@ Create `BP_OBSignalFlare` as a child of `AOBSignalFlare` and assign:
 - `Launch Sound`
 - `Burst Sound`
 
-Optional events `On Flare Launched` and `On Flare Burst` can drive a mesh, light, camera shake, or additional Niagara components. Assign this class to each extraction-zone Blueprint's `Signal Flare Class`.
+Optional events `On Flare Launched` and `On Flare Burst` can drive a mesh, light, camera shake, or additional Niagara components.
+
+Assign the Blueprint once in `Project Settings > Game > OutBreak Helicopter System > Default Extraction Signal Flare Class`. An extraction-zone Blueprint's `Signal Flare Class` remains available as an optional per-zone override.
+
+`All Team Boarded Departure Delay` controls the 2-3 second early-departure countdown. The countdown starts when every connected, active member of the calling team is seated; downed teammates block it, while dead or already extracted teammates do not.
+
+The same project-settings section owns the flare sequence:
+
+- `Launch Speed`, `Projectile Gravity Scale`, and `Burst Height Above Launch` control the server-authoritative ascent.
+- `Maximum Flight Time` is a safety burst if the configured height cannot be reached.
+- `Trail Niagara System`, `Burst Niagara System`, `Post Burst Niagara System`, and `Burst Effect Scale` control presentation. Blueprint-authored Niagara components still work when the trail setting is empty and are deactivated at burst.
+- `Launch Sound Cue` and `Burst Sound Cue` are played through `Play Sound And Report Noise`; their noise tags and attenuation-range scales are configured alongside them.
+- `Destroy Delay After Burst` leaves enough replication time for every client to receive the final burst location, then removes the flare actor. World-space burst systems continue independently after actor deletion.
 
 ## 3. Insertion routes
 
