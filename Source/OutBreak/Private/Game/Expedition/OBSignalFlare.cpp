@@ -4,9 +4,11 @@
 #include "Game/Expedition/OBHelicopterSystemSettings.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Global/OutBreakGlobal.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Sound/SoundAttenuation.h"
 #include "Sound/SoundCue.h"
 #include "TimerManager.h"
 
@@ -221,13 +223,47 @@ void AOBSignalFlare::PlayBurstPresentation()
 		: Cast<USoundCue>(BurstSound.Get());
 	if (ResolvedBurstSound)
 	{
-		UOutBreakGlobal::PlaySoundAndReportNoise(
+		// Flare-only exception: keep the audible explosion at the real airborne
+		// burst point, but attract the zombie horde to the original launch point
+		// on navigable ground. The shared audio/noise helper intentionally keeps
+		// both locations identical, so the two operations are split only here.
+		UGameplayStatics::PlaySoundAtLocation(
 			this,
 			ResolvedBurstSound,
 			EffectLocation,
-			this,
-			Settings ? Settings->SignalFlareBurstNoiseTag : FName(TEXT("Flare")),
-			Settings ? FMath::Max(0.01f, Settings->SignalFlareBurstNoiseRangeScale) : 1.f);
+			FRotator::ZeroRotator,
+			1.f,
+			1.f,
+			0.f,
+			nullptr);
+
+		if (HasAuthority())
+		{
+			const float NoiseRangeScale = Settings
+				? FMath::Max(0.01f, Settings->SignalFlareBurstNoiseRangeScale)
+				: 1.f;
+			float MaxNoiseRange = 0.f;
+			if (const FSoundAttenuationSettings* AttenuationSettings =
+				ResolvedBurstSound->GetAttenuationSettingsToApply();
+				AttenuationSettings && AttenuationSettings->bAttenuate)
+			{
+				MaxNoiseRange = AttenuationSettings->GetMaxFalloffDistance() * NoiseRangeScale;
+			}
+
+			UOutBreakGlobal::ReportNoiseToAI(
+				this,
+				LaunchLocation,
+				this,
+				Settings ? Settings->SignalFlareBurstNoiseTag : FName(TEXT("Flare")),
+				1.f,
+				MaxNoiseRange);
+
+			UE_LOG(LogTemp, Verbose,
+				TEXT("[SignalFlare] Air burst audio at %s; AI noise redirected to launch point %s with range %.1f."),
+				*EffectLocation.ToCompactString(),
+				*LaunchLocation.ToCompactString(),
+				MaxNoiseRange);
+		}
 	}
 	BP_OnFlareBurst();
 }

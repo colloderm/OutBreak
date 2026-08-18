@@ -6,6 +6,7 @@
 
 class AOBSignalFlare;
 class UNiagaraSystem;
+class USoundBase;
 class USoundCue;
 
 /** Project-wide defaults used by the insertion and extraction helicopter system. */
@@ -23,6 +24,18 @@ public:
 	UPROPERTY(Config, EditDefaultsOnly, Category = "Extraction|Presentation",
 		Meta = (DisplayName = "Default Extraction Signal Flare Class"))
 	TSoftClassPtr<AOBSignalFlare> ExtractionSignalFlareClass;
+
+	/**
+	 * Non-spatial radio message played only for the player whose call-trigger
+	 * overlap successfully starts an extraction. This does not report AI noise.
+	 */
+	UPROPERTY(Config, EditDefaultsOnly, Category = "Extraction|Audio",
+		Meta = (DisplayName = "Call Accepted Radio Sound"))
+	TSoftObjectPtr<USoundBase> ExtractionCallRadioSound;
+
+	UPROPERTY(Config, EditDefaultsOnly, Category = "Extraction|Audio",
+		Meta = (DisplayName = "Call Accepted Radio Volume", ClampMin = "0.0", UIMin = "0.0"))
+	float ExtractionCallRadioVolume = 1.f;
 
 	/** Optional Niagara trail. When empty, components authored on the flare Blueprint remain usable. */
 	UPROPERTY(Config, EditDefaultsOnly, Category = "Extraction|Signal Flare|Effects",

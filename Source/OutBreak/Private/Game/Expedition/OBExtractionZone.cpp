@@ -14,6 +14,7 @@
 #include "HAL/IConsoleManager.h"
 #include "DrawDebugHelpers.h"
 #include "Net/UnrealNetwork.h"
+#include "Player/Controller/OBPlayerController.h"
 #include "Player/State/OBPlayerStateBase.h"
 #include "TimerManager.h"
 
@@ -290,6 +291,20 @@ void AOBExtractionZone::OnCallTriggerBeginOverlap(
 			Controller && Controller->GetPlayerState<AOBPlayerStateBase>()
 				? Controller->GetPlayerState<AOBPlayerStateBase>()->GetTeamId() : 0,
 			OwningTeamId, *ExtractionTypeName(ExtractType));
+
+		if (AOBPlayerController* CallingPlayer = Cast<AOBPlayerController>(Controller))
+		{
+			if (const UOBHelicopterSystemSettings* Settings = GetDefault<UOBHelicopterSystemSettings>();
+				Settings && !Settings->ExtractionCallRadioSound.IsNull())
+			{
+				if (USoundBase* RadioSound = Settings->ExtractionCallRadioSound.LoadSynchronous())
+				{
+					CallingPlayer->Client_PlayExtractionRadio(
+						RadioSound,
+						FMath::Max(0.f, Settings->ExtractionCallRadioVolume));
+				}
+			}
+		}
 		StartExtractionCall(Controller);
 	}
 	else

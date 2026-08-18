@@ -80,6 +80,13 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0.0", Units="cm"))
 	float DefaultNoiseRange = 10000.0f;
 
+	/**
+	 * How long zombies retain hearing, damage, and lost-sight stimulus memory.
+	 * StateTree reactions that depend on an active stimulus can end when this expires.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category="Response|Memory", meta=(ClampMin="0.0", Units="s"))
+	float StimulusMemoryDuration = 8.0f;
+
 	/** Same-instigator/tag events inside this rolling window are handled as one burst. */
 	UPROPERTY(Config, EditAnywhere, Category="Response", meta=(ClampMin="0.0", Units="s"))
 	float MergeWindow = 0.35f;

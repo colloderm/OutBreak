@@ -2,6 +2,9 @@
 
 #include "Player/Controller/OBPlayerController.h"
 
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
@@ -2071,6 +2074,15 @@ void AOBPlayerController::Client_ApplyExtractionResultV2_Implementation(
 	UE_LOG(LogTemp, Log,
 		TEXT("[Expedition] Extraction V2: stacks=%d instances=%d returned=%d"),
 		StackHaul.Num(), LootedInstances.Num(), ReturnedLoadoutInstances.Num());
+}
+
+void AOBPlayerController::Client_PlayExtractionRadio_Implementation(
+	USoundBase* RadioSound, float VolumeMultiplier)
+{
+	if (IsValid(RadioSound))
+	{
+		UGameplayStatics::PlaySound2D(this, RadioSound, FMath::Max(0.f, VolumeMultiplier));
+	}
 }
 
 void AOBPlayerController::ReturnToHome()
