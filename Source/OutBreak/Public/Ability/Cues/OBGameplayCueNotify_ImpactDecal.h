@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Chaos/ChaosEngineInterface.h"   // EPhysicalSurface
 #include "GameplayCueNotify_Static.h"
 #include "OBGameplayCueNotify_ImpactDecal.generated.h"
 
@@ -31,7 +32,14 @@ public:
 		const FGameplayCueParameters& Parameters) const override;
 
 protected:
-	// 비어 있으면 아무것도 찍지 않고 경고를 남긴다.
+	// 표면별 데칼. 맞은 표면이 여기 없거나 값이 비어 있으면 아래 DecalMaterial로 떨어진다.
+	// 표면 종류는 Config/DefaultEngine.ini의 [/Script/Engine.PhysicsSettings]에 정의돼 있다.
+	// 채우지 않아도 동작한다 — 콘크리트/흙만 먼저 넣고 나머지는 나중에 채워도 된다.
+	UPROPERTY(EditDefaultsOnly, Category = "Impact Decal")
+	TMap<TEnumAsByte<EPhysicalSurface>, TObjectPtr<UMaterialInterface>> SurfaceDecals;
+
+	// 폴백. 표면이 미지정(SurfaceType_Default)이거나 위 맵에 없을 때 쓴다.
+	// 이것까지 비어 있으면 아무것도 찍지 않고 경고를 남긴다.
 	UPROPERTY(EditDefaultsOnly, Category = "Impact Decal")
 	TObjectPtr<UMaterialInterface> DecalMaterial;
 

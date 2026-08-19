@@ -6,6 +6,7 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
+#include "PhysicalMaterials/PhysicalMaterial.h"
 
 bool UOBGameplayCueNotify_ImpactDecal::OnExecute_Implementation(
 	AActor* MyTarget,
@@ -24,7 +25,21 @@ bool UOBGameplayCueNotify_ImpactDecal::OnExecute_Implementation(
 		return false;
 	}
 
-	if (!DecalMaterial)
+	// 맞은 표면을 고른다. PhysicalMaterial이 없으면 DetermineSurfaceType이 Default를 준다.
+	const EPhysicalSurface Surface =
+		UPhysicalMaterial::DetermineSurfaceType(Parameters.PhysicalMaterial.Get());
+
+	// 표면 전용 → 폴백 순. 맵에 키는 있는데 값이 비어 있는 경우도 폴백으로 흘린다.
+	UMaterialInterface* Material = DecalMaterial;
+	if (const TObjectPtr<UMaterialInterface>* Found = SurfaceDecals.Find(Surface))
+	{
+		if (*Found)
+		{
+			Material = *Found;
+		}
+	}
+
+	if (!Material)
 	{
 		UE_LOG(LogTemp, Warning,
 			TEXT("[ImpactDecal] %s 에 Decal Material이 비어 있다. "
@@ -50,7 +65,7 @@ bool UOBGameplayCueNotify_ImpactDecal::OnExecute_Implementation(
 	// LifeSpan을 여기서 주면 페이드 도중에 잘려 사라진다. 수명은 아래 SetFadeOut이 맡는다.
 	UDecalComponent* Decal = UGameplayStatics::SpawnDecalAtLocation(
 		MyTarget,
-		DecalMaterial,
+		Material,
 		FVector(DecalThickness, Size, Size),
 		Parameters.Location,
 		DecalRotation,

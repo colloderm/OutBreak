@@ -3,7 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Chaos/ChaosEngineInterface.h"   // EPhysicalSurface
 #include "Components/ActorComponent.h"
+#include "GameplayTagContainer.h"
 #include "OBFootstepComponent.generated.h"
 
 class USkeletalMeshComponent;
@@ -29,15 +31,50 @@ public:
 	UOBFootstepComponent();
 
 	// 노티파이가 부르는 유일한 진입점(연출).
-	void PlayFootstep(USkeletalMeshComponent* MeshComp, FName FootSocket);
+	// GASP의 BP_AnimNotify_FoleyEvent에서도 호출하므로 BP에 노출한다 —
+	// GASP 애님에는 Foley 노티파이가 이미 전부 박혀 있어서, 그쪽에 얹는 편이
+	// 모션 매칭 DB 전체에 우리 노티파이를 수작업으로 까는 것보다 압도적으로 싸다.
+	// 반환값: 실제로 소리를 냈는가. 호출자가 자기 사운드를 건너뛸지 판단하는 데 쓴다.
+	// bWarnIfNoSound: 사운드가 하나도 없을 때 경고할지. Foley 경로는 false를 넘긴다 —
+	//   거기서는 "둘 다 비어 있음"이 오설정이 아니라 GASP에 넘긴다는 정상 구성이다.
+	UFUNCTION(BlueprintCallable, Category = "Footstep")
+	bool PlayFootstep(USkeletalMeshComponent* MeshComp, FName FootSocket, bool bWarnIfNoSound = true);
+
+	// GASP Foley 노티파이 전용 진입점. BP_AnimNotify_FoleyEvent(부모)에서 부른다.
+	// 부모를 고치면 Jump/Handplant 자식까지 전부 타므로, 어떤 이벤트가 발소리인지는
+	// 여기서 거른다. BP에 Branch를 두지 않는 이유는 프로젝트 규칙(로직은 C++) 때문이다.
+	// 반환 true = 우리가 소리를 냈으니 GASP Foley 사운드는 건너뛴다.
+	// false = 표면 지정이 없는 바닥이거나 발소리 이벤트가 아니므로 Foley가 담당한다.
+	UFUNCTION(BlueprintCallable, Category = "Footstep")
+	bool PlayFootstepFromFoley(USkeletalMeshComponent* MeshComp, FGameplayTag FoleyEvent, FName FootSocket);
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
-	// 발소리 원본. 비어 있으면 아무 소리도 나지 않는다(로그로 알린다).
+	// 표면별 발소리. 밟은 표면이 여기 없거나 값이 비어 있으면 아래 FootstepSound로 떨어진다.
+	// 표면 종류는 Config/DefaultEngine.ini의 [/Script/Engine.PhysicsSettings] 정의를 따른다.
+	// 비워두면 지금과 똑같이 동작한다 — 흙/콘크리트만 먼저 넣어도 된다.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Footstep")
+	TMap<TEnumAsByte<EPhysicalSurface>, TObjectPtr<USoundBase>> SurfaceSounds;
+
+	// 폴백 발소리. 표면이 미지정이거나 위 맵에 없을 때 쓴다.
+	// 이것까지 비어 있으면 아무 소리도 나지 않는다(로그로 알린다).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Footstep")
 	TObjectPtr<USoundBase> FootstepSound;
+
+	// 발소리로 취급할 Foley 이벤트. 비워두면 BeginPlay가 기본값을 채운다
+	// (Walk/WalkBackwds/Run/RunBackwds/RunStrafe/Scuff/ScuffPivot/Land).
+	// Jump·Handplant·ScuffWall·Slide.Loop은 바닥 표면음이 어울리지 않아 제외한다.
+	// 태그 목록은 Config/DefaultGameplayTags.ini의 Foley.Event.* 참조.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Footstep|Foley")
+	FGameplayTagContainer FoleyFootstepEvents;
+
+	// 발 소켓 기준 위아래로 이 거리(cm)만큼 훑어 바닥을 찾는다.
+	// 애니메이션에 따라 발이 지면에서 살짝 뜨거나 파묻히므로 양방향으로 잡는다.
+	// SurfaceSounds가 비어 있으면 트레이스 자체를 건너뛴다(비용 0).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Footstep", meta = (ClampMin = "1.0"))
+	float GroundTraceHeight = 40.f;
 
 	// 거리 감쇠. 비우면 사운드 애셋 자체의 감쇠 설정을 따른다.
 	// PvP에서 "얼마나 멀리서 들리는가"가 곧 밸런스라 여기서 잡는 걸 권장한다.
@@ -65,9 +102,11 @@ protected:
 	float MinSpeedThreshold = 20.f;
 
 	// 연속 발소리 최소 간격(초). 애니 블렌드 구간에서 두 시퀀스의 노티파이가
-	// 같은 프레임에 겹쳐 발화하는 걸 막는다. 스프린트 보폭보다 짧게 잡을 것.
+	// 같은 프레임에 겹쳐 발화하는 걸 막는다.
+	// ★ 0.15는 너무 길었다 — 700cm/s 스프린트는 발당 약 0.11초라 정상 걸음이 잘린다.
+	//   겹침 방지는 프레임 단위면 충분하므로 넉넉히 낮춘다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Footstep", meta = (ClampMin = "0.0"))
-	float MinInterval = 0.15f;
+	float MinInterval = 0.08f;
 
 	// 매번 같은 소리로 들리지 않게 피치를 흔든다. 0이면 고정.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Footstep", meta = (ClampMin = "0.0", ClampMax = "0.5"))
@@ -123,6 +162,9 @@ protected:
 
 private:
 	void SampleFootstepNoise();
+
+	// 발 밑을 훑어 밟은 표면을 알아낸다. 못 찾으면 SurfaceType_Default.
+	EPhysicalSurface TraceGroundSurface(const FVector& FootLocation) const;
 
 	// 마지막 재생 시각(월드 시간). 연타 방지용.
 	float LastFootstepTime = -1.f;
