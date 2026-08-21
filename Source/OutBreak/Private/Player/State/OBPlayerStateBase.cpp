@@ -48,8 +48,6 @@ void AOBPlayerStateBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, bIsExtracting,				COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, PersonalExtractLocations,	COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, TeammateMapLocations,		COND_OwnerOnly);
-	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, ExtractionProgress,			COND_OwnerOnly);
-	DOREPLIFETIME_CONDITION(AOBPlayerStateBase, bIsExtracting,				COND_OwnerOnly);
 }
 
 void AOBPlayerStateBase::BeginPlay()

@@ -4,6 +4,7 @@
 #include "AI/Components/EnemyMemoryComponent.h"
 
 #include "AI/EnemyController.h"
+#include "AI/Spawning/EnemyDirectorSettings.h"
 #include "AISystem.h"
 #include "Perception/AIPerceptionSystem.h"
 #include "Perception/AISense_Damage.h"
@@ -51,7 +52,9 @@ void UEnemyMemoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	if (StimulusType != EEnemyStimulusType::None &&
 		CurrentTime - LastStimulusTime >=
-		FMath::Max(0.0f, StimulusMemoryDuration))
+		FMath::Max(
+			0.0f,
+			GetDefault<UEnemyDirectorSettings>()->StimulusMemoryDuration))
 	{
 		ClearStimulusMemory();
 		bMemoryUpdated = true;

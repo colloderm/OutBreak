@@ -2,6 +2,9 @@
 
 #include "Player/Controller/OBPlayerController.h"
 
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
+
 #include "AbilitySystemBlueprintLibrary.h"
 #include "AbilitySystemComponent.h"
 #include "Ability/Components/OBAbilitySystemComponent.h"
@@ -1420,6 +1423,23 @@ void AOBPlayerController::SetupInputComponent()
 	}
 }
 
+void AOBPlayerController::UpdateRotation(const float DeltaTime)
+{
+	if (!bHelicopterTransitLocked)
+	{
+		Super::UpdateRotation(DeltaTime);
+		return;
+	}
+
+	// APlayerCameraManager normally clamps control pitch to roughly +/-90 degrees.
+	// The helicopter camera is a free-look view target, so consume the accumulated
+	// look input directly and allow continuous yaw and pitch rotation.
+	FRotator ViewRotation = GetControlRotation() + RotationInput;
+	RotationInput = FRotator::ZeroRotator;
+	ViewRotation.Normalize();
+	SetControlRotation(ViewRotation);
+}
+
 bool AOBPlayerController::IsInventoryInputBlocked() const
 {
 	AOBCharacterBase* CharacterBase = Cast<AOBCharacterBase>(GetPawn());
@@ -2071,6 +2091,15 @@ void AOBPlayerController::Client_ApplyExtractionResultV2_Implementation(
 	UE_LOG(LogTemp, Log,
 		TEXT("[Expedition] Extraction V2: stacks=%d instances=%d returned=%d"),
 		StackHaul.Num(), LootedInstances.Num(), ReturnedLoadoutInstances.Num());
+}
+
+void AOBPlayerController::Client_PlayExtractionRadio_Implementation(
+	USoundBase* RadioSound, float VolumeMultiplier)
+{
+	if (IsValid(RadioSound))
+	{
+		UGameplayStatics::PlaySound2D(this, RadioSound, FMath::Max(0.f, VolumeMultiplier));
+	}
 }
 
 void AOBPlayerController::ReturnToHome()

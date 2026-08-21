@@ -18,7 +18,7 @@ UEnemyBaseActorComponent::UEnemyBaseActorComponent()
 	// ...
 }
 
-AEnemyCharacter* UEnemyBaseActorComponent::GetEnemyCharacter() { return EnemyCharacter; }
+AEnemyCharacter* UEnemyBaseActorComponent::GetEnemyCharacter() const { return EnemyCharacter; }
 
 
 // Called when the game starts
@@ -27,8 +27,33 @@ void UEnemyBaseActorComponent::BeginPlay()
 	Super::BeginPlay();
 	
 	EnemyCharacter = Cast<AEnemyCharacter>(GetOwner());
-	
+	if (!IsValid(EnemyCharacter))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: Owner '%s' is not an AEnemyCharacter."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(GetOwner()));
+		SetComponentTickEnabled(false);
+		return;
+	}
+
 	EnemyAsset = EnemyCharacter->GetEnemyAsset();
+	if (!IsValid(EnemyAsset))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: EnemyAsset is not assigned on '%s' (Class: %s)."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(EnemyCharacter),
+			*GetNameSafe(EnemyCharacter->GetClass()));
+		SetComponentTickEnabled(false);
+		return;
+	}
 	// ...
 	
 }

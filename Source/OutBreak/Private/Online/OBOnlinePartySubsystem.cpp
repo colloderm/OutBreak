@@ -286,6 +286,13 @@ void UOBOnlinePartySubsystem::PollLeaderStart()
 	{
 		bTraveled = true;
 		UE_LOG(LogTemp, Log, TEXT("[Online] 리더 출발 신호 수신: %s"), *Addr);
+
+		// 감지만 하고 끝나면 멤버는 영원히 로비에 남는다. bTraveled 때문에 재시도도 없다.
+		if (UWorld* W = GetGameInstance() ? GetGameInstance()->GetWorld() : nullptr)
+		{
+			W->GetTimerManager().ClearTimer(FollowTimer);
+		}
+		TravelToServer(Addr);
 	}
 }
 

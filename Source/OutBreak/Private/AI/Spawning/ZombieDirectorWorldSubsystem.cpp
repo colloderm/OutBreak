@@ -1,12 +1,18 @@
 #include "AI/Spawning/ZombieDirectorWorldSubsystem.h"
 
 #include "AI/Components/EnemySpawnableComponent.h"
+#include "AI/Components/EnemyMemoryComponent.h"
+#include "AI/Data/EnemyAsset.h"
 #include "AI/EnemyCharacter.h"
+#include "AI/EnemyController.h"
 #include "AI/Spawning/EnemyCharacterSpawner.h"
 #include "AI/Spawning/EnemyDirectorSettings.h"
 #include "AI/Spawning/EnemySpawnSectorVolume.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "Engine/NetConnection.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 
 DEFINE_LOG_CATEGORY(LogZombieDirector);
@@ -62,6 +68,28 @@ namespace
 		TEXT("Reports an authoritative test noise. Optional args: X Y Z"),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(
 			&ReportZombieDirectorTestNoise));
+
+	void DumpZombieReplicationBudget(UWorld* World)
+	{
+		if (IsValid(World))
+		{
+			if (const UZombieDirectorWorldSubsystem* Director =
+				World->GetSubsystem<UZombieDirectorWorldSubsystem>())
+			{
+				UE_LOG(
+					LogZombieDirector,
+					Log,
+					TEXT("%s"),
+					*Director->GetReplicationBudgetDebugSummary());
+			}
+		}
+	}
+
+	FAutoConsoleCommandWithWorld GDumpZombieReplicationBudgetCommand(
+		TEXT("OutBreak.ZombieDirector.DumpReplicationBudget"),
+		TEXT("Prints per-player zombie interest and connection congestion budgets."),
+		FConsoleCommandWithWorldDelegate::CreateStatic(
+			&DumpZombieReplicationBudget));
 }
 #endif
 
@@ -86,6 +114,8 @@ void UZombieDirectorWorldSubsystem::Deinitialize()
 	PendingRequests.Reset();
 	RecentNoises.Reset();
 	LatestSectorNoises.Reset();
+	ViewerReplicationInterest.Reset();
+	LastReplicationLODUpdateTime = -DBL_MAX;
 	Super::Deinitialize();
 }
 
@@ -100,6 +130,7 @@ void UZombieDirectorWorldSubsystem::Tick(float DeltaTime)
 	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
 	int32 SpawnBudget = FMath::Max(1, Settings->SpawnBurstPerFrame);
 	const double Now = GetWorld()->GetTimeSeconds();
+	UpdateEnemyReplicationLOD(Now);
 	EnsureBasePopulations(Now);
 
 	for (int32 Index = PendingRequests.Num() - 1; Index >= 0 && SpawnBudget > 0; --Index)
@@ -110,7 +141,14 @@ void UZombieDirectorWorldSubsystem::Tick(float DeltaTime)
 			PendingRequests.RemoveAtSwap(Index);
 			continue;
 		}
-		if (!Request.bPersistent && Request.ExpireTime <= Now)
+		const bool bWaitingForNavigation = Request.LastFailureReason.Contains(
+			TEXT("navigation"),
+			ESearchCase::IgnoreCase);
+		const double NavigationGraceDeadline = Request.NoiseEvent.Timestamp +
+			FMath::Max(0.0f, Settings->SpawnNavigationReadyGracePeriod);
+		const bool bNavigationGraceActive =
+			bWaitingForNavigation && Now < NavigationGraceDeadline;
+		if (!Request.bPersistent && Request.ExpireTime <= Now && !bNavigationGraceActive)
 		{
 			UE_LOG(
 				LogZombieDirector,
@@ -180,6 +218,520 @@ void UZombieDirectorWorldSubsystem::Tick(float DeltaTime)
 	{
 		return Now - Noise.Time > FMath::Max(1.0f, Settings->MergeWindow * 4.0f);
 	});
+}
+
+void UZombieDirectorWorldSubsystem::UpdateEnemyReplicationLOD(const double Now)
+{
+	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
+	const double UpdateInterval = FMath::Clamp(
+		static_cast<double>(Settings->ReplicationLODUpdateInterval),
+		0.05,
+		5.0);
+	if (Now - LastReplicationLODUpdateTime < UpdateInterval)
+	{
+		return;
+	}
+	LastReplicationLODUpdateTime = Now;
+
+	TArray<int32, TInlineAllocator<8>> SortedLODIndices;
+	SortedLODIndices.Reserve(Settings->ReplicationLODLevels.Num());
+	for (int32 Index = 0; Index < Settings->ReplicationLODLevels.Num(); ++Index)
+	{
+		if (Settings->ReplicationLODLevels[Index].MaxDistance > 0.0f)
+		{
+			SortedLODIndices.Add(Index);
+		}
+	}
+	SortedLODIndices.Sort([Settings](const int32 Left, const int32 Right)
+	{
+		return Settings->ReplicationLODLevels[Left].MaxDistance <
+			Settings->ReplicationLODLevels[Right].MaxDistance;
+	});
+
+	if (!Settings->bEnableReplicationLOD || SortedLODIndices.IsEmpty())
+	{
+		ViewerReplicationInterest.Reset();
+		for (const TWeakObjectPtr<UEnemySpawnableComponent>& WeakSpawnable : Enemies)
+		{
+			UEnemySpawnableComponent* Spawnable = WeakSpawnable.Get();
+			if (!IsValid(Spawnable) ||
+				Spawnable->GetPoolPhase() == EEnemyPoolPhase::InactivePooled ||
+				Spawnable->GetPoolPhase() == EEnemyPoolPhase::Reserved)
+			{
+				continue;
+			}
+
+			if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Spawnable->GetOwner()))
+			{
+				Enemy->ResetNetworkReplicationLOD();
+			}
+		}
+		return;
+	}
+
+	TArray<APlayerController*, TInlineAllocator<8>> ViewerControllers;
+	TArray<FVector, TInlineAllocator<8>> PlayerLocations;
+	for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PlayerController = It->Get();
+		APawn* PlayerPawn = IsValid(PlayerController)
+			? PlayerController->GetPawn()
+			: nullptr;
+		if (IsValid(PlayerPawn) && !PlayerPawn->IsActorBeingDestroyed())
+		{
+			ViewerControllers.Add(PlayerController);
+			PlayerLocations.Add(PlayerPawn->GetActorLocation());
+		}
+	}
+
+	const int32 LastLODPosition = SortedLODIndices.Num() - 1;
+	const int32 LastLODIndex = SortedLODIndices[LastLODPosition];
+	const FEnemyReplicationLODLevel& LastLOD =
+		Settings->ReplicationLODLevels[LastLODIndex];
+	const float CullDistance = FMath::Max(100.0f, LastLOD.MaxDistance);
+	const float CullDistanceSquared = FMath::Square(CullDistance);
+	const float Hysteresis = FMath::Max(0.0f, Settings->ReplicationLODHysteresis);
+	const bool bUseInterestBudget = Settings->bEnablePerPlayerInterestBudget;
+
+	struct FEnemyInterestCandidate
+	{
+		AEnemyCharacter* Enemy = nullptr;
+		float Score = 0.0f;
+		float DistanceSquared = 0.0f;
+	};
+
+	TMap<TObjectKey<AEnemyCharacter>, int32> BestDetailPositionByEnemy;
+	if (bUseInterestBudget)
+	{
+		TMap<TObjectKey<APlayerController>, FViewerReplicationInterestState>
+			NewViewerInterest;
+		const int32 ViewerCount = FMath::Max(1, ViewerControllers.Num());
+		const int32 GlobalShare = FMath::Max(
+			1,
+			Settings->MaxTotalZombieViewerPairs / ViewerCount);
+
+		for (APlayerController* PlayerController : ViewerControllers)
+		{
+			APawn* PlayerPawn = PlayerController->GetPawn();
+			if (!IsValid(PlayerPawn))
+			{
+				continue;
+			}
+
+			const TObjectKey<APlayerController> ViewerKey(PlayerController);
+			const FViewerReplicationInterestState* PreviousState =
+				ViewerReplicationInterest.Find(ViewerKey);
+			FViewerReplicationInterestState NewState;
+			NewState.ViewPawn = PlayerPawn;
+			NewState.CongestionLevel = PreviousState
+				? PreviousState->CongestionLevel
+				: 0.0f;
+
+			if (Settings->bEnableAdaptiveBandwidthBudget)
+			{
+				if (UNetConnection* Connection = PlayerController->GetNetConnection())
+				{
+					NewState.MeasuredOutBytesPerSecond =
+						FMath::Max(0, Connection->OutBytesPerSecond);
+					NewState.NegotiatedBytesPerSecond =
+						FMath::Max(1, Connection->CurrentNetSpeed);
+					const float Utilization =
+						static_cast<float>(NewState.MeasuredOutBytesPerSecond) /
+						static_cast<float>(NewState.NegotiatedBytesPerSecond);
+					const float TargetUtilization = FMath::Clamp(
+						Settings->TargetConnectionUtilization,
+						0.1f,
+						0.95f);
+					const float EmergencyUtilization = FMath::Clamp(
+						Settings->EmergencyConnectionUtilization,
+						TargetUtilization + 0.01f,
+						1.0f);
+					float DesiredCongestion = FMath::Clamp(
+						(Utilization - TargetUtilization) /
+						(EmergencyUtilization - TargetUtilization),
+						0.0f,
+						1.0f);
+					if (!Connection->IsNetReady() || Utilization >= EmergencyUtilization)
+					{
+						DesiredCongestion = 1.0f;
+					}
+
+					const float InterpSpeed = DesiredCongestion > NewState.CongestionLevel
+						? FMath::Max(0.1f, Settings->CongestionAttackPerSecond)
+						: FMath::Max(0.01f, Settings->CongestionRecoveryPerSecond);
+					NewState.CongestionLevel = FMath::FInterpConstantTo(
+						NewState.CongestionLevel,
+						DesiredCongestion,
+						static_cast<float>(UpdateInterval),
+						InterpSpeed);
+				}
+			}
+			else
+			{
+				NewState.CongestionLevel = 0.0f;
+			}
+
+			const int32 NormalBudget = FMath::Max(
+				1,
+				FMath::Min(Settings->MaxRelevantZombiesPerPlayer, GlobalShare));
+			const int32 MinimumBudget = FMath::Clamp(
+				Settings->MinRelevantZombiesPerPlayer,
+				1,
+				NormalBudget);
+			NewState.EffectiveRelevantBudget = FMath::Clamp(
+				FMath::RoundToInt(FMath::Lerp(
+					static_cast<float>(NormalBudget),
+					static_cast<float>(MinimumBudget),
+					NewState.CongestionLevel)),
+				MinimumBudget,
+				NormalBudget);
+
+			const FVector ViewLocation = PlayerPawn->GetActorLocation();
+			FVector ViewDirection = PlayerController->GetControlRotation().Vector();
+			if (!ViewDirection.Normalize())
+			{
+				ViewDirection = PlayerPawn->GetActorForwardVector();
+			}
+
+			TArray<FEnemyInterestCandidate, TInlineAllocator<128>> Candidates;
+			for (const TWeakObjectPtr<UEnemySpawnableComponent>& WeakSpawnable : Enemies)
+			{
+				UEnemySpawnableComponent* Spawnable = WeakSpawnable.Get();
+				if (!IsValid(Spawnable) ||
+					Spawnable->GetPoolPhase() == EEnemyPoolPhase::InactivePooled ||
+					Spawnable->GetPoolPhase() == EEnemyPoolPhase::Reserved)
+				{
+					continue;
+				}
+
+				AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Spawnable->GetOwner());
+				if (!IsValid(Enemy))
+				{
+					continue;
+				}
+
+				const FVector ToEnemy = Enemy->GetActorLocation() - ViewLocation;
+				const float DistanceSquared = ToEnemy.SizeSquared();
+				if (DistanceSquared > CullDistanceSquared)
+				{
+					continue;
+				}
+
+				const float Distance = FMath::Sqrt(DistanceSquared);
+				const FVector DirectionToEnemy = ToEnemy.GetSafeNormal();
+				const float ViewDot = FVector::DotProduct(ViewDirection, DirectionToEnemy);
+				bool bTargetsViewer = false;
+				if (const AEnemyController* EnemyController =
+					Cast<AEnemyController>(Enemy->GetController()))
+				{
+					if (const UEnemyMemoryComponent* Memory =
+						EnemyController->GetEnemyMemoryComponent())
+					{
+						bTargetsViewer = Memory->GetTargetActor() == PlayerPawn;
+					}
+				}
+				const bool bRecentlyCritical =
+					Now - Enemy->GetLastCriticalNetUpdateTime() <=
+					FMath::Max(0.0f, Settings->CriticalRelevancyDuration);
+				const bool bInViewFocus = ViewDot >= Settings->ViewFocusDotThreshold;
+				if (!bTargetsViewer && !bRecentlyCritical && !bInViewFocus &&
+					Distance > FMath::Max(100.0f, Settings->PeripheralReplicationDistance))
+				{
+					continue;
+				}
+
+				FEnemyInterestCandidate& Candidate = Candidates.AddDefaulted_GetRef();
+				Candidate.Enemy = Enemy;
+				Candidate.DistanceSquared = DistanceSquared;
+				Candidate.Score = 2.0f * (1.0f - FMath::Clamp(
+					Distance / CullDistance,
+					0.0f,
+					1.0f));
+				if (bInViewFocus)
+				{
+					const float FocusAlpha = FMath::GetMappedRangeValueClamped(
+						FVector2D(Settings->ViewFocusDotThreshold, 1.0f),
+						FVector2D(0.0f, 1.0f),
+						ViewDot);
+					Candidate.Score += FocusAlpha * Settings->ViewFocusScoreBonus;
+				}
+				if (bTargetsViewer)
+				{
+					Candidate.Score += Settings->CombatTargetScoreBonus;
+				}
+				if (bRecentlyCritical)
+				{
+					Candidate.Score += Settings->RecentCriticalScoreBonus;
+				}
+				if (PreviousState && PreviousState->RelevantEnemies.Contains(
+					TObjectKey<AEnemyCharacter>(Enemy)))
+				{
+					Candidate.Score += Settings->SelectionRetentionScoreBonus;
+				}
+			}
+
+			Candidates.Sort([](
+				const FEnemyInterestCandidate& Left,
+				const FEnemyInterestCandidate& Right)
+			{
+				return !FMath::IsNearlyEqual(Left.Score, Right.Score)
+					? Left.Score > Right.Score
+					: Left.DistanceSquared < Right.DistanceSquared;
+			});
+
+			const int32 SelectedCount = FMath::Min(
+				NewState.EffectiveRelevantBudget,
+				Candidates.Num());
+			const int32 HighDetailCount = FMath::Clamp(
+				Settings->HighDetailZombiesPerPlayer,
+				1,
+				FMath::Max(1, SelectedCount));
+			const int32 MediumDetailCount = FMath::Clamp(
+				Settings->MediumDetailZombiesPerPlayer,
+				HighDetailCount,
+				FMath::Max(HighDetailCount, SelectedCount));
+			for (int32 Rank = 0; Rank < SelectedCount; ++Rank)
+			{
+				AEnemyCharacter* Enemy = Candidates[Rank].Enemy;
+				const TObjectKey<AEnemyCharacter> EnemyKey(Enemy);
+				NewState.RelevantEnemies.Add(EnemyKey);
+
+				int32 MinimumDetailPosition = LastLODPosition;
+				if (Rank < HighDetailCount)
+				{
+					MinimumDetailPosition = 0;
+				}
+				else if (Rank < MediumDetailCount)
+				{
+					MinimumDetailPosition = FMath::Min(1, LastLODPosition);
+				}
+
+				int32& BestPosition = BestDetailPositionByEnemy.FindOrAdd(
+					EnemyKey,
+					MinimumDetailPosition);
+				BestPosition = FMath::Min(BestPosition, MinimumDetailPosition);
+			}
+
+			NewViewerInterest.Add(ViewerKey, MoveTemp(NewState));
+		}
+
+		ViewerReplicationInterest = MoveTemp(NewViewerInterest);
+	}
+	else
+	{
+		ViewerReplicationInterest.Reset();
+	}
+
+	for (const TWeakObjectPtr<UEnemySpawnableComponent>& WeakSpawnable : Enemies)
+	{
+		UEnemySpawnableComponent* Spawnable = WeakSpawnable.Get();
+		if (!IsValid(Spawnable) ||
+			Spawnable->GetPoolPhase() == EEnemyPoolPhase::InactivePooled ||
+			Spawnable->GetPoolPhase() == EEnemyPoolPhase::Reserved)
+		{
+			continue;
+		}
+
+		AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Spawnable->GetOwner());
+		if (!IsValid(Enemy))
+		{
+			continue;
+		}
+
+		float ClosestDistanceSquared = TNumericLimits<float>::Max();
+		for (const FVector& PlayerLocation : PlayerLocations)
+		{
+			ClosestDistanceSquared = FMath::Min(
+				ClosestDistanceSquared,
+				FVector::DistSquared(Enemy->GetActorLocation(), PlayerLocation));
+		}
+		const float ClosestDistance = PlayerLocations.IsEmpty()
+			? TNumericLimits<float>::Max()
+			: FMath::Sqrt(ClosestDistanceSquared);
+
+		int32 ResolvedLODPosition = INDEX_NONE;
+		for (int32 Position = 0; Position < SortedLODIndices.Num(); ++Position)
+		{
+			const int32 CandidateIndex = SortedLODIndices[Position];
+			if (ClosestDistance <= FMath::Max(
+				100.0f,
+				Settings->ReplicationLODLevels[CandidateIndex].MaxDistance))
+			{
+				ResolvedLODPosition = Position;
+				break;
+			}
+		}
+
+		const TObjectKey<AEnemyCharacter> EnemyKey(Enemy);
+		const int32* MinimumDetailPosition = bUseInterestBudget
+			? BestDetailPositionByEnemy.Find(EnemyKey)
+			: nullptr;
+		if (bUseInterestBudget && MinimumDetailPosition == nullptr)
+		{
+			ResolvedLODPosition = INDEX_NONE;
+		}
+		else if (ResolvedLODPosition != INDEX_NONE && MinimumDetailPosition)
+		{
+			ResolvedLODPosition = FMath::Max(
+				ResolvedLODPosition,
+				*MinimumDetailPosition);
+		}
+
+		if (Enemy->IsNetworkLODDormant() && ResolvedLODPosition != INDEX_NONE &&
+			ClosestDistance > FMath::Max(0.0f, CullDistance - Hysteresis))
+		{
+			ResolvedLODPosition = INDEX_NONE;
+		}
+		else if (!bUseInterestBudget)
+		{
+			const int32 CurrentLODIndex = Enemy->GetCurrentReplicationLODIndex();
+			const int32 CurrentLODPosition =
+				SortedLODIndices.IndexOfByKey(CurrentLODIndex);
+			if (CurrentLODPosition != INDEX_NONE &&
+				ResolvedLODPosition != CurrentLODPosition)
+			{
+				const float CurrentMaxDistance = FMath::Max(
+					100.0f,
+					Settings->ReplicationLODLevels[CurrentLODIndex].MaxDistance);
+				if (ResolvedLODPosition == INDEX_NONE &&
+					ClosestDistance <= CurrentMaxDistance + Hysteresis)
+				{
+					ResolvedLODPosition = CurrentLODPosition;
+				}
+				else if (ResolvedLODPosition != INDEX_NONE)
+				{
+					const float ResolvedMaxDistance = FMath::Max(
+						100.0f,
+						Settings->ReplicationLODLevels[
+							SortedLODIndices[ResolvedLODPosition]].MaxDistance);
+					if (ResolvedLODPosition > CurrentLODPosition &&
+						ClosestDistance <= CurrentMaxDistance + Hysteresis)
+					{
+						ResolvedLODPosition = CurrentLODPosition;
+					}
+					else if (ResolvedLODPosition < CurrentLODPosition &&
+						ClosestDistance >= FMath::Max(
+							0.0f,
+							ResolvedMaxDistance - Hysteresis))
+					{
+						ResolvedLODPosition = CurrentLODPosition;
+					}
+				}
+			}
+		}
+
+		const bool bShouldBeDormant =
+			ResolvedLODPosition == INDEX_NONE && Settings->bUseDormancyBeyondLastLOD;
+		const int32 AppliedLODPosition = ResolvedLODPosition == INDEX_NONE
+			? LastLODPosition
+			: ResolvedLODPosition;
+		const int32 AppliedLODIndex = SortedLODIndices[AppliedLODPosition];
+		const FEnemyReplicationLODLevel& AppliedLOD =
+			Settings->ReplicationLODLevels[AppliedLODIndex];
+		Enemy->ApplyNetworkReplicationLOD(
+			bShouldBeDormant ? INDEX_NONE : AppliedLODIndex,
+			AppliedLOD.NetUpdateFrequency,
+			AppliedLOD.MinNetUpdateFrequency,
+			CullDistance,
+			bShouldBeDormant);
+	}
+}
+
+bool UZombieDirectorWorldSubsystem::IsEnemyRelevantForViewer(
+	const AEnemyCharacter* Enemy,
+	const AActor* RealViewer,
+	bool& bOutHasViewerBudget) const
+{
+	bOutHasViewerBudget = false;
+	if (!IsValid(Enemy) || !IsValid(RealViewer))
+	{
+		return false;
+	}
+
+	const APlayerController* PlayerController =
+		Cast<APlayerController>(RealViewer);
+	if (!IsValid(PlayerController))
+	{
+		return false;
+	}
+
+	const FViewerReplicationInterestState* State =
+		ViewerReplicationInterest.Find(TObjectKey<APlayerController>(
+			const_cast<APlayerController*>(PlayerController)));
+	if (State == nullptr)
+	{
+		return false;
+	}
+
+	bOutHasViewerBudget = true;
+	return State->RelevantEnemies.Contains(TObjectKey<AEnemyCharacter>(
+		const_cast<AEnemyCharacter*>(Enemy)));
+}
+
+void UZombieDirectorWorldSubsystem::NotifyEnemyCriticalNetUpdate(
+	AEnemyCharacter* Enemy)
+{
+	if (!IsAuthorityWorld() || !IsValid(Enemy))
+	{
+		return;
+	}
+
+	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
+	if (!Settings->bEnableReplicationLOD ||
+		!Settings->bEnablePerPlayerInterestBudget)
+	{
+		return;
+	}
+
+	float CullDistance = 0.0f;
+	for (const FEnemyReplicationLODLevel& Level : Settings->ReplicationLODLevels)
+	{
+		CullDistance = FMath::Max(CullDistance, Level.MaxDistance);
+	}
+	const float CullDistanceSquared = FMath::Square(FMath::Max(100.0f, CullDistance));
+	const TObjectKey<AEnemyCharacter> EnemyKey(Enemy);
+	for (TPair<TObjectKey<APlayerController>, FViewerReplicationInterestState>& Pair :
+		ViewerReplicationInterest)
+	{
+		FViewerReplicationInterestState& State = Pair.Value;
+		const APawn* ViewPawn = State.ViewPawn.Get();
+		if (!IsValid(ViewPawn) ||
+			FVector::DistSquared(ViewPawn->GetActorLocation(), Enemy->GetActorLocation()) >
+			CullDistanceSquared)
+		{
+			continue;
+		}
+
+		const int32 TemporaryLimit = State.EffectiveRelevantBudget +
+			FMath::Max(0, Settings->CriticalInterestOverflowPerPlayer);
+		if (State.RelevantEnemies.Contains(EnemyKey) ||
+			State.RelevantEnemies.Num() < TemporaryLimit)
+		{
+			State.RelevantEnemies.Add(EnemyKey);
+		}
+	}
+}
+
+FString UZombieDirectorWorldSubsystem::GetReplicationBudgetDebugSummary() const
+{
+	FString Summary = FString::Printf(
+		TEXT("Zombie replication viewer budgets: %d"),
+		ViewerReplicationInterest.Num());
+	for (const TPair<TObjectKey<APlayerController>, FViewerReplicationInterestState>& Pair :
+		ViewerReplicationInterest)
+	{
+		const APlayerController* PlayerController = Pair.Key.ResolveObjectPtr();
+		const FViewerReplicationInterestState& State = Pair.Value;
+		Summary += FString::Printf(
+			TEXT("\n  %s selected=%d/%d congestion=%.2f bandwidth=%d/%d B/s"),
+			*GetNameSafe(PlayerController),
+			State.RelevantEnemies.Num(),
+			State.EffectiveRelevantBudget,
+			State.CongestionLevel,
+			State.MeasuredOutBytesPerSecond,
+			State.NegotiatedBytesPerSecond);
+	}
+	return Summary;
 }
 
 TStatId UZombieDirectorWorldSubsystem::GetStatId() const
@@ -288,7 +840,6 @@ void UZombieDirectorWorldSubsystem::ReportNoise(const FEnemyNoiseEvent& InNoiseE
 	}
 
 	FEnemyNoiseEvent NoiseEvent = InNoiseEvent;
-	NoiseEvent.EventId = NoiseEvent.EventId == 0 ? NextNoiseEventId++ : NoiseEvent.EventId;
 	NoiseEvent.Timestamp = GetWorld()->GetTimeSeconds();
 	NoiseEvent.Loudness = FMath::Clamp(NoiseEvent.Loudness, 0.0f, 10.0f);
 	if (NoiseEvent.MaxRange <= 0.0f)
@@ -296,13 +847,8 @@ void UZombieDirectorWorldSubsystem::ReportNoise(const FEnemyNoiseEvent& InNoiseE
 		NoiseEvent.MaxRange = GetDefault<UEnemyDirectorSettings>()->DefaultNoiseRange;
 	}
 
-	const FName SectorId = ResolveSectorId(NoiseEvent.Location);
-	FLatestSectorNoise& LatestNoise = LatestSectorNoises.FindOrAdd(SectorId);
-	LatestNoise.Location = NoiseEvent.Location;
-	LatestNoise.EventId = NoiseEvent.EventId;
-	LatestNoise.Timestamp = NoiseEvent.Timestamp;
-	DispatchLatestNoiseToReinforcements(SectorId, NoiseEvent.Location);
-
+	// Coalesce first. No perception wake-up, StateTree event, path query, or
+	// reinforcement update is allowed to escape from a duplicate burst event.
 	if (ShouldMergeNoise(NoiseEvent))
 	{
 		UE_LOG(
@@ -314,13 +860,20 @@ void UZombieDirectorWorldSubsystem::ReportNoise(const FEnemyNoiseEvent& InNoiseE
 		return;
 	}
 
+	NoiseEvent.EventId = NoiseEvent.EventId == 0 ? NextNoiseEventId++ : NoiseEvent.EventId;
+	const FName SectorId = ResolveSectorId(NoiseEvent.Location);
+	FLatestSectorNoise& LatestNoise = LatestSectorNoises.FindOrAdd(SectorId);
+	LatestNoise.Location = NoiseEvent.Location;
+	LatestNoise.EventId = NoiseEvent.EventId;
+	LatestNoise.Timestamp = NoiseEvent.Timestamp;
+
 	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
 	const int32 DesiredCount = FMath::Clamp(
 		FMath::RoundToInt(Settings->DefaultResponders * FMath::Max(0.25f, NoiseEvent.Loudness)),
 		0,
 		Settings->MaxRespondersPerNoise);
 	const int32 ExistingCount = RedirectExistingEnemies(NoiseEvent, DesiredCount);
-	const int32 ReinforcementCount = DesiredCount;
+	const int32 ReinforcementCount = FMath::Max(0, DesiredCount - ExistingCount);
 
 	if (ReinforcementCount > 0)
 	{
@@ -337,7 +890,9 @@ void UZombieDirectorWorldSubsystem::ReportNoise(const FEnemyNoiseEvent& InNoiseE
 		Request.NoiseEvent = NoiseEvent;
 		Request.SectorId = SectorId;
 		Request.PopulationRole = EEnemyPopulationRole::NoiseReinforcement;
-		Request.RemainingCount += ReinforcementCount;
+		// A burst maintains one response target; repeated accepted requests do
+		// not add an unbounded backlog while the previous response is pending.
+		Request.RemainingCount = FMath::Max(Request.RemainingCount, ReinforcementCount);
 		Request.ExpireTime = NoiseEvent.Timestamp + Settings->SpawnRequestTimeout;
 		Request.LastFailureReason.Reset();
 	}
@@ -396,25 +951,6 @@ bool UZombieDirectorWorldSubsystem::ShouldMergeNoise(const FEnemyNoiseEvent& Noi
 	Recent.Time = NoiseEvent.Timestamp;
 	return false;
 }
-
-void UZombieDirectorWorldSubsystem::DispatchLatestNoiseToReinforcements(
-	const FName SectorId,
-	const FVector& NoiseLocation)
-{
-	for (const TWeakObjectPtr<UEnemySpawnableComponent>& WeakEnemy : Enemies)
-	{
-		UEnemySpawnableComponent* Component = WeakEnemy.Get();
-		if (!IsValid(Component) ||
-			Component->GetPopulationRole() != EEnemyPopulationRole::NoiseReinforcement ||
-			Component->GetSectorId() != SectorId)
-		{
-			continue;
-		}
-
-		Component->CommandInvestigateNoise(NoiseLocation);
-	}
-}
-
 void UZombieDirectorWorldSubsystem::EnsureBasePopulations(const double Now)
 {
 	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
@@ -825,6 +1361,19 @@ AEnemyCharacter* UZombieDirectorWorldSubsystem::CreateEnemy(
 	TSubclassOf<AEnemyCharacter> EnemyClass = Spawner.ResolveEnemyClass();
 	if (!EnemyClass)
 	{
+		return nullptr;
+	}
+
+	const AEnemyCharacter* EnemyDefaults =
+		EnemyClass->GetDefaultObject<AEnemyCharacter>();
+	if (!IsValid(EnemyDefaults) || !IsValid(EnemyDefaults->GetEnemyAsset()))
+	{
+		UE_LOG(
+			LogZombieDirector,
+			Error,
+			TEXT("CreateEnemy rejected class '%s' from spawner '%s': EnemyAsset is not assigned on the class defaults."),
+			*GetNameSafe(EnemyClass.Get()),
+			*GetNameSafe(&Spawner));
 		return nullptr;
 	}
 

@@ -5,12 +5,40 @@
 
 #include "AI/EnemyCharacter.h"
 #include "AI/Components/EnemyMovementComponent.h"
+#include "AI/Components/EnemyStatusComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 #include "Engine/StaticMeshActor.h"
 
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
+
+namespace
+{
+const FName HeadLimbName(TEXT("Head"));
+const FName RightArmLimbName(TEXT("upperarm_r"));
+const FName LeftArmLimbName(TEXT("upperarm_l"));
+const FName RightLegLimbName(TEXT("thigh_r"));
+const FName LeftLegLimbName(TEXT("thigh_l"));
+
+bool IsCrawlingLocomotionState(
+	const ELocomotionWalkRunState State)
+{
+	return State == ELocomotionWalkRunState::Crawling ||
+		State == ELocomotionWalkRunState::SlowCrawling;
+}
+
+bool IsUpperBodyHitReactRegion(const EEnemyHitReactRegion Region)
+{
+	return Region == EEnemyHitReactRegion::Head ||
+		Region == EEnemyHitReactRegion::Torso ||
+		Region == EEnemyHitReactRegion::ArmRight ||
+		Region == EEnemyHitReactRegion::ArmLeft;
+}
+}
 
 // Sets default values for this component's properties
 UEnemyPhysicalComponent::UEnemyPhysicalComponent()
@@ -21,13 +49,6 @@ UEnemyPhysicalComponent::UEnemyPhysicalComponent()
 	
 	// 부위 파괴 상태를 클라에 전달한다.
 	SetIsReplicatedByDefault(true);
-	
-	Limbes.Add(FName(TEXT("Head")), FLimbData(20, 20));
-	Limbes.Add(FName(TEXT("upperarm_r")), FLimbData(40, 40));
-	Limbes.Add(FName(TEXT("upperarm_l")), FLimbData(40, 40));
-	Limbes.Add(FName(TEXT("thigh_r")), FLimbData(40, 40));
-	Limbes.Add(FName(TEXT("thigh_l")), FLimbData(40, 40));
-	// ...
 }
 
 
@@ -35,14 +56,51 @@ UEnemyPhysicalComponent::UEnemyPhysicalComponent()
 void UEnemyPhysicalComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	Health = FMath::Max(1.0f, MaxHealth);
-	
-	
-	
-	TargetMesh = GetEnemyCharacter()->GetMesh();
-	ProxyMesh = GetEnemyCharacter()->GetChildActorSkeletalMesh();
-	
-	const auto PhysicalReact = EnemyAsset->GetPhysicalReact();
+	InitializeHealthStateFromSettings();
+
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (!IsValid(OwnerCharacter) || !IsValid(EnemyAsset))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: Invalid enemy context. Owner=%s EnemyAsset=%s."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(OwnerCharacter),
+			*GetNameSafe(EnemyAsset));
+		SetComponentTickEnabled(false);
+		return;
+	}
+
+	TargetMesh = OwnerCharacter->GetMesh();
+	ProxyMesh = OwnerCharacter->GetChildActorSkeletalMesh();
+	if (!IsValid(TargetMesh))
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: Target mesh is invalid on '%s'."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(OwnerCharacter));
+		SetComponentTickEnabled(false);
+		return;
+	}
+
+	const FEnemyPhysicalReact* PhysicalReact = EnemyAsset->GetPhysicalReact();
+	if (PhysicalReact == nullptr)
+	{
+		UE_LOG(
+			LogTemp,
+			Error,
+			TEXT("%s::%s: PhysicalReact is unavailable in '%s'."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(EnemyAsset));
+		SetComponentTickEnabled(false);
+		return;
+	}
 	
 	if (IsValid(PhysicalReact->ReactCurveFloat))
 	{
@@ -60,6 +118,7 @@ void UEnemyPhysicalComponent::BeginPlay()
 		ReactTimeline.AddInterpFloat(PhysicalReact->ReactCurveFloat, UpdateDelegate);
 		ReactTimeline.SetTimelineFinishedFunc(FinishedDelegate);
 		
+		ReactTimeline.SetTimelineLengthMode(TL_LastKeyFrame);
 		ReactTimeline.SetLooping(false);
 		ReactTimeline.SetPlayRate(1.f);
 	}
@@ -71,7 +130,7 @@ void UEnemyPhysicalComponent::BeginPlay()
 		PhysicalReact->PM_Arm_L &&
 		PhysicalReact->PM_Leg_R &&
 		PhysicalReact->PM_Leg_L,
-		TEXT("%s::%s: VaultMontage is invalid."),
+		TEXT("%s::%s: One or more physical materials are invalid."),
 		*GetClass()->GetName(),
 		TEXT(__FUNCTION__)))
 	{
@@ -85,7 +144,7 @@ void UEnemyPhysicalComponent::BeginPlay()
 
 // Called every frame
 void UEnemyPhysicalComponent::TickComponent(float DeltaTime, ELevelTick TickType,
-                                                FActorComponentTickFunction* ThisTickFunction)
+                                                 FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
@@ -94,11 +153,81 @@ void UEnemyPhysicalComponent::TickComponent(float DeltaTime, ELevelTick TickType
 	// ...
 }
 
+void UEnemyPhysicalComponent::SetHealth(const float NewHealth)
+{
+	Health = FMath::Clamp(
+		NewHealth,
+		0.0f,
+		FMath::Max(1.0f, MaxHealth));
+}
+
+float UEnemyPhysicalComponent::GetLimbDurability(
+	const FName LimbBoneName) const
+{
+	const FLimbData* LimbData = Limbes.Find(LimbBoneName);
+	return LimbData != nullptr ? LimbData->Durability : 0.0f;
+}
+
+float UEnemyPhysicalComponent::GetLimbMaxDurability(
+	const FName LimbBoneName) const
+{
+	const FLimbData* LimbData = Limbes.Find(LimbBoneName);
+	return LimbData != nullptr ? LimbData->MaxDurability : 0.0f;
+}
+
+void UEnemyPhysicalComponent::InitializeHealthStateFromSettings()
+{
+	MaxHealth = FMath::Max(1.0f, MaxHealth);
+	Head_MaxDurability = FMath::Max(1.0f, Head_MaxDurability);
+	Arm_R_MaxDurability = FMath::Max(1.0f, Arm_R_MaxDurability);
+	Arm_L_MaxDurability = FMath::Max(1.0f, Arm_L_MaxDurability);
+	Leg_R_MaxDurability = FMath::Max(1.0f, Leg_R_MaxDurability);
+	Leg_L_MaxDurability = FMath::Max(1.0f, Leg_L_MaxDurability);
+
+	Health = MaxHealth;
+	InitializeLimbStateFromSettings();
+}
+
+void UEnemyPhysicalComponent::InitializeLimbStateFromSettings()
+{
+	Limbes.Empty(5);
+	Limbes.Emplace(HeadLimbName, FLimbData(Head_MaxDurability));
+	Limbes.Emplace(RightArmLimbName, FLimbData(Arm_R_MaxDurability));
+	Limbes.Emplace(LeftArmLimbName, FLimbData(Arm_L_MaxDurability));
+	Limbes.Emplace(RightLegLimbName, FLimbData(Leg_R_MaxDurability));
+	Limbes.Emplace(LeftLegLimbName, FLimbData(Leg_L_MaxDurability));
+}
+
+bool UEnemyPhysicalComponent::IsLimbPresent(
+	const FName LimbBoneName) const
+{
+	const FLimbData* LimbData = Limbes.Find(LimbBoneName);
+	return LimbData == nullptr || LimbData->bIsHas;
+}
+
+void UEnemyPhysicalComponent::SynchronizeLocomotionState()
+{
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (!IsValid(OwnerCharacter))
+	{
+		return;
+	}
+
+	if (UEnemyMovementComponent* MovementComponent =
+		Cast<UEnemyMovementComponent>(
+			OwnerCharacter->GetMovementComponent()))
+	{
+		MovementComponent->SetLocomotationState(
+			EvaluateLocomotionState());
+	}
+}
+
 void UEnemyPhysicalComponent::ApplyDamage(const float DamageAmount)
 {
 	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
 	if (DamageAmount <= 0.0f ||
 		!IsValid(OwnerCharacter) ||
+		!OwnerCharacter->HasAuthority() ||
 		OwnerCharacter->IsDead())
 	{
 		return;
@@ -118,16 +247,13 @@ void UEnemyPhysicalComponent::ResetForPool()
 		return;
 	}
 
-	Health = FMath::Max(1.0f, MaxHealth);
-	ReactTimeline.Stop();
-	bIsHit = false;
-	CacheBoneName = NAME_None;
+	InitializeHealthStateFromSettings();
+	StopHitReactPresentation(false);
+	bOwnsHitReactActionLock = false;
 	DestroyedLimbs.Reset();
 
-	for (TPair<FName, FLimbData>& Pair : Limbes)
+	for (const TPair<FName, FLimbData>& Pair : Limbes)
 	{
-		Pair.Value.bIsHas = true;
-		Pair.Value.Durability = Pair.Value.MaxDurability;
 		if (IsValid(ProxyMesh))
 		{
 			ProxyMesh->UnHideBoneByName(Pair.Key);
@@ -140,14 +266,22 @@ void UEnemyPhysicalComponent::ResetForPool()
 		TargetMesh->SetAllBodiesSimulatePhysics(false);
 		TargetMesh->SetAllBodiesPhysicsBlendWeight(0.0f);
 	}
+
+	SynchronizeLocomotionState();
 }
 
-void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const float DamageAmount)
+void UEnemyPhysicalComponent::ActionPhysical(
+	const FHitResult& HitResult,
+	const float DamageAmount,
+	const FVector& ShotDirection)
 {
 	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
 	if (DamageAmount <= 0.0f ||
 		!IsValid(OwnerCharacter) ||
-		OwnerCharacter->IsDead())
+		OwnerCharacter->IsDead() ||
+		!OwnerCharacter->HasAuthority() ||
+		!IsValid(EnemyAsset) ||
+		!IsValid(TargetMesh))
 	{
 		return;
 	}
@@ -155,14 +289,21 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 	// 서버에서만 판정하고, 연출은 모두에게 보낸다.
 	Multicast_BloodVFX(HitResult.ImpactPoint, HitResult.ImpactNormal);
 
-	const auto PhysicalReact = EnemyAsset->GetPhysicalReact();
-	const auto LimbMeshes = EnemyAsset->GetLimbMeshes();
-	const float BlendWeight = PhysicalReact->BlendWeight_Anim_Physics;
-	
-	TWeakObjectPtr<UPhysicalMaterial> PhyMtrl = HitResult.PhysMaterial;
-	
+	const FEnemyPhysicalReact* PhysicalReact =
+		EnemyAsset->GetPhysicalReact();
+	if (PhysicalReact == nullptr)
+	{
+		return;
+	}
+
 	const FName BoneName = HitResult.BoneName;
-	const FVector HitDirection = HitResult.Normal;
+	const EEnemyHitReactRegion HitRegion =
+		ResolveHitReactRegion(HitResult, *PhysicalReact);
+	const FName PhysicsBoneName =
+		ResolvePhysicsBoneName(HitRegion, BoneName);
+	const FVector HitDirection = !ShotDirection.IsNearlyZero()
+		? ShotDirection.GetSafeNormal()
+		: -HitResult.ImpactNormal.GetSafeNormal();
 	
 	
 	ApplyDamage(DamageAmount);
@@ -171,43 +312,10 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 		return;
 	}
 
-	// Pelvis hits still reduce overall health. Only the localized limb and
-	// temporary physics reaction are skipped for the root bone.
-	if (BoneName == FName(TEXT("pelvis")))
+	const FName LimbBoneName = ResolveLimbBoneName(HitRegion);
+	if (LimbBoneName != NAME_None)
 	{
-		UE_LOG(
-			LogTemp,
-			VeryVerbose,
-			TEXT("%s::%s: Pelvis hit applied damage; localized reaction skipped."),
-			*GetClass()->GetName(),
-			TEXT(__FUNCTION__));
-		return;
-	}
-	
-	CacheBoneName = BoneName;
-	
-	OwnerCharacter->StopCharacterMovement();
-	
-	
-	if (PhyMtrl == PhysicalReact->PM_Head)
-	{
-		ActionLimb(FName(TEXT("Head")), DamageAmount);
-	}
-	else if (PhyMtrl == PhysicalReact->PM_Arm_R)
-	{
-		ActionLimb(FName(TEXT("upperarm_r")), DamageAmount);
-	}
-	else if (PhyMtrl == PhysicalReact->PM_Arm_L)
-	{
-		ActionLimb(FName(TEXT("upperarm_l")), DamageAmount);
-	}
-	else if (PhyMtrl == PhysicalReact->PM_Leg_R)
-	{
-		ActionLimb(FName(TEXT("thigh_r")), DamageAmount);
-	}
-	else if (PhyMtrl == PhysicalReact->PM_Leg_L)
-	{
-		ActionLimb(FName(TEXT("thigh_l")), DamageAmount);
+		ActionLimb(LimbBoneName, DamageAmount);
 	}
 
 	// Head destruction or a lethal limb combination can enter the dead state
@@ -217,21 +325,71 @@ void UEnemyPhysicalComponent::ActionPhysical(const FHitResult& HitResult, const 
 	{
 		return;
 	}
-	
-	
-	if (bIsHit)
+	if (ShouldSkipHitReactPresentation())
 	{
-		UE_LOG(LogTemp, Display, TEXT("%s::%s: It's already a hit."), *GetClass()->GetName(), TEXT(__FUNCTION__));
+		UE_LOG(
+			LogTemp,
+			VeryVerbose,
+			TEXT("%s::%s: Hit presentation skipped during traversal. Actor=%s"),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(OwnerCharacter));
 		return;
 	}
-	
-	TargetMesh->SetAllBodiesBelowPhysicsBlendWeight(BoneName, BlendWeight);
-	TargetMesh->SetAllBodiesBelowSimulatePhysics(BoneName, true, true);
-	TargetMesh->AddImpulse(HitDirection.GetSafeNormal() * PhysicalReact->ReactScale, BoneName, true);
-	
-	ReactTimeline.PlayFromStart();
-	
-	bIsHit = true;
+
+	if (bIsHit && !PhysicalReact->bRefreshLockOnRepeatedHit)
+	{
+		UE_LOG(
+			LogTemp,
+			VeryVerbose,
+			TEXT("%s::%s: Active hit-react montage retained."),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__));
+		return;
+	}
+
+	const bool bIsCrawling = IsCrawlingLocomotionState(
+		EvaluateLocomotionState());
+	const bool bRequiresMovementLock =
+		bIsCrawling || !IsUpperBodyHitReactRegion(HitRegion);
+	if (bRequiresMovementLock)
+	{
+		if (UEnemyStatusComponent* StatusComponent =
+			OwnerCharacter->GetEnemyStatusComponent())
+		{
+			// Lower-body and crawling reactions remain movement-locked. The
+			// montage/timeline completion callback owns the normal unlock.
+			const EEnemyActionState PreviousActionState =
+				StatusComponent->GetActionState();
+			StatusComponent->ApplyActionState(EEnemyActionState::Stunned);
+			bOwnsHitReactActionLock =
+				bOwnsHitReactActionLock ||
+				(PreviousActionState != EEnemyActionState::Stunned &&
+					StatusComponent->GetActionState() ==
+					EEnemyActionState::Stunned);
+		}
+		OwnerCharacter->StopCharacterMovement();
+	}
+	else
+	{
+		// Head, torso and arm montages play through the Upper Body slot, so
+		// locomotion is intentionally allowed to continue underneath them.
+		ReleaseHitReactActionLock();
+	}
+	const bool bAllowMontage = !bIsCrawling;
+
+	Multicast_PlayHitReact(
+		HitRegion,
+		PhysicsBoneName,
+		HitDirection,
+		bAllowMontage);
+
+	// A missing montage and missing physics curve must never leave the actor
+	// permanently action-locked.
+	if (!bIsHit)
+	{
+		ReleaseHitReactActionLock();
+	}
 }
 
 void UEnemyPhysicalComponent::Multicast_BloodVFX_Implementation(
@@ -244,6 +402,449 @@ void UEnemyPhysicalComponent::Multicast_BloodVFX_Implementation(
 	Hit.ImpactNormal = ImpactNormal;
 
 	BloodVFX(Hit);
+}
+
+void UEnemyPhysicalComponent::Multicast_PlayHitReact_Implementation(
+	const EEnemyHitReactRegion Region,
+	const FName PhysicsBoneName,
+	const FVector_NetQuantizeNormal ImpulseDirection,
+	const bool bAllowMontage)
+{
+	PlayHitReactPresentation(
+		Region,
+		PhysicsBoneName,
+		ImpulseDirection,
+		bAllowMontage);
+}
+
+EEnemyHitReactRegion UEnemyPhysicalComponent::ResolveHitReactRegion(
+	const FHitResult& HitResult,
+	const FEnemyPhysicalReact& PhysicalReact) const
+{
+	UPhysicalMaterial* HitMaterial = HitResult.PhysMaterial.Get();
+	if (IsValid(HitMaterial))
+	{
+		if (HitMaterial == PhysicalReact.PM_Head.Get())
+		{
+			return EEnemyHitReactRegion::Head;
+		}
+		if (HitMaterial == PhysicalReact.PM_Torso.Get())
+		{
+			return EEnemyHitReactRegion::Torso;
+		}
+		if (HitMaterial == PhysicalReact.PM_Arm_R.Get())
+		{
+			return EEnemyHitReactRegion::ArmRight;
+		}
+		if (HitMaterial == PhysicalReact.PM_Arm_L.Get())
+		{
+			return EEnemyHitReactRegion::ArmLeft;
+		}
+		if (HitMaterial == PhysicalReact.PM_Leg_R.Get())
+		{
+			return EEnemyHitReactRegion::LegRight;
+		}
+		if (HitMaterial == PhysicalReact.PM_Leg_L.Get())
+		{
+			return EEnemyHitReactRegion::LegLeft;
+		}
+	}
+
+	const EEnemyHitReactRegion BoneRegion =
+		ResolveHitReactRegionFromBone(HitResult.BoneName);
+	return BoneRegion != EEnemyHitReactRegion::None
+		? BoneRegion
+		: EEnemyHitReactRegion::Torso;
+}
+
+EEnemyHitReactRegion
+UEnemyPhysicalComponent::ResolveHitReactRegionFromBone(
+	const FName BoneName) const
+{
+	if (BoneName == NAME_None)
+	{
+		return EEnemyHitReactRegion::None;
+	}
+
+	const FString Bone = BoneName.ToString().ToLower();
+	if (Bone.Contains(TEXT("head")) || Bone.StartsWith(TEXT("neck")))
+	{
+		return EEnemyHitReactRegion::Head;
+	}
+	if (Bone.StartsWith(TEXT("clavicle_r")) ||
+		Bone.StartsWith(TEXT("upperarm_r")) ||
+		Bone.StartsWith(TEXT("lowerarm_r")) ||
+		Bone.StartsWith(TEXT("hand_r")))
+	{
+		return EEnemyHitReactRegion::ArmRight;
+	}
+	if (Bone.StartsWith(TEXT("clavicle_l")) ||
+		Bone.StartsWith(TEXT("upperarm_l")) ||
+		Bone.StartsWith(TEXT("lowerarm_l")) ||
+		Bone.StartsWith(TEXT("hand_l")))
+	{
+		return EEnemyHitReactRegion::ArmLeft;
+	}
+	if (Bone.StartsWith(TEXT("thigh_r")) ||
+		Bone.StartsWith(TEXT("calf_r")) ||
+		Bone.StartsWith(TEXT("foot_r")))
+	{
+		return EEnemyHitReactRegion::LegRight;
+	}
+	if (Bone.StartsWith(TEXT("thigh_l")) ||
+		Bone.StartsWith(TEXT("calf_l")) ||
+		Bone.StartsWith(TEXT("foot_l")))
+	{
+		return EEnemyHitReactRegion::LegLeft;
+	}
+	if (Bone.StartsWith(TEXT("spine")) || Bone == TEXT("pelvis"))
+	{
+		return EEnemyHitReactRegion::Torso;
+	}
+
+	return EEnemyHitReactRegion::None;
+}
+
+UAnimMontage* UEnemyPhysicalComponent::ResolveHitReactMontage(
+	const EEnemyHitReactRegion Region,
+	const FEnemyPhysicalReact& PhysicalReact) const
+{
+	switch (Region)
+	{
+	case EEnemyHitReactRegion::Head:
+		return PhysicalReact.Hit_Montage_Head;
+	case EEnemyHitReactRegion::ArmRight:
+		return PhysicalReact.Hit_Montage_RightShoulder;
+	case EEnemyHitReactRegion::ArmLeft:
+		return PhysicalReact.Hit_Montage_LeftSholder;
+	case EEnemyHitReactRegion::LegRight:
+		return PhysicalReact.Hit_Montage_RightLeg;
+	case EEnemyHitReactRegion::LegLeft:
+		return PhysicalReact.Hit_Montage_LeftLeg;
+	case EEnemyHitReactRegion::Torso:
+		return PhysicalReact.Hit_Montage_Spine;
+	case EEnemyHitReactRegion::None:
+	default:
+		return nullptr;
+	}
+}
+
+FName UEnemyPhysicalComponent::ResolvePhysicsBoneName(
+	const EEnemyHitReactRegion Region,
+	const FName HitBoneName) const
+{
+	FName Candidate = NAME_None;
+	switch (Region)
+	{
+	case EEnemyHitReactRegion::Head:
+		Candidate = HitBoneName != NAME_None
+			? HitBoneName
+			: FName(TEXT("Head"));
+		break;
+	case EEnemyHitReactRegion::Torso:
+		Candidate =
+			HitBoneName.ToString().StartsWith(TEXT("spine"))
+				? HitBoneName
+				: FName(TEXT("spine_01"));
+		break;
+	case EEnemyHitReactRegion::ArmRight:
+		Candidate = FName(TEXT("upperarm_r"));
+		break;
+	case EEnemyHitReactRegion::ArmLeft:
+		Candidate = FName(TEXT("upperarm_l"));
+		break;
+	case EEnemyHitReactRegion::LegRight:
+		Candidate = FName(TEXT("thigh_r"));
+		break;
+	case EEnemyHitReactRegion::LegLeft:
+		Candidate = FName(TEXT("thigh_l"));
+		break;
+	case EEnemyHitReactRegion::None:
+	default:
+		return NAME_None;
+	}
+
+	return IsValid(TargetMesh) &&
+		TargetMesh->GetBoneIndex(Candidate) != INDEX_NONE
+			? Candidate
+			: NAME_None;
+}
+
+FName UEnemyPhysicalComponent::ResolveLimbBoneName(
+	const EEnemyHitReactRegion Region) const
+{
+	switch (Region)
+	{
+	case EEnemyHitReactRegion::Head:
+		return FName(TEXT("Head"));
+	case EEnemyHitReactRegion::ArmRight:
+		return FName(TEXT("upperarm_r"));
+	case EEnemyHitReactRegion::ArmLeft:
+		return FName(TEXT("upperarm_l"));
+	case EEnemyHitReactRegion::LegRight:
+		return FName(TEXT("thigh_r"));
+	case EEnemyHitReactRegion::LegLeft:
+		return FName(TEXT("thigh_l"));
+	case EEnemyHitReactRegion::Torso:
+	case EEnemyHitReactRegion::None:
+	default:
+		return NAME_None;
+	}
+}
+
+bool UEnemyPhysicalComponent::ShouldSkipHitReactPresentation() const
+{
+	const AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	const UEnemyMovementComponent* MovementComponent =
+		IsValid(OwnerCharacter)
+			? Cast<UEnemyMovementComponent>(
+				OwnerCharacter->GetMovementComponent())
+			: nullptr;
+	return IsValid(MovementComponent) &&
+		MovementComponent->IsTraversingNavLink();
+}
+
+void UEnemyPhysicalComponent::PlayHitReactPresentation(
+	const EEnemyHitReactRegion Region,
+	const FName PhysicsBoneName,
+	const FVector& ImpulseDirection,
+	const bool bAllowMontage)
+{
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (!IsValid(OwnerCharacter) || OwnerCharacter->IsDead() ||
+		!IsValid(EnemyAsset) || !IsValid(TargetMesh))
+	{
+		return;
+	}
+
+	const FEnemyPhysicalReact* PhysicalReact =
+		EnemyAsset->GetPhysicalReact();
+	if (PhysicalReact == nullptr)
+	{
+		return;
+	}
+
+	if (bIsHit)
+	{
+		if (bAllowMontage &&
+			!PhysicalReact->bRefreshLockOnRepeatedHit)
+		{
+			return;
+		}
+
+		// Repeated hits replace rather than stack the presentation. Crawling
+		// always overrides the refresh option so a standing montage cannot
+		// survive the locomotion transition on any client.
+		StopHitReactPresentation(false);
+	}
+
+	bool bMontageStarted = false;
+	float MontageExpectedDuration = 0.0f;
+	UAnimMontage* HitMontage = bAllowMontage
+		? ResolveHitReactMontage(Region, *PhysicalReact)
+		: nullptr;
+	if (IsValid(HitMontage))
+	{
+		if (UAnimInstance* AnimInstance = TargetMesh->GetAnimInstance())
+		{
+			AnimInstance->StopAllMontages(
+				FMath::Max(
+					0.0f,
+					PhysicalReact->HitReactMontageBlendOutTime));
+			const float MontageLength = OwnerCharacter->PlayAnimMontage(
+				HitMontage,
+				FMath::Max(0.01f, PhysicalReact->HitReactPlayRate));
+			bMontageStarted = MontageLength > 0.0f;
+			if (bMontageStarted)
+			{
+				ActiveHitReactMontage = HitMontage;
+				const float EffectivePlayRate = FMath::Abs(
+					AnimInstance->Montage_GetPlayRate(HitMontage) *
+					HitMontage->RateScale);
+				MontageExpectedDuration = MontageLength /
+					FMath::Max(0.01f, EffectivePlayRate);
+				FOnMontageEnded MontageEndedDelegate;
+				MontageEndedDelegate.BindUObject(
+					this,
+					&UEnemyPhysicalComponent::HandleHitReactMontageEnded);
+				AnimInstance->Montage_SetEndDelegate(
+					MontageEndedDelegate,
+					HitMontage);
+			}
+		}
+	}
+	else if (bAllowMontage)
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("%s::%s: Hit montage is missing for region %s. Asset=%s"),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*UEnum::GetValueAsString(Region),
+			*GetNameSafe(EnemyAsset));
+	}
+	else
+	{
+		UE_LOG(
+			LogTemp,
+			VeryVerbose,
+			TEXT("%s::%s: Crawling enemy uses physics-only hit react. Actor=%s"),
+			*GetClass()->GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(OwnerCharacter));
+	}
+
+	const bool bCanStartPhysics =
+		PhysicsBoneName != NAME_None &&
+		IsValid(PhysicalReact->ReactCurveFloat);
+	if (bCanStartPhysics)
+	{
+		CacheBoneName = PhysicsBoneName;
+		const float MaxBlendWeight = FMath::Clamp(
+			PhysicalReact->BlendWeight_Anim_Physics,
+			0.0f,
+			1.0f);
+		TargetMesh->SetAllBodiesBelowSimulatePhysics(
+			PhysicsBoneName,
+			true,
+			true);
+		TargetMesh->SetAllBodiesBelowPhysicsBlendWeight(
+			PhysicsBoneName,
+			MaxBlendWeight);
+
+		if (!ImpulseDirection.IsNearlyZero() &&
+			!FMath::IsNearlyZero(PhysicalReact->ReactScale))
+		{
+			TargetMesh->AddImpulse(
+				ImpulseDirection.GetSafeNormal() *
+				PhysicalReact->ReactScale,
+				PhysicsBoneName,
+				true);
+		}
+		ReactTimeline.PlayFromStart();
+	}
+
+	bIsHit = bMontageStarted || bCanStartPhysics;
+	ActiveHitReactRegion = bIsHit
+		? Region
+		: EEnemyHitReactRegion::None;
+
+	if (bIsHit)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			// Montage-ended is the normal walking completion signal; the physics
+			// timeline owns physics-only crawling completion. This timer is only
+			// a watchdog for a missing completion callback.
+			const float FallbackDuration = bMontageStarted
+				? MontageExpectedDuration + 1.0f
+				: FMath::Max(
+					PhysicalReact->HitReactMovementLockDuration,
+					ReactTimeline.GetTimelineLength() + 1.0f);
+			World->GetTimerManager().SetTimer(
+				HitReactFallbackTimerHandle,
+				this,
+				&UEnemyPhysicalComponent::HandleHitReactFallbackFinished,
+				FallbackDuration,
+				false);
+		}
+	}
+}
+
+void UEnemyPhysicalComponent::StopHitReactPresentation(
+	const bool bPreservePhysics)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(
+			HitReactFallbackTimerHandle);
+	}
+	HitReactFallbackTimerHandle.Invalidate();
+	ReactTimeline.Stop();
+
+	if (IsValid(TargetMesh))
+	{
+		if (IsValid(ActiveHitReactMontage))
+		{
+			if (UAnimInstance* AnimInstance =
+				TargetMesh->GetAnimInstance())
+			{
+				// External cleanup (death, pooling, replacement hit) must not let
+				// the old montage callback release the new state/presentation.
+				FOnMontageEnded EmptyMontageEndedDelegate;
+				AnimInstance->Montage_SetEndDelegate(
+					EmptyMontageEndedDelegate,
+					ActiveHitReactMontage);
+				AnimInstance->Montage_Stop(
+					0.0f,
+					ActiveHitReactMontage);
+			}
+		}
+
+		if (!bPreservePhysics)
+		{
+			TargetMesh->SetAllBodiesPhysicsBlendWeight(0.0f, false);
+			TargetMesh->SetAllBodiesSimulatePhysics(false);
+		}
+	}
+
+	bIsHit = false;
+	CacheBoneName = NAME_None;
+	ActiveHitReactRegion = EEnemyHitReactRegion::None;
+	ActiveHitReactMontage = nullptr;
+}
+
+void UEnemyPhysicalComponent::ReleaseHitReactActionLock()
+{
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (!bOwnsHitReactActionLock ||
+		!IsValid(OwnerCharacter) ||
+		!OwnerCharacter->HasAuthority())
+	{
+		return;
+	}
+	bOwnsHitReactActionLock = false;
+
+	if (UEnemyStatusComponent* StatusComponent =
+		OwnerCharacter->GetEnemyStatusComponent())
+	{
+		// Expected-state clearing prevents a late montage callback from
+		// clearing a higher-priority Knockdown or Dead state.
+		StatusComponent->ClearActionState(EEnemyActionState::Stunned);
+	}
+}
+
+void UEnemyPhysicalComponent::HandleHitReactMontageEnded(
+	UAnimMontage* Montage,
+	const bool /*bInterrupted*/)
+{
+	if (!IsValid(Montage) || Montage != ActiveHitReactMontage)
+	{
+		return;
+	}
+
+	// Clear the tracked montage first so presentation cleanup cannot trigger
+	// this completion path recursively.
+	ActiveHitReactMontage = nullptr;
+	ReleaseHitReactActionLock();
+	StopHitReactPresentation(false);
+}
+
+void UEnemyPhysicalComponent::HandleHitReactFallbackFinished()
+{
+	HitReactFallbackTimerHandle.Invalidate();
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("%s::%s: Hit-react completion watchdog fired. Actor=%s Montage=%s"),
+		*GetClass()->GetName(),
+		TEXT(__FUNCTION__),
+		*GetNameSafe(GetEnemyCharacter()),
+		*GetNameSafe(ActiveHitReactMontage));
+
+	ReleaseHitReactActionLock();
+	StopHitReactPresentation(false);
 }
 
 void UEnemyPhysicalComponent::BloodVFX(const FHitResult& HitResult)
@@ -261,6 +862,10 @@ void UEnemyPhysicalComponent::BloodVFX(const FHitResult& HitResult)
 	}
 
 	const FEnemyPhysicalReact* PhysicalReact = EnemyAsset->GetPhysicalReact();
+	if (PhysicalReact == nullptr)
+	{
+		return;
+	}
 
 	UNiagaraSystem* BulletHit                  = PhysicalReact->Blood_BulletHit;
 	UNiagaraSystem* BloodSplatter              = PhysicalReact->Blood_Splatter;
@@ -412,6 +1017,18 @@ UStaticMesh* UEnemyPhysicalComponent::GetLimbMesh(const FName BoneName) const
 
 void UEnemyPhysicalComponent::ApplyLimbDestruction(const FName BoneName)
 {
+	const ELocomotionWalkRunState NewLocomotionState =
+		EvaluateLocomotionState();
+	if (IsCrawlingLocomotionState(NewLocomotionState) &&
+		(bIsHit || IsValid(ActiveHitReactMontage)))
+	{
+		// Losing a leg switches the locomotion graph to crawling. A standing
+		// hit montage must not keep controlling that pose, and its old end
+		// callback must not outlive the transition.
+		StopHitReactPresentation(false);
+		ReleaseHitReactActionLock();
+	}
+
 	if (UStaticMesh* MeshAsset = GetLimbMesh(BoneName))
 	{
 		UWorld* World = GetWorld();
@@ -458,19 +1075,31 @@ void UEnemyPhysicalComponent::ApplyLimbDestruction(const FName BoneName)
 		ProxyMesh->HideBoneByName(BoneName, PBO_Term);
 	}
 
-	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
-	if (!IsValid(OwnerCharacter)) return;
-
-	if (UEnemyMovementComponent* MovementComponent = Cast<UEnemyMovementComponent>(OwnerCharacter->GetMovementComponent()))
-	{
-		MovementComponent->SetLocomotationState(EvaluateLocomotionState());
-	}
+	SynchronizeLocomotionState();
 }
 
 void UEnemyPhysicalComponent::OnRep_DestroyedLimbs()
 {
+	if (Limbes.Num() == 0)
+	{
+		InitializeLimbStateFromSettings();
+	}
+
 	for (TPair<FName, FLimbData>& Pair : Limbes)
 	{
+		const bool bShouldBeDestroyed =
+			DestroyedLimbs.Contains(Pair.Key);
+		if (bShouldBeDestroyed)
+		{
+			if (Pair.Value.bIsHas)
+			{
+				Pair.Value.bIsHas = false;
+				Pair.Value.Durability = 0.0f;
+				ApplyLimbDestruction(Pair.Key);
+			}
+			continue;
+		}
+
 		Pair.Value.bIsHas = true;
 		Pair.Value.Durability = Pair.Value.MaxDurability;
 		if (IsValid(ProxyMesh))
@@ -479,16 +1108,23 @@ void UEnemyPhysicalComponent::OnRep_DestroyedLimbs()
 		}
 	}
 
-	// 배열 전체를 훑는다. 늦게 접속한 클라는 여기서 한 번에 따라잡는다.
 	for (const FName& BoneName : DestroyedLimbs)
 	{
-		FLimbData* Data = Limbes.Find(BoneName);
-		if (Data == nullptr || !Data->bIsHas) continue;   // 이미 반영됨
-
-		Data->bIsHas = false;
-		Data->Durability = 0.f;
-		ApplyLimbDestruction(BoneName);
+		if (!Limbes.Contains(BoneName))
+		{
+			UE_LOG(
+				LogTemp,
+				Warning,
+				TEXT("%s::%s: Unknown replicated limb bone '%s'."),
+				*GetClass()->GetName(),
+				TEXT(__FUNCTION__),
+				*BoneName.ToString());
+		}
 	}
+
+	// An empty replicated array is also meaningful: it restores a pooled
+	// enemy to walking on clients.
+	SynchronizeLocomotionState();
 }
 
 void UEnemyPhysicalComponent::ActionLimb(const FName BoneName, const float DamageAmount)
@@ -517,13 +1153,16 @@ void UEnemyPhysicalComponent::ActionLimb(const FName BoneName, const float Damag
 
 			// 복제 트리거. 클라는 OnRep_DestroyedLimbs에서 같은 연출을 재생한다.
 			DestroyedLimbs.AddUnique(BoneName);
+			if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(GetOwner()))
+			{
+				Enemy->ForceCriticalNetUpdate();
+			}
 
 			ApplyLimbDestruction(BoneName);
 		}
 	}
 
-	const FLimbData* HeadData = Limbes.Find(FName(TEXT("Head")));
-	if (HeadData != nullptr && !HeadData->bIsHas)
+	if (!IsLimbPresent(HeadLimbName))
 	{
 		Action_Dead();
 	}
@@ -531,42 +1170,36 @@ void UEnemyPhysicalComponent::ActionLimb(const FName BoneName, const float Damag
 
 ELocomotionWalkRunState UEnemyPhysicalComponent::EvaluateLocomotionState() const
 {
-	const FLimbData* Arm_R = Limbes.Find(FName(TEXT("upperarm_r")));
-	const FLimbData* Arm_L = Limbes.Find(FName(TEXT("upperarm_l")));
-	const FLimbData* Leg_R = Limbes.Find(FName(TEXT("thigh_r")));
-	const FLimbData* Leg_L = Limbes.Find(FName(TEXT("thigh_l")));
-	
-	
-	int MissingLimb_Arm = FMath::Clamp((!Arm_R->bIsHas + !Arm_L->bIsHas), 0, 2);
-	
-	
-	if (!Leg_R->bIsHas || !Leg_L->bIsHas)
+	const int32 MissingArmCount =
+		static_cast<int32>(!IsLimbPresent(RightArmLimbName)) +
+		static_cast<int32>(!IsLimbPresent(LeftArmLimbName));
+	const bool bMissingLeg =
+		!IsLimbPresent(RightLegLimbName) ||
+		!IsLimbPresent(LeftLegLimbName);
+
+	if (bMissingLeg)
 	{
-		if (MissingLimb_Arm == 2)
+		if (MissingArmCount == 2)
 		{
-			return ELocomotionWalkRunState::Dead;	
+			return ELocomotionWalkRunState::Dead;
 		}
-		else if (MissingLimb_Arm == 1)
+		if (MissingArmCount == 1)
 		{
 			return ELocomotionWalkRunState::SlowCrawling;
 		}
-		
+
 		return ELocomotionWalkRunState::Crawling;
 	}
+
 	return ELocomotionWalkRunState::Walking;
 }
 
 EEnemyMissingArmState UEnemyPhysicalComponent::GetMissingArmState() const
 {
-	const FLimbData* RightArm =
-		Limbes.Find(FName(TEXT("upperarm_r")));
-	const FLimbData* LeftArm =
-		Limbes.Find(FName(TEXT("upperarm_l")));
-
 	const bool bRightArmMissing =
-		RightArm == nullptr || !RightArm->bIsHas;
+		!IsLimbPresent(RightArmLimbName);
 	const bool bLeftArmMissing =
-		LeftArm == nullptr || !LeftArm->bIsHas;
+		!IsLimbPresent(LeftArmLimbName);
 
 	if (bLeftArmMissing && bRightArmMissing)
 	{
@@ -589,7 +1222,8 @@ EEnemyMissingArmState UEnemyPhysicalComponent::GetMissingArmState() const
 void UEnemyPhysicalComponent::Action_Dead()
 {
 	Health = 0.0f;
-	ReactTimeline.Stop();
+	StopHitReactPresentation(true);
+	bOwnsHitReactActionLock = false;
 	if (AEnemyCharacter* OwnerCharacter = GetEnemyCharacter())
 	{
 		OwnerCharacter->Dead();
@@ -598,94 +1232,112 @@ void UEnemyPhysicalComponent::Action_Dead()
 
 void UEnemyPhysicalComponent::DrawDebugLimb()
 {
-	if (bIsDrawDebug)
+	if (!bIsDrawDebug)
 	{
-		UWorld* World = GetWorld();
-		if (!IsValid(World))
-		{
-			UE_LOG(LogTemp, Error, TEXT("%s::%s : World is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-			return;
-		}
-		
-		AEnemyCharacter* Character = GetEnemyCharacter();
-		if (!IsValid(Character))
-		{
-			UE_LOG(LogTemp, Error, TEXT("%s::%s : Character is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-			return;
-		}
-		
-		USkeletalMeshComponent* MeshComp = Character->GetChildActorSkeletalMesh();
-		if (!IsValid(MeshComp))
-		{
-			UE_LOG(LogTemp, Error, TEXT("%s::%s : Mesh Component is invalid."), *GetClass()->GetName(), TEXT(__FUNCTION__));
-			return; 
-		}
-		
-		
-		const FVector ActorPos = Character->GetActorLocation();
-		
-		const FVector Head_Pos = MeshComp->GetSocketLocation("Head");
-		const FVector Body_Pos = MeshComp->GetSocketLocation("spine_02");
-		const FVector ArmR_Pos = MeshComp->GetSocketLocation("upperarm_r");
-		const FVector ArmL_Pos = MeshComp->GetSocketLocation("upperarm_l");
-		const FVector LegR_Pos = MeshComp->GetSocketLocation("thigh_r");
-		const FVector LegL_Pos = MeshComp->GetSocketLocation("thigh_l");
-		const float DT = 0.f;
-		
-		FLimbData* Data = Limbes.Find(FName(TEXT("Head")));
-		FVector Pos = Head_Pos;
-		if (Data->bIsHas)
-		{
-			DrawDebugString(World, Pos, FString::Printf(TEXT("Head : %.01f / %.01f"), Data->Durability, Data->MaxDurability), nullptr, FColor::White, DT);
-		}
-		
-		
-		Data = Limbes.Find(FName(TEXT("upperarm_r")));
-		Pos = ArmR_Pos;
-		if (Data->bIsHas)
-		{
-			DrawDebugString(World, Pos, FString::Printf(TEXT("Arm_R : %.01f / %.01f"), Data->Durability, Data->MaxDurability), nullptr, FColor::White, DT);
-		}
-		
-		Data = Limbes.Find(FName(TEXT("upperarm_l")));
-		Pos = ArmL_Pos;
-		if (Data->bIsHas)
-		{
-			DrawDebugString(World, Pos, FString::Printf(TEXT("Arm_L : %.01f / %.01f"), Data->Durability, Data->MaxDurability), nullptr, FColor::White, DT);
-		}
-		
-		Data = Limbes.Find(FName(TEXT("thigh_r")));
-		Pos = LegR_Pos;
-		if (Data->bIsHas)
-		{
-			DrawDebugString(World, Pos, FString::Printf(TEXT("Leg_R : %.01f / %.01f"), Data->Durability, Data->MaxDurability), nullptr, FColor::White, DT);
-		}
-		
-		Data = Limbes.Find(FName(TEXT("thigh_l")));
-		Pos = LegL_Pos;
-		if (Data->bIsHas)
-		{
-			DrawDebugString(World, Pos, FString::Printf(TEXT("Leg_L : %.01f / %.01f"), Data->Durability, Data->MaxDurability), nullptr, FColor::White, DT);
-		}
-		
+		return;
 	}
 
+	UWorld* World = GetWorld();
+	AEnemyCharacter* Character = GetEnemyCharacter();
+	USkeletalMeshComponent* MeshComp = IsValid(Character)
+		? Character->GetChildActorSkeletalMesh()
+		: nullptr;
+	if (!IsValid(World) || !IsValid(Character) || !IsValid(MeshComp))
+	{
+		return;
+	}
+
+	DrawDebugString(
+		World,
+		MeshComp->GetSocketLocation(FName(TEXT("spine_02"))),
+		FString::Printf(
+			TEXT("Health : %.1f / %.1f"),
+			Health,
+			MaxHealth),
+		nullptr,
+		FColor::Yellow,
+		0.0f);
+
+	const auto DrawLimb =
+		[this, World, MeshComp](
+			const FName LimbName,
+			const TCHAR* Label)
+		{
+			const FLimbData* LimbData = Limbes.Find(LimbName);
+			if (LimbData == nullptr || !LimbData->bIsHas)
+			{
+				return;
+			}
+
+			DrawDebugString(
+				World,
+				MeshComp->GetSocketLocation(LimbName),
+				FString::Printf(
+					TEXT("%s : %.1f / %.1f"),
+					Label,
+					LimbData->Durability,
+					LimbData->MaxDurability),
+				nullptr,
+				FColor::White,
+				0.0f);
+		};
+
+	DrawLimb(HeadLimbName, TEXT("Head"));
+	DrawLimb(RightArmLimbName, TEXT("Arm_R"));
+	DrawLimb(LeftArmLimbName, TEXT("Arm_L"));
+	DrawLimb(RightLegLimbName, TEXT("Leg_R"));
+	DrawLimb(LeftLegLimbName, TEXT("Leg_L"));
 }
 
 void UEnemyPhysicalComponent::HandleReactTimeline(float value)
 {
-	if (CacheBoneName == NAME_None)
+	if (CacheBoneName == NAME_None || !IsValid(TargetMesh) ||
+		!IsValid(EnemyAsset))
 	{
-		UE_LOG(LogTemp, Error, TEXT("%s::%s: Cache Bone Name is \"NAME_None\""), *GetClass()->GetName(), TEXT(__FUNCTION__));
 		return;
 	}
-	TargetMesh->SetAllBodiesBelowPhysicsBlendWeight(CacheBoneName, value);
+
+	const FEnemyPhysicalReact* PhysicalReact =
+		EnemyAsset->GetPhysicalReact();
+	if (PhysicalReact == nullptr)
+	{
+		return;
+	}
+
+	const float FinalBlendWeight =
+		FMath::Clamp(value, 0.0f, 1.0f) *
+		FMath::Clamp(
+			PhysicalReact->BlendWeight_Anim_Physics,
+			0.0f,
+			1.0f);
+	TargetMesh->SetAllBodiesBelowPhysicsBlendWeight(
+		CacheBoneName,
+		FinalBlendWeight);
 }
 
 void UEnemyPhysicalComponent::HandleReactTimelineFinished()
 {
-	TargetMesh->SetAllBodiesPhysicsBlendWeight(0.0f, false);
-	TargetMesh->SetAllBodiesSimulatePhysics(false);
-	bIsHit = false;
-}
+	AEnemyCharacter* OwnerCharacter = GetEnemyCharacter();
+	if (IsValid(TargetMesh) &&
+		(!IsValid(OwnerCharacter) || !OwnerCharacter->IsDead()))
+	{
+		TargetMesh->SetAllBodiesPhysicsBlendWeight(0.0f, false);
+		TargetMesh->SetAllBodiesSimulatePhysics(false);
+	}
+	CacheBoneName = NAME_None;
 
+	// Physics can finish before the montage. In that case the montage-ended
+	// callback remains the sole owner of the Stunned -> Active transition.
+	if (!IsValid(ActiveHitReactMontage))
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(
+				HitReactFallbackTimerHandle);
+		}
+		HitReactFallbackTimerHandle.Invalidate();
+		bIsHit = false;
+		ActiveHitReactRegion = EEnemyHitReactRegion::None;
+		ReleaseHitReactActionLock();
+	}
+}

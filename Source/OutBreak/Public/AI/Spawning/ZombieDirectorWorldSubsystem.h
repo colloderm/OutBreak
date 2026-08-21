@@ -3,11 +3,14 @@
 #include "CoreMinimal.h"
 #include "AI/Spawning/EnemySpawnTypes.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "UObject/ObjectKey.h"
 #include "ZombieDirectorWorldSubsystem.generated.h"
 
 class AEnemyCharacter;
 class AEnemyCharacterSpawner;
 class AEnemySpawnSectorVolume;
+class APawn;
+class APlayerController;
 class UEnemySpawnableComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogZombieDirector, Log, All);
@@ -30,6 +33,18 @@ public:
 	void RegisterEnemy(UEnemySpawnableComponent* SpawnableComponent);
 	void UnregisterEnemy(UEnemySpawnableComponent* SpawnableComponent);
 	void ReturnEnemyToPool(AEnemyCharacter* Enemy, FName PoolKey);
+
+	/** Per-connection interest result consumed by AEnemyCharacter::IsNetRelevantFor. */
+	bool IsEnemyRelevantForViewer(
+		const AEnemyCharacter* Enemy,
+		const AActor* RealViewer,
+		bool& bOutHasViewerBudget) const;
+
+	/** Makes a nearby critical event relevant before the next scheduled budget pass. */
+	void NotifyEnemyCriticalNetUpdate(AEnemyCharacter* Enemy);
+
+	/** Current per-connection budget and bandwidth telemetry for console diagnostics. */
+	FString GetReplicationBudgetDebugSummary() const;
 
 	UFUNCTION(BlueprintCallable, Category="Enemy Director")
 	void ReportNoise(const FEnemyNoiseEvent& NoiseEvent);
@@ -64,9 +79,18 @@ private:
 		double Timestamp = 0.0;
 	};
 
+	struct FViewerReplicationInterestState
+	{
+		TWeakObjectPtr<APawn> ViewPawn;
+		TSet<TObjectKey<AEnemyCharacter>> RelevantEnemies;
+		float CongestionLevel = 0.0f;
+		int32 EffectiveRelevantBudget = 0;
+		int32 MeasuredOutBytesPerSecond = 0;
+		int32 NegotiatedBytesPerSecond = 0;
+	};
+
 	bool IsAuthorityWorld() const;
 	bool ShouldMergeNoise(const FEnemyNoiseEvent& NoiseEvent);
-	void DispatchLatestNoiseToReinforcements(FName SectorId, const FVector& NoiseLocation);
 	void EnsureBasePopulations(double Now);
 	void AdoptPlacedEnemiesAsSectorBase();
 	int32 RedirectExistingEnemies(const FEnemyNoiseEvent& NoiseEvent, int32 DesiredCount);
@@ -109,6 +133,7 @@ private:
 	int32 ResolveSectorBaseTarget(FName SectorId) const;
 	int32 ResolveSectorHardCap(FName SectorId) const;
 	void CompactRegistries();
+	void UpdateEnemyReplicationLOD(double Now);
 
 	TArray<TWeakObjectPtr<AEnemyCharacterSpawner>> Spawners;
 	TArray<TWeakObjectPtr<AEnemySpawnSectorVolume>> Sectors;
@@ -118,6 +143,9 @@ private:
 	TArray<FPendingSpawnRequest> PendingRequests;
 	TArray<FRecentNoise> RecentNoises;
 	TMap<FName, FLatestSectorNoise> LatestSectorNoises;
+	TMap<TObjectKey<APlayerController>, FViewerReplicationInterestState>
+		ViewerReplicationInterest;
 	int64 NextNoiseEventId = 1;
 	double LastBasePopulationCheckTime = -DBL_MAX;
+	double LastReplicationLODUpdateTime = -DBL_MAX;
 };

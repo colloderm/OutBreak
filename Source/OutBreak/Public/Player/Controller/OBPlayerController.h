@@ -25,6 +25,7 @@ class UOBInputConfig;
 struct FGameplayTag;
 class UInputMappingContext;
 class UInputAction;
+class USoundBase;
 struct FInputActionValue;
 
 UCLASS()
@@ -113,6 +114,7 @@ private:
 protected:
 	//~ APlayerController interface
 	virtual void SetupInputComponent() override;
+	virtual void UpdateRotation(float DeltaTime) override;
 	virtual void BeginPlay() override;
 	virtual void OnRep_Pawn() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -502,6 +504,10 @@ public:
 		const TArray<FOBItemStack>& StackHaul,
 		const TArray<FInventoryData>& LootedInstances,
 		const TArray<FInventoryData>& ReturnedLoadoutInstances);
+
+	/** Plays a private, non-spatial radio message without reporting AI noise. */
+	UFUNCTION(Client, Reliable)
+	void Client_PlayExtractionRadio(USoundBase* RadioSound, float VolumeMultiplier);
 
 private:
 	void EnterInsertionInputMode(bool bCanSelectTarget);

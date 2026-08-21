@@ -25,6 +25,19 @@ enum class EEnemyMissingArmState : uint8
 	Both,
 };
 
+/** Body region selected by the authoritative hit-reaction resolver. */
+UENUM(BlueprintType)
+enum class EEnemyHitReactRegion : uint8
+{
+	None,
+	Head,
+	Torso,
+	ArmRight,
+	ArmLeft,
+	LegRight,
+	LegLeft,
+};
+
 /**
  * Authoritative action lock state. UEnemyStatusComponent is the only runtime
  * owner allowed to mutate this value.

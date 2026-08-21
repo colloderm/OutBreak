@@ -115,6 +115,8 @@ void FSTEvaluateEnemyAIContext::SynchronizePhysicalState(
 		EnemyCharacter.GetLocomotionWalkRunState();
 	InstanceData.MissingArmState =
 		EnemyCharacter.GetMissingArmState();
+	InstanceData.ActionState =
+		EnemyCharacter.GetActionState();
 }
 
 bool FSTEvaluateEnemyAIContext::SynchronizeMemoryState(
@@ -213,4 +215,6 @@ void FSTEvaluateEnemyAIContext::ClearPhysicalState(
 		ELocomotionWalkRunState::Dead;
 	InstanceData.MissingArmState =
 		EEnemyMissingArmState::None;
+	InstanceData.ActionState =
+		EEnemyActionState::Dead;
 }

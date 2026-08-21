@@ -1,6 +1,7 @@
 #include "AI/Spawning/EnemyCharacterSpawner.h"
 
 #include "AI/EnemyCharacter.h"
+#include "AI/Components/EnemySpawnableComponent.h"
 #include "AI/Spawning/EnemyDirectorSettings.h"
 #include "AI/Spawning/EnemySpawnProfile.h"
 #include "AI/Spawning/EnemySpawnTypes.h"
@@ -12,6 +13,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "NavigationSystem.h"
 #include "Net/UnrealNetwork.h"
@@ -114,10 +116,6 @@ bool AEnemyCharacterSpawner::TryResolveSafeSpawnTransform(
 		? Capsule->GetCollisionObjectType()
 		: ECC_Pawn;
 
-	FCollisionObjectQueryParams GroundObjects;
-	GroundObjects.AddObjectTypesToQuery(ECC_WorldStatic);
-	GroundObjects.AddObjectTypesToQuery(ECC_WorldDynamic);
-
 	FCollisionQueryParams QueryParams(
 		SCENE_QUERY_STAT(EnemySpawnerSafePlacement),
 		false,
@@ -169,124 +167,208 @@ bool AEnemyCharacterSpawner::TryResolveSafeSpawnTransform(
 		return bBlockedByStaticMesh;
 	};
 
-	TArray<FVector2D, TInlineAllocator<25>> SearchOffsets;
+	struct FExistingEnemyCapsule
+	{
+		FVector Center = FVector::ZeroVector;
+		float Radius = 0.0f;
+		float HalfHeight = 0.0f;
+		FString Name;
+	};
+
+	TArray<FExistingEnemyCapsule> ExistingEnemyCapsules;
+	for (TActorIterator<AEnemyCharacter> It(World); It; ++It)
+	{
+		const AEnemyCharacter* ExistingEnemy = *It;
+		if (!IsValid(ExistingEnemy) || ExistingEnemy->IsActorBeingDestroyed())
+		{
+			continue;
+		}
+
+		const UEnemySpawnableComponent* Spawnable =
+			ExistingEnemy->GetEnemySpawnableComponent();
+		if (IsValid(Spawnable) &&
+			Spawnable->GetPoolPhase() == EEnemyPoolPhase::InactivePooled)
+		{
+			continue;
+		}
+		if (!IsValid(Spawnable) &&
+			(ExistingEnemy->IsHidden() || !ExistingEnemy->GetActorEnableCollision()))
+		{
+			continue;
+		}
+
+		const UCapsuleComponent* ExistingCapsule = ExistingEnemy->GetCapsuleComponent();
+		if (!IsValid(ExistingCapsule))
+		{
+			continue;
+		}
+
+		FExistingEnemyCapsule& Occupied = ExistingEnemyCapsules.AddDefaulted_GetRef();
+		Occupied.Center = ExistingCapsule->GetComponentLocation();
+		ExistingCapsule->GetScaledCapsuleSize(Occupied.Radius, Occupied.HalfHeight);
+		Occupied.Name = ExistingEnemy->GetName();
+	}
+
+	auto FindBlockingEnemies = [
+		&ExistingEnemyCapsules,
+		CapsuleRadius,
+		CapsuleHalfHeight,
+		EnemySeparation = FMath::Max(0.0f, MinEnemySpawnSeparation)](
+			const FVector& CandidateLocation,
+			TArray<FString>* OutEnemyNames = nullptr)
+	{
+		bool bBlocked = false;
+		for (const FExistingEnemyCapsule& Existing : ExistingEnemyCapsules)
+		{
+			const float RequiredHorizontalDistance =
+				CapsuleRadius + Existing.Radius + EnemySeparation;
+			const bool bHorizontallyOverlapping =
+				FVector::DistSquared2D(CandidateLocation, Existing.Center) <
+				FMath::Square(RequiredHorizontalDistance);
+			const bool bVerticallyOverlapping =
+				FMath::Abs(CandidateLocation.Z - Existing.Center.Z) <
+				CapsuleHalfHeight + Existing.HalfHeight;
+			if (!bHorizontallyOverlapping || !bVerticallyOverlapping)
+			{
+				continue;
+			}
+
+			bBlocked = true;
+			if (OutEnemyNames && OutEnemyNames->Num() < 8)
+			{
+				OutEnemyNames->AddUnique(Existing.Name);
+			}
+		}
+		return bBlocked;
+	};
+
+	const int32 SearchRingCount = FMath::Clamp(PlacementSearchRings, 1, 12);
+	const int32 SamplesPerRing = FMath::Clamp(PlacementSamplesPerRing, 4, 32);
+	TArray<FVector2D> SearchOffsets;
+	SearchOffsets.Reserve(1 + SearchRingCount * SamplesPerRing);
 	SearchOffsets.Add(FVector2D::ZeroVector);
 	const float HorizontalRadius = FMath::Max(0.0f, CollisionSearchRadius);
 	if (HorizontalRadius > KINDA_SMALL_NUMBER)
 	{
-		for (int32 Ring = 1; Ring <= 3; ++Ring)
+		for (int32 Ring = 1; Ring <= SearchRingCount; ++Ring)
 		{
-			const float RingRadius = HorizontalRadius * static_cast<float>(Ring) / 3.0f;
-			for (int32 Direction = 0; Direction < 8; ++Direction)
+			const float RingRadius =
+				HorizontalRadius * static_cast<float>(Ring) / SearchRingCount;
+			const float RingAngleOffset =
+				(Ring % 2 == 0 ? 0.5f : 0.0f) * UE_TWO_PI / SamplesPerRing;
+			for (int32 Direction = 0; Direction < SamplesPerRing; ++Direction)
 			{
-				const float Angle = UE_TWO_PI * static_cast<float>(Direction) / 8.0f;
-				SearchOffsets.Add(FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * RingRadius);
+				const float Angle = RingAngleOffset +
+					UE_TWO_PI * static_cast<float>(Direction) / SamplesPerRing;
+				SearchOffsets.Add(
+					FVector2D(FMath::Cos(Angle), FMath::Sin(Angle)) * RingRadius);
 			}
 		}
 	}
 
-	TArray<float, TInlineAllocator<20>> VerticalOffsets;
-	VerticalOffsets.Add(0.0f);
-	const float MaxVerticalAdjustment = FMath::Max(0.0f, MaxVerticalSpawnAdjustment);
-	const float FineSearchHeight = FMath::Min(400.0f, MaxVerticalAdjustment);
-	for (float Lift = 50.0f; Lift <= FineSearchHeight; Lift += 50.0f)
-	{
-		VerticalOffsets.Add(Lift);
-	}
-	for (float Lift = 600.0f; Lift < MaxVerticalAdjustment; Lift += 200.0f)
-	{
-		VerticalOffsets.Add(Lift);
-	}
-	if (MaxVerticalAdjustment > FineSearchHeight)
-	{
-		VerticalOffsets.AddUnique(MaxVerticalAdjustment);
-	}
-
 	UNavigationSystemV1* Navigation = UNavigationSystemV1::GetCurrent(World);
+	const float RingSpacing = HorizontalRadius > KINDA_SMALL_NUMBER
+		? HorizontalRadius / SearchRingCount
+		: CapsuleRadius * 2.0f;
+	// A large projection extent can silently snap several probes to the same remote
+	// polygon. Cap every probe to a fraction of the ring spacing instead.
+	const float LocalNavigationProjectionRadius = FMath::Clamp(
+		NavigationSearchRadius,
+		25.0f,
+		FMath::Max(75.0f, RingSpacing * 0.75f));
 	const FVector NavigationExtent(
-		FMath::Max(1.0f, NavigationSearchRadius),
-		FMath::Max(1.0f, NavigationSearchRadius),
+		LocalNavigationProjectionRadius,
+		LocalNavigationProjectionRadius,
 		FMath::Max(1.0f, NavigationSearchHeight));
 	bool bFoundNavigationProjection = false;
-	TArray<FVector, TInlineAllocator<25>> CapsuleBaseLocations;
+	int32 NavigationProjectionCount = 0;
+	int32 StaticMeshRejectedCount = 0;
+	int32 EnemyRejectedCount = 0;
+	int32 DuplicateProjectionCount = 0;
+	TArray<FVector> CandidateLocations;
+	CandidateLocations.Reserve(SearchOffsets.Num());
 
 	for (const FVector2D& Offset : SearchOffsets)
 	{
-		FVector ProbeLocation = RequestedLocation + FVector(Offset.X, Offset.Y, 0.0f);
+		const FVector ProbeLocation =
+			RequestedLocation + FVector(Offset.X, Offset.Y, 0.0f);
 		FNavLocation ProjectedLocation;
 		const bool bProjectedToNavigation = IsValid(Navigation) &&
 			Navigation->ProjectPointToNavigation(
 				ProbeLocation,
 				ProjectedLocation,
-				NavigationExtent);
+				NavigationExtent,
+				IsValid(EnemyCDO) ? &EnemyCDO->GetNavAgentPropertiesRef() : nullptr);
 		bFoundNavigationProjection |= bProjectedToNavigation;
+		NavigationProjectionCount += bProjectedToNavigation ? 1 : 0;
 
-		if (bRequireNavigation && !bProjectedToNavigation && !bAllowNavigationFallback)
+		// EnemyCharacterSpawner is reserved for moving zombies. Legacy asset values
+		// cannot opt back into an off-NavMesh ground-trace spawn.
+		if (!bProjectedToNavigation)
 		{
 			continue;
 		}
 
-		FVector SurfaceLocation = ProbeLocation;
-		if (bProjectedToNavigation)
-		{
-			SurfaceLocation = ProjectedLocation.Location;
-		}
-		else
-		{
-			FHitResult GroundHit;
-			const FVector TraceStart = ProbeLocation + FVector(0.0f, 0.0f, 50.0f);
-			const FVector TraceEnd = ProbeLocation - FVector(
-				0.0f,
-				0.0f,
-				FMath::Max(100.0f, NavigationSearchHeight));
-			if (World->LineTraceSingleByObjectType(
-				GroundHit,
-				TraceStart,
-				TraceEnd,
-				GroundObjects,
-				QueryParams))
-			{
-				SurfaceLocation = GroundHit.ImpactPoint;
-			}
-		}
+		const FVector SurfaceLocation = ProjectedLocation.Location;
 
-		CapsuleBaseLocations.Add(FVector(
+		const FVector CandidateLocation(
 			SurfaceLocation.X,
 			SurfaceLocation.Y,
-			SurfaceLocation.Z + CapsuleHalfHeight + Clearance));
-	}
-
-	// Prefer a nearby lateral correction before lifting the zombie. This avoids
-	// choosing a roof or upper floor when an open spot exists beside the marker.
-	for (const float VerticalOffset : VerticalOffsets)
-	{
-		for (const FVector& CapsuleBaseLocation : CapsuleBaseLocations)
-		{
-			const FVector CandidateLocation =
-				CapsuleBaseLocation + FVector(0.0f, 0.0f, VerticalOffset);
-			// Only static-mesh geometry may relocate a spawn. Pawns, skeletal
-			// meshes, logical volumes, and other enemies are intentionally ignored
-			// so a busy spawner does not drift into an unintended ring location.
-			if (!CollectBlockingStaticMeshes(CandidateLocation))
+			SurfaceLocation.Z + CapsuleHalfHeight + Clearance);
+		const bool bDuplicateProjection = CandidateLocations.ContainsByPredicate(
+			[&CandidateLocation](const FVector& ExistingCandidate)
 			{
-				OutTransform.SetLocation(CandidateLocation);
-				return true;
-			}
+				return FVector::DistSquared2D(CandidateLocation, ExistingCandidate) <
+					FMath::Square(10.0f) &&
+					FMath::Abs(CandidateLocation.Z - ExistingCandidate.Z) < 10.0f;
+			});
+		if (bDuplicateProjection)
+		{
+			++DuplicateProjectionCount;
+			continue;
 		}
+		CandidateLocations.Add(CandidateLocation);
+
+		// "Bad Size" stays restricted to static meshes. Enemy capsules use a
+		// separate spacing rule, including collision-disabled Emerging zombies.
+		if (CollectBlockingStaticMeshes(CandidateLocation))
+		{
+			++StaticMeshRejectedCount;
+			continue;
+		}
+		if (FindBlockingEnemies(CandidateLocation))
+		{
+			++EnemyRejectedCount;
+			continue;
+		}
+
+		OutTransform.SetLocation(CandidateLocation);
+		UE_LOG(
+			LogZombieDirector,
+			Verbose,
+			TEXT("Spawner %s resolved NavMesh spawn at %s after %d/%d probes (StaticRejected=%d EnemyRejected=%d Duplicate=%d)"),
+			*GetNameSafe(this),
+			*CandidateLocation.ToCompactString(),
+			CandidateLocations.Num(),
+			SearchOffsets.Num(),
+			StaticMeshRejectedCount,
+			EnemyRejectedCount,
+			DuplicateProjectionCount);
+		return true;
 	}
 
-	if (bRequireNavigation && !bFoundNavigationProjection && !bAllowNavigationFallback)
+	if (!bFoundNavigationProjection)
 	{
-		return Fail(TEXT("navigation projection failed"));
+		return Fail(TEXT("navigation not ready or no NavMesh candidate inside search radius"));
 	}
 
-	const FVector DiagnosticBaseLocation = CapsuleBaseLocations.IsEmpty()
+	const FVector DiagnosticLocation = CandidateLocations.IsEmpty()
 		? RequestedLocation + FVector(0.0f, 0.0f, CapsuleHalfHeight + Clearance)
-		: CapsuleBaseLocations[0];
-	const FVector DiagnosticLocation = DiagnosticBaseLocation +
-		FVector(0.0f, 0.0f, MaxVerticalAdjustment);
+		: CandidateLocations[0];
 	TArray<FOverlapResult> DiagnosticOverlaps;
 	CollectBlockingStaticMeshes(DiagnosticLocation, &DiagnosticOverlaps);
+	TArray<FString> DiagnosticEnemyNames;
+	FindBlockingEnemies(DiagnosticLocation, &DiagnosticEnemyNames);
 
 	FString BlockerSummary;
 	for (const FOverlapResult& Overlap : DiagnosticOverlaps)
@@ -305,16 +387,24 @@ bool AEnemyCharacterSpawner::TryResolveSafeSpawnTransform(
 			}
 		}
 	}
+	const FString EnemySummary = DiagnosticEnemyNames.IsEmpty()
+		? TEXT("none at first probe")
+		: FString::Join(DiagnosticEnemyNames, TEXT(","));
 
 	if (OutFailureReason)
 	{
 		*OutFailureReason = FString::Printf(
-			TEXT("no static-mesh-free spawn location; Capsule(R=%.1f,H=%.1f) MaxLift=%.1f NavProjected=%s StaticMeshBlockers=%s"),
+			TEXT("no spawnable NavMesh candidate in %.0fcm; Capsule(R=%.1f,H=%.1f) Probes=%d Nav=%d StaticRejected=%d EnemyRejected=%d Duplicate=%d StaticMeshBlockers=%s EnemyBlockers=%s"),
+			HorizontalRadius,
 			CapsuleRadius,
 			CapsuleHalfHeight,
-			MaxVerticalAdjustment,
-			bFoundNavigationProjection ? TEXT("true") : TEXT("false"),
-			BlockerSummary.IsEmpty() ? TEXT("none at highest probe") : *BlockerSummary);
+			SearchOffsets.Num(),
+			NavigationProjectionCount,
+			StaticMeshRejectedCount,
+			EnemyRejectedCount,
+			DuplicateProjectionCount,
+			BlockerSummary.IsEmpty() ? TEXT("none at first probe") : *BlockerSummary,
+			*EnemySummary);
 	}
 	return false;
 }

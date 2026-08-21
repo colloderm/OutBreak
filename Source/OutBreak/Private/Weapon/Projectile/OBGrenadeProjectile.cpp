@@ -6,14 +6,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "AbilitySystemComponent.h"
-#include "AbilitySystemBlueprintLibrary.h"
-#include "Ability/Tags/OBGameplayTags.h"
 #include "TimerManager.h"
-#include "AI/EnemyCharacter.h"
-#include "AI/Components/EnemyPhysicalComponent.h"
-#include "Kismet/GameplayStatics.h"
-#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
+#include "Weapon/OBExplosionLibrary.h"
 
 
 // Sets default values
@@ -79,73 +74,9 @@ void AOBGrenadeProjectile::Explode()
 	// 연출(서버/클라)
 	Multicast_OnExploded(Center);
 	
-	// 반경 데미지
-	{
-		TArray<FOverlapResult> Overlaps;
-		FCollisionQueryParams Params;
-		Params.AddIgnoredActor(this);
-
-		// 채널 응답 설정에 좌우되지 않도록 오브젝트 타입으로 찾는다.
-		FCollisionObjectQueryParams ObjectParams;
-		ObjectParams.AddObjectTypesToQuery(ECC_Pawn);
-
-		GetWorld()->OverlapMultiByObjectType(
-			Overlaps, Center, FQuat::Identity, ObjectParams, FCollisionShape::MakeSphere(ExplosionRadius), Params);
-
-		TSet<AActor*> AlreadyHit;
-		for (const FOverlapResult& Overlap : Overlaps)
-		{
-			AActor* Actor = Overlap.GetActor();
-			if (!Actor || AlreadyHit.Contains(Actor)) continue;
-			AlreadyHit.Add(Actor);
-
-			// 제곱근 감쇠. 선형이면 반경 끝에서 계수가 0에 수렴해
-			// 파편이 무력해진다(400 반경, 거리 393 → 계수 0.017).
-			const float Dist = FVector::Dist(Center, Actor->GetActorLocation());
-			const float Falloff = FMath::Sqrt(FMath::Clamp(1.f - (Dist / ExplosionRadius), 0.f, 1.f));
-			const float FinalDamage = Damage * Falloff;
-
-			UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Actor);
-
-			if (FinalDamage <= 0.f) continue;
-
-			if (TargetASC && DamageEffect && SourceASC.IsValid())
-			{
-				FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
-				Ctx.AddInstigator(GetInstigator(), this);
-
-				FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffect, 1.f, Ctx);
-				if (Spec.IsValid())
-				{
-					Spec.Data->SetSetByCallerMagnitude(OBGameplayTags::SetByCaller_Damage, FinalDamage);
-					SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
-				}
-			}
-			else
-			{
-				// 좀비는 ASC가 없다. TakeDamage → EnemyPhysicalComponent 경로로 보낸다.
-				UGameplayStatics::ApplyDamage(Actor, FinalDamage, GetInstigatorController(), this, UDamageType::StaticClass());
-
-				// 총격과 동일한 피격 연출. 폭심 쪽 표면에서 피가 튀도록 방향을 잡는다.
-				if (AEnemyCharacter* Enemy = Cast<AEnemyCharacter>(Actor))
-				{
-					if (UEnemyPhysicalComponent* Physical =
-						Enemy->FindComponentByClass<UEnemyPhysicalComponent>())
-					{
-						const FVector ToCenter =
-							(Center - Actor->GetActorLocation()).GetSafeNormal();
-
-						// 발밑이 아니라 몸통 높이에서 터지도록 살짝 올린다.
-						const FVector ImpactPoint =
-							Actor->GetActorLocation() + ToCenter * 40.f + FVector(0.f, 0.f, 60.f);
-
-						// 총알과 같은 규약: 노멀은 표면에서 가해자 쪽을 향한다.
-						Physical->Multicast_BloodVFX(ImpactPoint, ToCenter);
-					}
-				}
-			}
-		}
-	}
+	// 반경 데미지. 차량 폭발과 같은 경로를 쓴다.
+	UOBExplosionLibrary::ApplyExplosion(this, Center, ExplosionRadius, Damage, DamageEffect,
+		GetInstigatorController(), this, ExplosionImpulseStrength, TArray<AActor*>(), SourceASC.Get());
 	
 	SetActorEnableCollision(false);
 	SetActorHiddenInGame(true);

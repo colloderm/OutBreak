@@ -23,7 +23,8 @@ EStateTreeRunStatus FSTTPlayMontageTask::EnterState(
 	AEnemyCharacter* Character = InstanceData.ControlledPawn;
 
 	if (!IsValid(Character) ||
-		!IsValid(InstanceData.AttackMontage))
+		!IsValid(InstanceData.AttackMontage) ||
+		!Character->CanAct())
 	{
 		return EStateTreeRunStatus::Failed;
 	}
@@ -76,7 +77,8 @@ EStateTreeRunStatus FSTTPlayMontageTask::StartMontage(
 	AEnemyCharacter* Character = InstanceData.ControlledPawn.Get();
 	if (!IsValid(Character) ||
 		!IsValid(InstanceData.AttackMontage) ||
-		!IsValid(InstanceData.PlayingAnimInstance.Get()))
+		!IsValid(InstanceData.PlayingAnimInstance.Get()) ||
+		!Character->CanAct())
 	{
 		return EStateTreeRunStatus::Failed;
 	}
@@ -96,6 +98,7 @@ EStateTreeRunStatus FSTTPlayMontageTask::StartMontage(
 	}
 	
 	// 서버에서만 재생됐다. 클라에도 같은 몽타주를 보낸다.
+	Character->ForceCriticalNetUpdate();
 	Character->Multicast_PlayMontage(
 		InstanceData.AttackMontage,
 		InstanceData.PlayRate,
@@ -171,7 +174,8 @@ EStateTreeRunStatus FSTTPlayMontageTask::Tick(
 	{
 		if (!IsValid(InstanceData.ControlledPawn) ||
 			!IsValid(InstanceData.AttackMontage) ||
-			!IsValid(InstanceData.PlayingAnimInstance.Get()))
+			!IsValid(InstanceData.PlayingAnimInstance.Get()) ||
+			!InstanceData.ControlledPawn->CanAct())
 		{
 			return EStateTreeRunStatus::Failed;
 		}
@@ -192,7 +196,8 @@ EStateTreeRunStatus FSTTPlayMontageTask::Tick(
 	}
 
 	if (!IsValid(InstanceData.ControlledPawn) ||
-		!IsValid(InstanceData.AttackMontage))
+		!IsValid(InstanceData.AttackMontage) ||
+		!InstanceData.ControlledPawn->CanAct())
 	{
 		return EStateTreeRunStatus::Failed;
 	}

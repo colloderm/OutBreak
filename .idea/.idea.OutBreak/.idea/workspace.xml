@@ -21,9 +21,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86874122-45a9-4a44-88f7-867b626dc74b" name="변경" comment="">
-      <change beforePath="$PROJECT_DIR$/Content/Blueprint/Items/BP_Corpse.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Blueprint/Items/BP_Corpse.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.OutBreak/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Blueprints/SandboxCharacter_CMC_ABP.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Blueprints/SandboxCharacter_CMC_ABP.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/GameAbilitySystem/DataAssets/Data/DT_Weapons.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/GameAbilitySystem/DataAssets/Data/DT_Weapons.uasset" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Map/L_TestMap.umap" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Content/UI/Expedition/Loot/M_Highight.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/UI/Expedition/Loot/M_Highight.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Content/Sound/military-radio-communication.uasset" beforeDir="false" afterPath="$PROJECT_DIR$/Content/Sound/military-radio-communication.uasset" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/OutBreak.uproject" beforeDir="false" afterPath="$PROJECT_DIR$/OutBreak.uproject" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Game/Expedition/OBInsertionHelicopter.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Game/Expedition/OBInsertionHelicopter.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Private/Player/Controller/OBPlayerController.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Game/Expedition/OBInsertionHelicopter.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Game/Expedition/OBInsertionHelicopter.h" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" beforeDir="false" afterPath="$PROJECT_DIR$/Source/OutBreak/Public/Player/Controller/OBPlayerController.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -418,6 +425,13 @@
       <workItem from="1786322784052" duration="4607000" />
       <workItem from="1786335026005" duration="11527000" />
       <workItem from="1786407637881" duration="1948000" />
+      <workItem from="1786523782726" duration="670000" />
+      <workItem from="1786580546297" duration="1271000" />
+      <workItem from="1786585071063" duration="2050000" />
+      <workItem from="1786595802793" duration="713000" />
+      <workItem from="1786596659971" duration="257000" />
+      <workItem from="1787010777913" duration="846000" />
+      <workItem from="1787026569841" duration="3785000" />
     </task>
     <servers />
   </component>

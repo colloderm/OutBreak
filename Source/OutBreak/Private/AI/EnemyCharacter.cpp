@@ -19,6 +19,8 @@
 #include "AI/Components/EnemyStatusComponent.h"
 #include "AI/Components/EnemyPhysicalComponent.h"
 #include "AI/Components/EnemySpawnableComponent.h"
+#include "AI/Spawning/EnemyDirectorSettings.h"
+#include "AI/Spawning/ZombieDirectorWorldSubsystem.h"
 #include "Animation/AnimInstance.h"
 #include "Perception/AISense_Damage.h"
 #include "Sound/SoundCue.h"
@@ -142,6 +144,7 @@ void AEnemyCharacter::InitializeComponents()
 	BudgetedMesh->SetCanEverAffectNavigation(false);
 	
 	MotionWarpingComponent = CreateDefaultSubobject<UMotionWarpingComponent>(TEXT("MotionWarpingComponent"));
+	StatusComponent = CreateDefaultSubobject<UEnemyStatusComponent>(TEXT("StatusComponent"));
 	PhysicalComponent = CreateDefaultSubobject<UEnemyPhysicalComponent>(TEXT("PhysicalComponent"));
 	SpawnableComponent = CreateDefaultSubobject<UEnemySpawnableComponent>(TEXT("SpawnableComponent"));
 	
@@ -165,8 +168,25 @@ void AEnemyCharacter::InitializeAsset()
 void AEnemyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	DefaultNetUpdateFrequency = GetNetUpdateFrequency();
+	DefaultMinNetUpdateFrequency = GetMinNetUpdateFrequency();
+	DefaultNetCullDistanceSquared = GetNetCullDistanceSquared();
+	bCapturedNetworkReplicationDefaults = true;
 	
 	InitializeAsset();
+	if (!IsValid(EnemyAsset))
+	{
+		UE_LOG(
+			LogModularAnimationProxy,
+			Error,
+			TEXT("%s::%s: BeginPlay aborted because EnemyAsset is not assigned (Class: %s)."),
+			*GetName(),
+			TEXT(__FUNCTION__),
+			*GetNameSafe(GetClass()));
+		SetActorTickEnabled(false);
+		return;
+	}
 	
 	USkeletalMeshComponentBudgeted* BudgetedMesh =
 		Cast<USkeletalMeshComponentBudgeted>(GetMesh());
@@ -213,6 +233,187 @@ void AEnemyCharacter::Tick(float DeltaSeconds)
 	
 }
 
+float AEnemyCharacter::GetNetPriority(
+	const FVector& ViewPos,
+	const FVector& ViewDir,
+	AActor* Viewer,
+	AActor* ViewTarget,
+	UActorChannel* InChannel,
+	const float Time,
+	const bool bLowBandwidth)
+{
+	const float BasePriority = Super::GetNetPriority(
+		ViewPos,
+		ViewDir,
+		Viewer,
+		ViewTarget,
+		InChannel,
+		Time,
+		bLowBandwidth);
+
+	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
+	if (!Settings->bEnableReplicationLOD || Settings->ReplicationLODLevels.IsEmpty())
+	{
+		return BasePriority;
+	}
+
+	const float DistanceSquared = FVector::DistSquared(GetActorLocation(), ViewPos);
+	const FEnemyReplicationLODLevel* BestLevel = nullptr;
+	float BestMaxDistance = TNumericLimits<float>::Max();
+	for (const FEnemyReplicationLODLevel& Level : Settings->ReplicationLODLevels)
+	{
+		const float MaxDistance = FMath::Max(100.0f, Level.MaxDistance);
+		if (MaxDistance < BestMaxDistance &&
+			DistanceSquared <= FMath::Square(MaxDistance))
+		{
+			BestLevel = &Level;
+			BestMaxDistance = MaxDistance;
+		}
+	}
+
+	// Actors outside the final band are normally culled. Keep a very small
+	// priority for exceptional relevancy paths (ownership, replay, and so on).
+	const float PriorityScale = BestLevel
+		? FMath::Clamp(BestLevel->NetPriorityScale, 0.01f, 1.0f)
+		: 0.01f;
+	return BasePriority * PriorityScale;
+}
+
+bool AEnemyCharacter::IsNetRelevantFor(
+	const AActor* RealViewer,
+	const AActor* ViewTarget,
+	const FVector& SrcLocation) const
+{
+	if (!Super::IsNetRelevantFor(RealViewer, ViewTarget, SrcLocation))
+	{
+		return false;
+	}
+
+	const UEnemyDirectorSettings* Settings = GetDefault<UEnemyDirectorSettings>();
+	if (!Settings->bEnableReplicationLOD ||
+		!Settings->bEnablePerPlayerInterestBudget)
+	{
+		return true;
+	}
+
+	if (const UWorld* World = GetWorld())
+	{
+		if (const UZombieDirectorWorldSubsystem* Director =
+			World->GetSubsystem<UZombieDirectorWorldSubsystem>())
+		{
+			bool bHasViewerBudget = false;
+			const bool bRelevant = Director->IsEnemyRelevantForViewer(
+				this,
+				RealViewer,
+				bHasViewerBudget);
+			if (bHasViewerBudget)
+			{
+				return bRelevant;
+			}
+		}
+	}
+
+	// Preserve Unreal's normal relevancy during world startup or teardown when
+	// no viewer budget has been built yet.
+	return true;
+}
+
+void AEnemyCharacter::ApplyNetworkReplicationLOD(
+	const int32 LODIndex,
+	const float UpdateFrequency,
+	const float MinimumUpdateFrequency,
+	const float CullDistance,
+	const bool bShouldBeDormant)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (!bCapturedNetworkReplicationDefaults)
+	{
+		DefaultNetUpdateFrequency = GetNetUpdateFrequency();
+		DefaultMinNetUpdateFrequency = GetMinNetUpdateFrequency();
+		DefaultNetCullDistanceSquared = GetNetCullDistanceSquared();
+		bCapturedNetworkReplicationDefaults = true;
+	}
+
+	CurrentReplicationLODIndex = LODIndex;
+	const float SafeUpdateFrequency = FMath::Max(0.1f, UpdateFrequency);
+	const float SafeMinimumFrequency = FMath::Clamp(
+		MinimumUpdateFrequency,
+		0.1f,
+		SafeUpdateFrequency);
+	SetNetUpdateFrequency(SafeUpdateFrequency);
+	SetMinNetUpdateFrequency(SafeMinimumFrequency);
+	SetNetCullDistanceSquared(FMath::Square(FMath::Max(100.0f, CullDistance)));
+
+	if (bShouldBeDormant)
+	{
+		if (!bNetworkLODDormant || NetDormancy != DORM_DormantAll)
+		{
+			// Schedule one last transform/state update before taking the actor out
+			// of the replication gather path.
+			ForceNetUpdate();
+			SetNetDormancy(DORM_DormantAll);
+		}
+		bNetworkLODDormant = true;
+		return;
+	}
+
+	if (NetDormancy != DORM_Awake)
+	{
+		SetNetDormancy(DORM_Awake);
+		ForceNetUpdate();
+	}
+	bNetworkLODDormant = false;
+}
+
+void AEnemyCharacter::ResetNetworkReplicationLOD()
+{
+	if (!HasAuthority() || !bCapturedNetworkReplicationDefaults)
+	{
+		return;
+	}
+
+	SetNetUpdateFrequency(DefaultNetUpdateFrequency);
+	SetMinNetUpdateFrequency(DefaultMinNetUpdateFrequency);
+	SetNetCullDistanceSquared(DefaultNetCullDistanceSquared);
+	if (bNetworkLODDormant)
+	{
+		SetNetDormancy(DORM_Awake);
+		ForceNetUpdate();
+	}
+
+	CurrentReplicationLODIndex = INDEX_NONE;
+	bNetworkLODDormant = false;
+}
+
+void AEnemyCharacter::ForceCriticalNetUpdate()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (const UWorld* World = GetWorld())
+	{
+		LastCriticalNetUpdateTime = World->GetTimeSeconds();
+		if (UZombieDirectorWorldSubsystem* Director =
+			World->GetSubsystem<UZombieDirectorWorldSubsystem>())
+		{
+			Director->NotifyEnemyCriticalNetUpdate(this);
+		}
+	}
+
+	if (NetDormancy != DORM_Awake)
+	{
+		SetNetDormancy(DORM_Awake);
+	}
+	bNetworkLODDormant = false;
+	ForceNetUpdate();
+}
+
 void AEnemyCharacter::EndPlay(
 	const EEndPlayReason::Type EndPlayReason)
 {
@@ -254,7 +455,10 @@ float AEnemyCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 				HitLocation = HitResult.ImpactPoint;
 			}
 
-			PhysicalComponent->ActionPhysical(HitResult, ActualDamage);
+			PhysicalComponent->ActionPhysical(
+				HitResult,
+				ActualDamage,
+				PointDamageEvent.ShotDirection);
 		}
 		else
 		{
@@ -347,7 +551,37 @@ AEnemyCharacter::GetChildActorSkeletalMesh()
 
 void AEnemyCharacter::StopCharacterMovement()
 {
-	GetMovementComponent()->StopMovementImmediately();
+	if (AEnemyController* EnemyController =
+		Cast<AEnemyController>(GetController()))
+	{
+		EnemyController->StopMovement();
+	}
+
+	if (UPawnMovementComponent* MovementComponent = GetMovementComponent())
+	{
+		MovementComponent->StopMovementImmediately();
+	}
+}
+
+EEnemyActionState AEnemyCharacter::GetActionState() const
+{
+	return IsValid(StatusComponent)
+		? StatusComponent->GetActionState()
+		: (bIsDead
+			? EEnemyActionState::Dead
+			: EEnemyActionState::Active);
+}
+
+bool AEnemyCharacter::CanMove() const
+{
+	return !bIsDead &&
+		(!IsValid(StatusComponent) || StatusComponent->CanMove());
+}
+
+bool AEnemyCharacter::CanAct() const
+{
+	return !bIsDead &&
+		(!IsValid(StatusComponent) || StatusComponent->CanAct());
 }
 
 void AEnemyCharacter::GetLifetimeReplicatedProps(
@@ -396,6 +630,11 @@ void AEnemyCharacter::PlayDeathCosmetics()
 
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
+		if (UAnimInstance* AnimInstance = MeshComp->GetAnimInstance())
+		{
+			AnimInstance->StopAllMontages(0.0f);
+		}
+
 		MeshComp->SetSimulatePhysics(true);
 
 		// 맞은 방향으로 쓰러진다. 방향이 없으면(환경 피해 등) 그냥 무너진다.
@@ -425,6 +664,10 @@ void AEnemyCharacter::Dead()
 	}
 
 	bIsDead = true;
+	if (IsValid(StatusComponent))
+	{
+		StatusComponent->SetDead();
+	}
 
 	// 서버 로컬 연출(리슨 서버 화면·데디의 물리 상태).
 	PlayDeathCosmetics();
@@ -449,6 +692,10 @@ void AEnemyCharacter::Dead()
 			FTransform(FRotator::ZeroRotator, DropLoc), DeathLootRow);
 	}
 
+	// Death, hit direction, action state, and the final movement transform must
+	// not wait for a low-frequency LOD slot.
+	ForceCriticalNetUpdate();
+
 	if (IsValid(SpawnableComponent))
 	{
 		SpawnableComponent->ScheduleReturnToPool(DeathCleanupDelay);
@@ -471,6 +718,10 @@ void AEnemyCharacter::ResetForPoolActivation()
 	bIsDead = false;
 	LastHitDirection = FVector::ZeroVector;
 	LastHitBoneName = NAME_None;
+	if (HasAuthority() && IsValid(StatusComponent))
+	{
+		StatusComponent->ResetForPool();
+	}
 
 	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
@@ -502,7 +753,7 @@ void AEnemyCharacter::ResetForPoolActivation()
 		}
 	}
 
-	ForceNetUpdate();
+	ForceCriticalNetUpdate();
 }
 
 void AEnemyCharacter::PrepareForPoolStorage()
