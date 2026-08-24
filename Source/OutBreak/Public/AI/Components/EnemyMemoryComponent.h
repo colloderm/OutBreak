@@ -133,6 +133,4 @@ private:
 	UPROPERTY(EditAnywhere, Category = "AI|Memory", meta = (ClampMin = "0.0", Units = "cm"))
 	float TargetSwitchDistanceMargin = 300.0f;
 
-	UPROPERTY(EditAnywhere, Category = "AI|Memory", meta = (ClampMin = "0.0"))
-	float StimulusMemoryDuration = 8.0f;
 };

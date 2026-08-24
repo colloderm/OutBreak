@@ -1,15 +1,21 @@
 #include "Game/Expedition/OBSignalFlare.h"
 
 #include "Components/SceneComponent.h"
+#include "Game/Expedition/OBHelicopterSystemSettings.h"
 #include "GameFramework/ProjectileMovementComponent.h"
+#include "Global/OutBreakGlobal.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Sound/SoundAttenuation.h"
+#include "Sound/SoundCue.h"
 #include "TimerManager.h"
 
 AOBSignalFlare::AOBSignalFlare()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = true;
 	bReplicates = true;
 	SetReplicatingMovement(true);
 	SetNetUpdateFrequency(20.f);
@@ -21,29 +27,88 @@ AOBSignalFlare::AOBSignalFlare()
 	ProjectileMovement->InitialSpeed = LaunchSpeed;
 	ProjectileMovement->MaxSpeed = LaunchSpeed;
 	ProjectileMovement->ProjectileGravityScale = 0.15f;
-	ProjectileMovement->bRotationFollowsVelocity = true;
+	// The extraction flare always travels along world +Z. Rotating the actor to
+	// follow velocity would also rotate attached Niagara systems onto their side.
+	ProjectileMovement->bRotationFollowsVelocity = false;
 }
 
 void AOBSignalFlare::BeginPlay()
 {
 	Super::BeginPlay();
-	PlayLaunchPresentation();
+	ConfigureFromProjectSettings();
+	// Keep the flare and any attached trail upright even when the launch anchor
+	// was authored with a pitch or roll rotation.
+	SetActorRotation(FRotator::ZeroRotator, ETeleportType::TeleportPhysics);
+	LaunchLocation = GetActorLocation();
+	// Do not inherit the extraction zone / launch anchor rotation. A tilted
+	// anchor must never turn the signal flare into a forward-fired projectile.
+	LaunchDirection = FVector::UpVector;
 
 	if (HasAuthority())
 	{
-		ProjectileMovement->Velocity = GetActorUpVector() * LaunchSpeed;
-		GetWorldTimerManager().SetTimer(BurstTimer, this, &AOBSignalFlare::Burst, FuseSeconds, false);
+		ProjectileMovement->Velocity = LaunchDirection * ProjectileMovement->InitialSpeed;
+		const UOBHelicopterSystemSettings* Settings = GetDefault<UOBHelicopterSystemSettings>();
+		const float MaxFlightSeconds = Settings
+			? FMath::Max(0.1f, Settings->SignalFlareMaxFlightSeconds)
+			: FMath::Max(0.1f, FuseSeconds);
+		GetWorldTimerManager().SetTimer(
+			SafetyBurstTimer, this, &AOBSignalFlare::Burst, MaxFlightSeconds, false);
 	}
 	else
 	{
 		ProjectileMovement->Deactivate();
+		SetActorTickEnabled(false);
+	}
+
+	if (bBurst)
+	{
+		PlayBurstPresentation();
+	}
+	else
+	{
+		PlayLaunchPresentation();
+	}
+}
+
+void AOBSignalFlare::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (!HasAuthority() || bBurst)
+	{
+		return;
+	}
+
+	const float HeightAboveLaunch = GetActorLocation().Z - LaunchLocation.Z;
+	if (HeightAboveLaunch >= BurstHeight)
+	{
+		Burst();
 	}
 }
 
 void AOBSignalFlare::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AOBSignalFlare, BurstLocation);
 	DOREPLIFETIME(AOBSignalFlare, bBurst);
+}
+
+void AOBSignalFlare::ConfigureFromProjectSettings()
+{
+	const UOBHelicopterSystemSettings* Settings = GetDefault<UOBHelicopterSystemSettings>();
+	if (!Settings)
+	{
+		ProjectileMovement->InitialSpeed = FMath::Max(100.f, LaunchSpeed);
+		ProjectileMovement->MaxSpeed = ProjectileMovement->InitialSpeed;
+		BurstHeight = 5000.f;
+		DestroyDelayAfterBurst = FMath::Max(0.25f, LifeAfterBurst);
+		return;
+	}
+
+	ProjectileMovement->InitialSpeed = FMath::Max(100.f, Settings->SignalFlareLaunchSpeed);
+	ProjectileMovement->MaxSpeed = ProjectileMovement->InitialSpeed;
+	ProjectileMovement->ProjectileGravityScale = FMath::Max(0.f, Settings->SignalFlareGravityScale);
+	BurstHeight = FMath::Max(100.f, Settings->SignalFlareBurstHeight);
+	DestroyDelayAfterBurst = FMath::Max(0.25f, Settings->SignalFlareDestroyDelay);
 }
 
 void AOBSignalFlare::Burst()
@@ -53,12 +118,15 @@ void AOBSignalFlare::Burst()
 		return;
 	}
 
+	GetWorldTimerManager().ClearTimer(SafetyBurstTimer);
+	BurstLocation = GetActorLocation();
 	bBurst = true;
 	ProjectileMovement->StopMovementImmediately();
 	ProjectileMovement->Deactivate();
+	SetActorTickEnabled(false);
 	ForceNetUpdate();
 	PlayBurstPresentation();
-	SetLifeSpan(LifeAfterBurst);
+	SetLifeSpan(DestroyDelayAfterBurst);
 }
 
 void AOBSignalFlare::OnRep_Burst()
@@ -71,34 +139,144 @@ void AOBSignalFlare::OnRep_Burst()
 
 void AOBSignalFlare::PlayLaunchPresentation()
 {
-	if (TrailSystem)
+	if (bLaunchPresentationPlayed || bBurst)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAttached(
-			TrailSystem, SceneRoot, NAME_None, FVector::ZeroVector, FRotator::ZeroRotator,
+		return;
+	}
+	bLaunchPresentationPlayed = true;
+
+	const UOBHelicopterSystemSettings* Settings = GetDefault<UOBHelicopterSystemSettings>();
+	UNiagaraSystem* ResolvedTrailSystem = Settings && !Settings->SignalFlareTrailSystem.IsNull()
+		? Settings->SignalFlareTrailSystem.LoadSynchronous()
+		: TrailSystem.Get();
+	if (ResolvedTrailSystem)
+	{
+		SpawnedTrailComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			ResolvedTrailSystem, SceneRoot, NAME_None, FVector::ZeroVector, FRotator::ZeroRotator,
 			EAttachLocation::KeepRelativeOffset, true);
 	}
-	if (LaunchSound)
+
+	USoundCue* ResolvedLaunchSound = Settings && !Settings->SignalFlareLaunchSound.IsNull()
+		? Settings->SignalFlareLaunchSound.LoadSynchronous()
+		: Cast<USoundCue>(LaunchSound.Get());
+	if (ResolvedLaunchSound)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, LaunchSound, GetActorLocation());
+		UOutBreakGlobal::PlaySoundAndReportNoise(
+			this,
+			ResolvedLaunchSound,
+			GetActorLocation(),
+			this,
+			Settings ? Settings->SignalFlareLaunchNoiseTag : FName(TEXT("Flare")),
+			Settings ? FMath::Max(0.01f, Settings->SignalFlareLaunchNoiseRangeScale) : 1.f);
 	}
 	BP_OnFlareLaunched();
 }
 
 void AOBSignalFlare::PlayBurstPresentation()
 {
-	if (BurstSystem)
+	if (bBurstPresentationPlayed)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, BurstSystem, GetActorLocation());
+		return;
 	}
-	if (PersistentSmokeSystem)
+	bBurstPresentationPlayed = true;
+	StopOwnedNiagaraComponents();
+
+	const UOBHelicopterSystemSettings* Settings = GetDefault<UOBHelicopterSystemSettings>();
+	const FVector EffectLocation = bBurst ? FVector(BurstLocation) : GetActorLocation();
+	const float EffectScale = Settings ? FMath::Max(0.01f, Settings->SignalFlareBurstEffectScale) : 1.f;
+	UNiagaraSystem* ResolvedBurstSystem = Settings && !Settings->SignalFlareBurstSystem.IsNull()
+		? Settings->SignalFlareBurstSystem.LoadSynchronous()
+		: BurstSystem.Get();
+	if (ResolvedBurstSystem)
 	{
-		UNiagaraFunctionLibrary::SpawnSystemAttached(
-			PersistentSmokeSystem, SceneRoot, NAME_None, FVector::ZeroVector, FRotator::ZeroRotator,
-			EAttachLocation::KeepRelativeOffset, true);
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			ResolvedBurstSystem,
+			EffectLocation,
+			FRotator::ZeroRotator,
+			FVector(EffectScale),
+			true,
+			true,
+			ENCPoolMethod::None,
+			true);
 	}
-	if (BurstSound)
+
+	UNiagaraSystem* ResolvedPostBurstSystem = Settings && !Settings->SignalFlarePostBurstSystem.IsNull()
+		? Settings->SignalFlarePostBurstSystem.LoadSynchronous()
+		: PersistentSmokeSystem.Get();
+	if (ResolvedPostBurstSystem)
 	{
-		UGameplayStatics::PlaySoundAtLocation(this, BurstSound, GetActorLocation());
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			this,
+			ResolvedPostBurstSystem,
+			EffectLocation,
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			true,
+			true,
+			ENCPoolMethod::None,
+			true);
+	}
+
+	USoundCue* ResolvedBurstSound = Settings && !Settings->SignalFlareBurstSound.IsNull()
+		? Settings->SignalFlareBurstSound.LoadSynchronous()
+		: Cast<USoundCue>(BurstSound.Get());
+	if (ResolvedBurstSound)
+	{
+		// Flare-only exception: keep the audible explosion at the real airborne
+		// burst point, but attract the zombie horde to the original launch point
+		// on navigable ground. The shared audio/noise helper intentionally keeps
+		// both locations identical, so the two operations are split only here.
+		UGameplayStatics::PlaySoundAtLocation(
+			this,
+			ResolvedBurstSound,
+			EffectLocation,
+			FRotator::ZeroRotator,
+			1.f,
+			1.f,
+			0.f,
+			nullptr);
+
+		if (HasAuthority())
+		{
+			const float NoiseRangeScale = Settings
+				? FMath::Max(0.01f, Settings->SignalFlareBurstNoiseRangeScale)
+				: 1.f;
+			float MaxNoiseRange = 0.f;
+			if (const FSoundAttenuationSettings* AttenuationSettings =
+				ResolvedBurstSound->GetAttenuationSettingsToApply();
+				AttenuationSettings && AttenuationSettings->bAttenuate)
+			{
+				MaxNoiseRange = AttenuationSettings->GetMaxFalloffDistance() * NoiseRangeScale;
+			}
+
+			UOutBreakGlobal::ReportNoiseToAI(
+				this,
+				LaunchLocation,
+				this,
+				Settings ? Settings->SignalFlareBurstNoiseTag : FName(TEXT("Flare")),
+				1.f,
+				MaxNoiseRange);
+
+			UE_LOG(LogTemp, Verbose,
+				TEXT("[SignalFlare] Air burst audio at %s; AI noise redirected to launch point %s with range %.1f."),
+				*EffectLocation.ToCompactString(),
+				*LaunchLocation.ToCompactString(),
+				MaxNoiseRange);
+		}
 	}
 	BP_OnFlareBurst();
+}
+
+void AOBSignalFlare::StopOwnedNiagaraComponents()
+{
+	TInlineComponentArray<UNiagaraComponent*> NiagaraComponents(this);
+	for (UNiagaraComponent* NiagaraComponent : NiagaraComponents)
+	{
+		if (IsValid(NiagaraComponent))
+		{
+			NiagaraComponent->Deactivate();
+		}
+	}
+	SpawnedTrailComponent = nullptr;
 }
