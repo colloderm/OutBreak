@@ -125,6 +125,10 @@
 		{
 			"Name": "SubtitlesAndClosedCaptions",
 			"Enabled": true
+		},
+		{
+			"Name": "MovieRenderPipeline",
+			"Enabled": true
 		}
 	]
 }
