@@ -408,17 +408,37 @@ bool UOBLoadoutSubsystem::IsOwnedOrEquipped(TSubclassOf<AOBWeaponBase> WeaponCla
 void UOBLoadoutSubsystem::EquipFromStash(TSubclassOf<AOBWeaponBase> WeaponClass)
 {
 	const FGameplayTag Tag = UOBItemRegistry::FindTagForWeaponClass(WeaponClass);
-	if (!Tag.IsValid()) return;
+	if (!Tag.IsValid())
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Loadout] %s 의 ItemTable 행이 없어 장착 불가. "
+				 "ItemTable에 WeaponClass=%s 인 행을 추가할 것."),
+			*GetNameSafe(WeaponClass.Get()), *GetNameSafe(WeaponClass.Get()));
+		return;
+	}
 
 	const UOBGameDataSubsystem* GameData = UOBGameDataSubsystem::Get();
 	const FOBWeaponDefinitionRow* WeaponDefinition = GameData
 		? GameData->FindWeapon(Tag)
 		: nullptr;
-	if (!WeaponDefinition) return;
+	if (!WeaponDefinition)
+	{
+		// 상점은 ItemTable만 보고 팔지만, 장착은 WeaponTable의 WeaponSlot이 필요하다.
+		// 이 로그가 뜨는 무기가 곧 "구매는 되는데 장착이 안 되는" 무기다.
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Loadout] %s 의 WeaponTable 행이 없어 장착 불가(슬롯 미정). "
+				 "WeaponTable에 같은 ItemTag 행을 추가할 것."), *Tag.ToString());
+		return;
+	}
 
 	// 창고에 없으면(이미 장착이거나 미보유) 장착 불가.
 	TArray<FInventoryData> RemovedInstances;
-	if (!RemoveStashItemsInternal(Tag, 1, &RemovedInstances)) return;
+	if (!RemoveStashItemsInternal(Tag, 1, &RemovedInstances))
+	{
+		UE_LOG(LogTemp, Verbose,
+			TEXT("[Loadout] %s 창고에 없음(이미 장착 중이거나 미보유)."), *Tag.ToString());
+		return;
+	}
 	FInventoryData NewInstance = RemovedInstances.IsEmpty()
 		? MakePersistentInstance(Tag)
 		: RemovedInstances[0];
@@ -868,6 +888,10 @@ void UOBLoadoutSubsystem::SaveToDisk()
 	Save->Loadout = CurrentLoadout;
 	Save->Currency = CurrentCurrency;
 	UGameplayStatics::SaveGameToSlot(Save, SlotName, UserIndex);
+
+	// 모든 변경 경로가 "즉시 저장"으로 여기 모인다. UI 갱신 훅을 한 곳에만 둔다.
+	// 새 뮤테이터가 추가돼도 저장만 하면 자동으로 UI가 따라온다.
+	OnLoadoutChanged.Broadcast();
 }
 
 void UOBLoadoutSubsystem::LoadFromDisk()

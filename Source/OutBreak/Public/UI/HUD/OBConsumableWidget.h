@@ -26,6 +26,9 @@ protected:
 	
 	virtual void NativeDestruct() override;
 	void Refresh();
+
+	// 구독은 NativeDestruct에서 끊긴다. 재진입 경로마다 다시 붙일 수 있게 분리했다.
+	void BindInventoryChanged();
 	
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UImage> BandageIcon;

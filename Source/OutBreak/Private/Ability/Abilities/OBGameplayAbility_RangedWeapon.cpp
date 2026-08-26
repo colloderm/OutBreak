@@ -732,6 +732,13 @@ bool UOBGameplayAbility_RangedWeapon::CommitServerShot(
 			// an impact cue it never predicted locally.
 			FScopedPredictionWindow ServerImpactCueScope(SourceASC, FPredictionKey(), false);
 			SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_Impact, ImpactCueParams);
+
+			// 탄흔 데칼은 월드 표면에만 남긴다. 캐릭터/좀비는 피 VFX가 담당하고,
+			// 움직이는 스켈레탈 메시에 데칼을 붙이면 제자리에 떠 있게 된다.
+			if (!Cast<APawn>(Hit.GetActor()))
+			{
+				SourceASC->ExecuteGameplayCue(OBGameplayTags::GameplayCue_Weapon_ImpactDecal, ImpactCueParams);
+			}
 		}
 	
 		// 같은 팀이면 무기 피해 무시(탄착 이펙트는 이미 재생됨).

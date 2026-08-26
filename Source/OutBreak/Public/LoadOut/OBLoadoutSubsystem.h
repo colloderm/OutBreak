@@ -11,6 +11,9 @@
 class AOBWeaponBase;
 class UOBWeaponCatalog;
 
+// 로드아웃/창고/재화 변경 통지. 구독자는 부분 갱신 없이 통째로 다시 그린다.
+DECLARE_MULTICAST_DELEGATE(FOBOnLoadoutChanged);
+
 /**
  * 개인 Loadout의 런타임 소유자(GameInstance 수명 = 세션 내내, 맵 전환에도 생존).
  * - 내부는 전부 아이템 태그. 무기 클래스로 오는 호출은 레지스트리로 태그를 찾아 변환한다.
@@ -24,6 +27,10 @@ class OUTBREAK_API UOBLoadoutSubsystem : public UGameInstanceSubsystem
 	
 public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
+	// 상점 구매/판매, 장착 교체, 정산, 스타터 지급 — 모든 변경 후 1회 브로드캐스트.
+	// SaveToDisk()가 유일한 브로드캐스트 지점이다(즉시 저장이 불변식이라 전부 여기로 모인다).
+	FOBOnLoadoutChanged OnLoadoutChanged;
 
 	// --- 슬롯 ---
 

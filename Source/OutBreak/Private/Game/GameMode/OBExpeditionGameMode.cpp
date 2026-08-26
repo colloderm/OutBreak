@@ -1246,9 +1246,13 @@ TSubclassOf<AOBInsertionHelicopter> AOBExpeditionGameMode::GetDefaultExtractionH
 void AOBExpeditionGameMode::GenericPlayerInitialization(AController* C)
 {
 	Super::GenericPlayerInitialization(C);
-	
+
 	if (!C) return;
-	
+
+	// 사람이 들어왔다. 대기 중인 리사이클은 취소한다(퇴장 직후 재접속 케이스).
+	bHasEverHadPlayers = true;
+	GetWorldTimerManager().ClearTimer(EmptyServerRecycleTimer);
+
 	// 진입 플레이어의 세션 초기화
 	if (AOBPlayerStateBase* PS = C->GetPlayerState<AOBPlayerStateBase>())
 	{		
@@ -1399,6 +1403,16 @@ void AOBExpeditionGameMode::Logout(AController* Exiting)
 	// 개인 탈출구는 이제 팀 공유다. 한 명 나갔다고 파괴하면 남은 팀원의 탈출구가 사라진다.
 	// 팀 전원이 나가도 세션 종료 시 레벨과 함께 정리되므로 개별 파괴는 하지 않는다.
 	PartyCodeByController.Remove(Exiting);
+
+	// 데디 서버는 맵을 계속 붙들고 있다. 전원 퇴장 시 리사이클하지 않으면
+	// Ended 상태의 월드가 영구히 남아 재접속자가 즉시 결과화면을 받는다.
+	// Logout 시점엔 아직 PlayerArray 정리가 안 끝났을 수 있어 타이머로 미룬다.
+	if (bHasEverHadPlayers)
+	{
+		GetWorldTimerManager().SetTimer(
+			EmptyServerRecycleTimer, this, &AOBExpeditionGameMode::RecycleIfEmpty,
+			FMath::Max(0.1f, EmptyServerRecycleDelay), false);
+	}
 }
 
 void AOBExpeditionGameMode::HandlePartyLeaderClaim(
@@ -1561,6 +1575,47 @@ void AOBExpeditionGameMode::EndExpedition(EOBExpeditionEndReason Reason)
 		
 		GS->SetPhase(EOBExpeditionPhase::Ended);
 	}
+}
+
+void AOBExpeditionGameMode::PreLogin(const FString& Options, const FString& Address,
+	const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+
+	// 정원 초과 등 기존 거부 사유를 덮지 않는다.
+	if (!ErrorMessage.IsEmpty()) return;
+
+	// 리사이클 대기 중인 서버. 받아주면 결과화면이 강제로 뜬다.
+	if (bExpeditionEnded)
+	{
+		ErrorMessage = TEXT("세션이 종료되었습니다. 잠시 후 다시 시도해 주세요.");
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Expedition] 종료된 세션 접속 거부: %s"), *Address);
+	}
+}
+
+void AOBExpeditionGameMode::RecycleIfEmpty()
+{
+	if (!bHasEverHadPlayers) return;
+	if (GetNumPlayers() + GetNumSpectators() > 0) return;
+
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	// 같은 맵으로 절대 트래블 = 월드/GameMode 전체 재생성.
+	// bExpeditionEnded, 루팅 상태, 스폰된 개인 탈출구, 헬기까지 전부 초기화된다.
+	// (bUseSeamlessTravel=false라 완전 재로드)
+	const FString TravelURL = World->URL.Map;
+	if (TravelURL.IsEmpty())
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("[Expedition] World URL.Map이 비어 리사이클 불가. 서버 수동 재시작 필요."));
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning,
+		TEXT("[Expedition] 잔류 플레이어 0명 → 서버 리사이클: %s"), *TravelURL);
+	World->ServerTravel(TravelURL, /*bAbsolute=*/true);
 }
 
 void AOBExpeditionGameMode::CheckEndConditions()

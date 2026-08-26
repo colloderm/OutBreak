@@ -349,6 +349,15 @@ void AOBPlayerController::ApplyInsertionTransitStateLocal(const TCHAR* Source)
 	bHelicopterTransitLocked = true;
 	ApplyInsertionAbilityGate(true, !bWasLocked);
 	SetPawnInputSuppressedForInsertion(true);
+
+	// 헬기에 탄 동안은 게임플레이 HUD를 감춘다. 전체 지도는 남는다(삽입 지점 선택).
+	if (IsLocalController())
+	{
+		if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
+		{
+			OBHUD->SetGameplayHUDVisible(false);
+		}
+	}
 	InsertionHelicopter = ReplicatedInsertionTransitState.Helicopter;
 	AActor* EffectiveTarget = ReplicatedInsertionTransitState.ViewTarget;
 	if (!IsValid(EffectiveTarget))
@@ -1088,6 +1097,9 @@ void AOBPlayerController::RestoreGameplayViewAndInput(APawn* RestoredPawn, const
 	if (AOBHUD* OBHUD = GetHUD<AOBHUD>())
 	{
 		OBHUD->CloseInsertionMap();
+		// 조작이 돌아오는 유일한 지점이라 HUD 복귀도 여기 묶는다.
+		// 실패 복구(ExpeditionInProgressFailsafe 등)도 전부 이 함수를 거친다.
+		OBHUD->SetGameplayHUDVisible(true);
 	}
 	if (IsLocalController())
 	{

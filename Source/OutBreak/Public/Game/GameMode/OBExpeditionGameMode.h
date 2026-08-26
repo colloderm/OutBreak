@@ -77,6 +77,11 @@ public:
 	
 	// 플레이어 접속 종료. 마지막 생존자가 나갔을 수 있어 종료 조건을 재평가.
 	virtual void Logout(AController* Exiting) override;
+
+	// 종료된 탐사에 새 접속을 막는다. Phase=Ended가 복제되면 클라가 무조건
+	// 결과화면을 띄우므로(OBPlayerController), 리사이클 전에는 아예 받지 않는다.
+	virtual void PreLogin(const FString& Options, const FString& Address,
+		const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	
 	virtual bool ShouldEnterDownedState(AController* C) const override; // 팀 생존자 존재?
 	virtual void NotifyPlayerDowned(AController* C) override;           // 블리드아웃 시작
@@ -199,6 +204,11 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition", meta = (ClampMin = "0"))
 	int32 FinalMinuteThreshold = 60;
 
+	// 마지막 플레이어가 나간 뒤 이 시간(초)만큼 기다렸다가 서버를 리사이클한다.
+	// 접속 종료/재접속 노이즈를 흡수할 정도만 주면 된다.
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition", meta = (ClampMin = "0"))
+	float EmptyServerRecycleDelay = 10.f;
+
 	// 파티코드 없는 접속자를 전원 같은 TeamId로 묶을지.
 	// 파티 시스템이 ?party= 코드를 붙여 주므로 기본은 false다.
 	// true면 각자 솔로로 들어온 플레이어끼리 한 팀이 되어 아군 판정·관전·팀전멸이 전부 어긋난다.
@@ -288,6 +298,13 @@ private:
 
 	// 이미 종료 처리했는지(중복 EndExpedition 방지).
 	bool bExpeditionEnded = false;
+
+	// 잔류 인원 0명이면 같은 맵으로 절대 트래블 → 월드/GameMode 전체 재생성.
+	void RecycleIfEmpty();
+	FTimerHandle EmptyServerRecycleTimer;
+
+	// 서버 부팅 직후에도 0명이다. 한 번이라도 사람이 들어온 뒤에만 리사이클한다.
+	bool bHasEverHadPlayers = false;
 	
 	bool bZonesCollected = false;   // 존을 한 번만 수집했는지
 

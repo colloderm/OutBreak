@@ -112,6 +112,10 @@ protected:
 	void DrawDebugStatus() const;
 	void StartExtractionCall(AController* CallingController);
 	void SpawnExtractionHelicopter();
+
+	// 두 타이밍 값은 BP와 레벨 인스턴스에서 따로 편집된다. LeadTime이 CallDelay보다
+	// 커지면 호출 즉시 스폰되고 접근 비행이 0.1초로 뭉개져 헬기가 순간이동한다.
+	float GetEffectiveInboundLeadTime() const;
 	void OpenBoardingWindow();
 	void ProcessBoarding(float DeltaSeconds);
 	void BoardPassenger(AController* Controller);
@@ -178,9 +182,11 @@ protected:
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "Extraction|Flight Path")
 	TObjectPtr<AOBHelicopterRoute> ExitRoute;
 
+	// 호출 → 착륙까지. 헬기가 화면에 나타나는 시점은 (이 값 - InboundLeadTime)이다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction|Timing", meta = (ClampMin = "1"))
-	float HelicopterCallDelay = 45.f;
+	float HelicopterCallDelay = 25.f;
 
+	// 착륙 몇 초 전에 스폰해 접근 비행을 시작할지. 이 값이 곧 접근 비행 시간이다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Extraction|Timing", meta = (ClampMin = "1"))
 	float InboundLeadTime = 15.f;
 

@@ -100,5 +100,18 @@ public:
 	void CloseInsertionMap();
 
 	UOBWorldMapWidget* GetWorldMapWidget() const { return WorldMapWidget; }
-	
+
+	/**
+	 * 헬기 삽입 중에는 게임플레이 HUD(체력·탄약·소모품·타이머·크로스헤어)를 감춘다.
+	 * 전체 지도는 제외한다 — 삽입 지점 선택에 그대로 써야 한다.
+	 * PC가 트랜짓 잠금/해제 시점에 호출한다.
+	 */
+	void SetGameplayHUDVisible(bool bVisible);
+
+	bool IsGameplayHUDVisible() const { return bGameplayHUDVisible; }
+
+private:
+	void ApplyGameplayHUDVisibility();
+
+	bool bGameplayHUDVisible = true;
 };
