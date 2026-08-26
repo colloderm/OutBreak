@@ -79,11 +79,11 @@ void AOBPlayerController::ShowInsertionDebugMessage(
 	const uint64 ScreenKey = MessageKey < 0
 		? static_cast<uint64>(-1)
 		: static_cast<uint64>(MessageKey);
-	GEngine->AddOnScreenDebugMessage(
-		ScreenKey,
-		EffectiveDuration,
-		Color,
-		FString::Printf(TEXT("[INSERTION] %s"), *Message));
+	// GEngine->AddOnScreenDebugMessage(
+	// 	ScreenKey,
+	// 	EffectiveDuration,
+	// 	Color,
+	// 	FString::Printf(TEXT("[INSERTION] %s"), *Message));
 }
 
 bool AOBPlayerController::HasActiveInsertionTransit() const
