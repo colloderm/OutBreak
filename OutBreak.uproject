@@ -125,6 +125,15 @@
 		{
 			"Name": "SubtitlesAndClosedCaptions",
 			"Enabled": true
+		},
+		{
+			"Name": "RuntimeVideoRecorder",
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/Fab/product/a883f9ac-b253-487b-b5ab-d612b660e41b"
+		},
+		{
+			"Name": "MovieRenderPipeline",
+			"Enabled": true
 		}
 	]
 }
